@@ -8,6 +8,7 @@ p130_ui_entry:
         jp      p130_ui_init_impl
         jp      p130_ui_putc_impl
         jp      p130_ui_clock_update
+        jp      p130_ui_print_at
 
 P130_UI_COLUMNS EQU 80
 P130_UI_ROWS    EQU 13
@@ -153,42 +154,6 @@ p130_ui_draw:
         call    p130_ui_print_at
         ld      hl,p130_ui_line1
         ld      a,1
-        ld      c,1
-        call    p130_ui_print_at
-        ld      hl,p130_ui_line2
-        ld      a,2
-        ld      c,1
-        call    p130_ui_print_at
-        ld      hl,p130_ui_line3
-        ld      a,3
-        ld      c,1
-        call    p130_ui_print_at
-        ld      hl,p130_ui_line4
-        ld      a,4
-        ld      c,1
-        call    p130_ui_print_at
-        ld      hl,p130_ui_line5
-        ld      a,5
-        ld      c,1
-        call    p130_ui_print_at
-        ld      hl,p130_ui_line6
-        ld      a,6
-        ld      c,1
-        call    p130_ui_print_at
-        ld      hl,p130_ui_line7
-        ld      a,7
-        ld      c,1
-        call    p130_ui_print_at
-        ld      hl,p130_ui_line8
-        ld      a,8
-        ld      c,1
-        call    p130_ui_print_at
-        ld      hl,p130_ui_line9
-        ld      a,9
-        ld      c,1
-        call    p130_ui_print_at
-        ld      hl,p130_ui_line10
-        ld      a,10
         ld      c,1
         call    p130_ui_print_at
         ld      hl,p130_ui_line11
@@ -464,13 +429,7 @@ p130_ui_scroll:
         ret
 
 p130_ui_line0:  db "PROJECT130  |  ATM TURBO 2+  |  HOST CONSOLE",0
-p130_ui_line1:  db "BOOTSTRAP-0.3.2-TRDOS-HDD-CATALOG",0
-p130_ui_line2:  db "SYSTEM / HOST STATUS",0
-p130_ui_line3:  db "HOST CPU      : Z80 / ATM TURBO 2+",0
-p130_ui_line4:  db "GUEST CPU     : 8086 REAL MODE / NeoGS",0
-p130_ui_line5:  db "BIOS          : GUEST ROM NOT LOADED",0
-p130_ui_line6:  db "VIDEO         : ATM RG=6 TEXT 80x25",0
-p130_ui_line7:  db "REAL TIME CLK : ??",0
+p130_ui_line1:  db "BOOTSTRAP-0.3.3-TRDOS-FILE-MENU",0
 ; Entry #A006: HL points to an eight-character "HH:MM:SS" buffer.
 ; The pointer is supplied by the C host; this module has no C externals.
 p130_ui_clock_update:
@@ -487,8 +446,8 @@ p130_ui_clock_update:
         inc     de
         djnz    .p130_ui_clock_copy
         ld      hl,p130_ui_clock_digits
-        ld      a,7
-        ld      c,17
+        ld      a,1
+        ld      c,60
         call    p130_ui_print_at
         pop     hl
         pop     de
@@ -496,10 +455,7 @@ p130_ui_clock_update:
         pop     af
         ret
 
-p130_ui_line8:  db "STORAGE       : TR-DOS + NEMO IDE / READ ONLY",0
-p130_ui_line9:  db "NEOGS / IPC",0
-p130_ui_line10: db "DEBUG STREAM  : ATM #EF -> HOST LOG",0
-p130_ui_line11: db "GUEST CLOCK   : VIRTUAL / HOST LOG: LIVE",0
+p130_ui_line11: db "TR-DOS FILES: UP/DOWN SELECT  CAPS+5/8 PAGE  ENTER LOAD",0
 
 p130_ui_clock_digits: db "??:??:??",0
 p130_ui_ready:       db 0
