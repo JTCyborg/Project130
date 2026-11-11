@@ -135,8 +135,8 @@ p130_cat_move_up:
         ld      b,a
         ld      a,(p130_cat_scroll)
         cp      b
-        jr      c,p130_cat_redraw
-        jr      z,p130_cat_redraw
+        jp      c,p130_cat_redraw
+        jp      z,p130_cat_redraw
         dec     a
         ld      (p130_cat_scroll),a
         jp      p130_cat_redraw
