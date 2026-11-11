@@ -320,6 +320,7 @@ p130_screen_write_char:
         push    hl
         ld      (p130_ui_char),a
         ld      a,d
+        ld      (p130_ui_write_row),a
         ld      l,a
         ld      h,0
         add     hl,hl
