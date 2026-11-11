@@ -193,7 +193,7 @@ void p130_c_entry(void)
     }
     p130_catalog_init();
     p130_debug_puts("[MAP] PHYSICAL W3 MAPPER NOT INITIALIZED\r\n");
-    p130_debug_puts("[P130] NEO GS / DMA NOT INITIALIZED\r\n");
+    p130_debug_puts("[NEOGS] DMA/IPC NOT INITIALIZED; PHYSICAL MAP PENDING\r\n");
 
     {
         volatile uint16_t rtc_poll_divider = 0u;

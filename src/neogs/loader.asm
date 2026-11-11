@@ -79,7 +79,7 @@ p130_ngs_len_ok:
 
         ; Restart the stock ROM into its known command receive state.
         ld      a,P130_CMD_RESET
-        call    p130_ngs_send_command
+        call    p130_ngs_send_command_long
         jp      c,p130_ngs_fail
 
         ; #14: low length argument, then high length, address low/high.
@@ -136,6 +136,33 @@ p130_ngs_stream_done:
 
 p130_ngs_fail:
         ld      hl,1
+        ret
+
+; Long bounded CBIT wait for the GS105a cold-reset command.
+p130_ngs_send_command_long:
+        ld      (p130_ngs_tx),a
+        ld      a,(p130_ngs_tx)
+        out     (P130_GSCOM),a
+        push    de
+        ld      d,16
+p130_ngs_reset_outer:
+        ld      bc,0FFFFh
+p130_ngs_reset_inner:
+        in      a,(P130_GSSTAT)
+        bit     0,a
+        jr      z,p130_ngs_reset_done
+        dec     bc
+        ld      a,b
+        or      c
+        jr      nz,p130_ngs_reset_inner
+        dec     d
+        jr      nz,p130_ngs_reset_outer
+        pop     de
+        scf
+        ret
+p130_ngs_reset_done:
+        pop     de
+        or      a
         ret
 
 ; A=command. Carry set on bounded CBIT timeout.
