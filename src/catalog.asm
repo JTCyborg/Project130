@@ -156,8 +156,8 @@ p130_cat_move_down:
         ld      b,a
         ld      a,(p130_cat_selected)
         cp      b
-        jr      c,p130_cat_redraw
-        jr      z,p130_cat_redraw
+        jp      c,p130_cat_redraw
+        jp      z,p130_cat_redraw
         ld      a,(p130_cat_scroll)
         inc     a
         ld      (p130_cat_scroll),a
@@ -225,7 +225,7 @@ p130_cat_confirm:
         ld      (_p130_catalog_load_request),a
         ld      hl,p130_cat_load_prefix
         call    p130_cat_debug_string
-        ld      hl,(__p130_catalog_selected_entry)
+        ld      hl,(_p130_catalog_selected_entry)
         ld      b,8
 p130_cat_confirm_name:
         ld      a,(hl)
