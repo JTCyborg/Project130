@@ -1,32 +1,8 @@
 #include <stdint.h>
+#include "diag.h"
 #include "memory.h"
 
 #define P130_BUILD_ID "BOOTSTRAP-0.2.0-ATM-HOST-BASE"
-
-volatile uint8_t p130_debug_value;
-
-static void p130_debug_putc(uint8_t value)
-{
-    p130_debug_value = value;
-    __asm
-        ld a,(_p130_debug_value)
-        ld bc,00EFh
-        out (c),a
-    __endasm;
-}
-
-static void p130_debug_puts(const char *text)
-{
-    while (*text) p130_debug_putc((uint8_t)*text++);
-}
-
-static void p130_debug_hex8(uint8_t value)
-{
-    uint8_t digit = (uint8_t)(value >> 4);
-    p130_debug_putc((uint8_t)(digit < 10u ? '0' + digit : 'A' + digit - 10u));
-    digit = (uint8_t)(value & 0x0Fu);
-    p130_debug_putc((uint8_t)(digit < 10u ? '0' + digit : 'A' + digit - 10u));
-}
 
 static void p130_report_memory(void)
 {
