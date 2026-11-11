@@ -139,7 +139,7 @@ p130_cat_move_up:
         jr      z,p130_cat_redraw
         dec     a
         ld      (p130_cat_scroll),a
-        jr      p130_cat_redraw
+        jp      p130_cat_redraw
 
 p130_cat_move_down:
         ld      a,(p130_cat_selected)
@@ -161,7 +161,7 @@ p130_cat_move_down:
         ld      a,(p130_cat_scroll)
         inc     a
         ld      (p130_cat_scroll),a
-        jr      p130_cat_redraw
+        jp      p130_cat_redraw
 
 p130_cat_page_up:
         ld      a,(p130_cat_selected)
@@ -174,7 +174,7 @@ p130_cat_page_up_sub:
 p130_cat_page_up_store:
         ld      (p130_cat_selected),a
         ld      (p130_cat_scroll),a
-        jr      p130_cat_redraw
+        jp      p130_cat_redraw
 
 p130_cat_page_down:
         ld      a,(p130_cat_total)
@@ -212,7 +212,7 @@ p130_cat_page_down_use_selected:
         ld      a,(p130_cat_selected)
 p130_cat_page_down_scroll_store:
         ld      (p130_cat_scroll),a
-        jr      p130_cat_redraw
+        jp      p130_cat_redraw
 
 p130_cat_confirm:
         ld      a,(p130_cat_selected)
@@ -225,7 +225,7 @@ p130_cat_confirm:
         ld      (_p130_catalog_load_request),a
         ld      hl,p130_cat_load_prefix
         call    p130_cat_debug_string
-        ld      hl,(_p130_cat_selected_entry)
+        ld      hl,(__p130_catalog_selected_entry)
         ld      b,8
 p130_cat_confirm_name:
         ld      a,(hl)
@@ -408,7 +408,7 @@ p130_cat_print_line:
         inc     a
         ld      (p130_cat_row),a
         cp      9
-        jr      nz,p130_cat_draw_loop
+        jp      nz,p130_cat_draw_loop
         pop     hl
         pop     de
         pop     bc
