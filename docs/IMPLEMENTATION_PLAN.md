@@ -17,6 +17,10 @@ A milestone is complete when its implementation and stable interfaces are integr
 
 ## Stage 1 — ATM host foundation
 
+- [x] Port Project126 ATM-native 80x25 console layout and host-page-preserving renderer.
+- [x] Separate console image at #A000 so video page remapping cannot unmap executing renderer code.
+- [x] Mirror ATM #EF host log output into the lower console log area; no test output is generated.
+
 - [x] Add the minimal ATM #EF diagnostic output path and stable byte/hex helpers.
 - [x] Add an ATM2+ physical-page accounting model with reserve/allocate/free/pin operations.
 - [x] Add production page accounting with reserve/allocate/free/pin operations (no in-emulator self-test).

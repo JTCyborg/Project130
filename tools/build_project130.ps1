@@ -30,15 +30,16 @@ $BuildDir = Join-Path $Root "build"
 New-Item -ItemType Directory -Force -Path $BuildDir | Out-Null
 $Resident = Join-Path $BuildDir "P130BOOT.bin"
 $MapFile = Join-Path $BuildDir "P130BOOT.map"
+$UiImage = Join-Path $BuildDir "P130UI.bin"
 $Out = [System.IO.Path]::GetFullPath($Output)
 if ([System.IO.Path]::GetFileName($Out) -ne "disk_A.trd") {
     throw "The packaging source writes disk_A.trd; use -Output disk_A.trd"
 }
 
-Remove-Item -Force -ErrorAction SilentlyContinue $Resident, $MapFile, (Join-Path $BuildDir "P130BOOT.sym"), $Out
+Remove-Item -Force -ErrorAction SilentlyContinue $Resident, $MapFile, $UiImage, (Join-Path $BuildDir "P130BOOT.sym"), $Out
 
-Write-Host "[P130 BUILD] VERSION=BOOTSTRAP-0.2.0-ATM-HOST-BASE"
-foreach ($Source in @("src/main.c", "src/diag.c", "src/diag.h", "src/memory.c", "src/memory.h", "src/entry.asm", "src/boot/main.asm")) {
+Write-Host "[P130 BUILD] VERSION=BOOTSTRAP-0.3.0-P126-ATM-CONSOLE"
+foreach ($Source in @("src/main.c", "src/diag.c", "src/diag.h", "src/memory.c", "src/memory.h", "src/entry.asm", "src/ui.asm", "src/boot/main.asm")) {
     $Hash = (Get-FileHash $Source -Algorithm SHA256).Hash.Substring(0, 8)
     Write-Host "[P130 BUILD] $Source=$Hash"
 }
@@ -82,7 +83,28 @@ if (-not $CallFound) { throw ("No CALL to linked C entry #{0:X4} found in reside
 
 $ResidentEnd = 0x6000 + $ResidentSize
 if ($ResidentEnd -gt 0xB000) { throw "Resident image overlaps BASIC loader at #B000" }
-Write-Host ("[P130 BUILD] IMAGE_SIZE={0} ENTRY=#6000 C_ENTRY=#{1:X4} END=#{2:X4} CALL=VERIFIED" -f $ResidentSize, $CEntryAddress, $ResidentEnd)
+Write-Host ("[P130 BUILD] HOST_IMAGE_SIZE={0} ENTRY=#6000 C_ENTRY=#{1:X4} CALL=VERIFIED" -f $ResidentSize, $CEntryAddress)
+
+# Project126-style console executes from ATM window 2 at #A000. Keeping it
+# there is required: the renderer remaps window 1 to the character plane.
+& $SjAsmPlus "--raw=$UiImage" src/ui.asm
+if ($LASTEXITCODE -ne 0) { throw "ATM console assembly failed: $LASTEXITCODE" }
+if (-not (Test-Path $UiImage)) { throw "ATM console assembler produced no image: $UiImage" }
+$UiBytes = [System.IO.File]::ReadAllBytes($UiImage)
+if ($UiBytes.Length -le 0 -or $UiBytes.Length -gt 4096) {
+    throw "ATM console must fit #A000-#AFFF (4 KiB); actual size: $($UiBytes.Length) bytes"
+}
+$HostBytes = [System.IO.File]::ReadAllBytes($Resident)
+$UiOffset = 0x4000
+$CombinedLength = $UiOffset + $UiBytes.Length
+if ($CombinedLength -gt 20480) { throw "Combined resident/console image exceeds #6000-#AFFF" }
+$Combined = New-Object byte[] $CombinedLength
+[Array]::Copy($HostBytes, 0, $Combined, 0, $HostBytes.Length)
+[Array]::Copy($UiBytes, 0, $Combined, $UiOffset, $UiBytes.Length)
+[System.IO.File]::WriteAllBytes($Resident, $Combined)
+$ResidentSize = $Combined.Length
+$ResidentEnd = 0x6000 + $ResidentSize
+Write-Host ("[P130 BUILD] UI=#A000 UI_SIZE={0} HOST_END=#{1:X4} COMBINED_SIZE={2}" -f $UiBytes.Length, (0x6000 + $HostBytes.Length), $ResidentSize)
 
 & $SjAsmPlus --dirbol src/boot/main.asm
 if ($LASTEXITCODE -ne 0) { throw "SjASMPlus TR-DOS packaging failed: $LASTEXITCODE" }

@@ -10,6 +10,7 @@ void p130_debug_putc(uint8_t value)
         ld a,(_p130_debug_value)
         ld bc,00EFh
         out (c),a
+        call 0A003h
     __endasm;
 }
 
