@@ -465,7 +465,7 @@ p130_ui_line3:  db "HOST CPU      : Z80 / ATM TURBO 2+",0
 p130_ui_line4:  db "GUEST CPU     : 8086 REAL MODE / NeoGS",0
 p130_ui_line5:  db "BIOS          : GUEST ROM NOT LOADED",0
 p130_ui_line6:  db "VIDEO         : ATM RG=6 TEXT 80x25",0
-p130_ui_line7:  db "REAL TIME CLK : ?? : ?? : ??",0
+p130_ui_line7:  db "REAL TIME CLK : ??",0
 p130_ui_clock_update:
         push    af
         push    bc
