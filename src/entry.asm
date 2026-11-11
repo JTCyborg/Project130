@@ -4,6 +4,7 @@
 SECTION CODE
 PUBLIC _p130_entry
 EXTERN _p130_c_entry
+EXTERN _p130_trdos_preload
 
 _p130_entry:
         ld      a,'>'
@@ -24,6 +25,18 @@ _p130_entry:
         out     (c),a
         ld      a,10
         out     (c),a
+
+        ; Match the proven ATM/Project127 TR-DOS ROM-call setup.
+        ld      a,010h
+        ld      bc,07FFDh
+        out     (c),a
+        ld      (05C3Bh),a
+        xor     a
+        ld      bc,0EFF7h
+        out     (c),a
+
+        ; Read track 0 sectors 1..8 into the host W3 buffer at #C800.
+        call    _p130_trdos_preload
 
         call    _p130_c_entry
 
