@@ -1,6 +1,6 @@
 # Project130 NeoGS bootstrap and DMA transport architecture
 
-Status: startup architecture accepted; hardware memory map and DMA buffer allocation are a separate pending design decision. No target validation is implied.
+Status: stage-0 bootstrap and GS105a launcher implemented in source; DMA/IPC payload transport and physical map remain gated. No target validation is implied.
 
 ## 1. Startup decision
 
@@ -9,8 +9,8 @@ The stock NeoGS GS105a ROM is retained only as a temporary bootstrap launcher.
 1. ATM host locates and validates the small Project130 bootstrap image.
 2. ATM host uses the stock GS105a receive command `#14` to place that image at the ROM-defined receive address (`#4000`).
 3. ATM host uses command `#13` to transfer control to the bootstrap at `#4000`.
-4. The bootstrap establishes a private stack, disables any active ZX DMA channel and disables the stock ROM through `GSCFG0` (`#0F`), setting `NOROM`.
-5. The bootstrap hands control to the Project130 resident runtime / DMA-IPC bring-up.
+4. The bootstrap disables any active ZX DMA channel and updates `GSCFG0` (`#0F`) using the documented NOROM/EXPAG transition.
+5. The bootstrap emits the `A1` ready acknowledgement through the NeoGS ZX data endpoint and remains in an idle loop. It does not yet start a DMA receiver because the physical backing map and buffer addresses are unapproved.
 6. After the handoff, the stock ROM byte-stream protocol is closed. No resident firmware, module, command, response, event, diagnostic or video payload may be transferred through GSDAT.
 
 The GS105a `#14/#13` exchange is the only legacy byte-channel exception. It transfers the bootstrap image itself and nothing else. In particular, the Project126 pattern of sending a resident core over GSDAT after the ROM has been disabled is **not** adopted.
