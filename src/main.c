@@ -35,7 +35,7 @@ static void p130_ui_clock_update(void)
 
 static void p130_rtc_start(void)
 {
-    p130_debug_puts("[RTC] DS12887 PROBE BEGIN (GLUK/SMUC)\\r\\n");
+    p130_debug_puts("[RTC] DS12887 PROBE BEGIN (GLUK/SMUC)\r\n");
     p130_rtc_probe();
     p130_rtc_read_current();
     p130_ui_clock_update();
@@ -52,9 +52,9 @@ static void p130_rtc_start(void)
         p130_debug_putc(':');
         p130_debug_putc((uint8_t)p130_rtc_second[0]);
         p130_debug_putc((uint8_t)p130_rtc_second[1]);
-        p130_debug_puts("\\r\\n");
+        p130_debug_puts("\r\n");
     } else {
-        p130_debug_puts("[RTC] DS12887 NOT DETECTED / INVALID STATUS\\r\\n");
+        p130_debug_puts("[RTC] DS12887 NOT DETECTED / INVALID STATUS\r\n");
     }
 }
 
