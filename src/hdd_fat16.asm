@@ -367,18 +367,16 @@ p130_hdd_fat_emit_done:
         ret
 
 
-; Local output bridge: A=character. The C diagnostic API mirrors #EF to the ATM UI.
+; Same register-level output ABI as the proven Project129 FAT16 path.
+; A=character. Mirror to #EF and call the Project130 ATM console entry #A003.
 p130_hdd_put_char:
         push    af
         push    bc
-        push    de
-        push    hl
-        ld      l,a
-        call    _p130_debug_putc
-        pop     hl
-        pop     de
+        ld      bc,00EFh
+        out     (c),a
         pop     bc
         pop     af
+        call    0A003h
         ret
 
 ; HL -> zero-terminated string.
