@@ -2,13 +2,18 @@
 
 A milestone is complete only when code, a stable interface, boundary/error-path checks and runtime evidence are available. A successful compile alone is not completion.
 
-## Stage 0 — project skeleton (current)
+## Stage 0 — project skeleton and boot chain (in progress)
 
 - [x] Establish repository structure and architecture rules.
 - [x] Record Project126/Project129 source boundaries.
 - [x] Add Z88DK resident entry and TR-DOS disk packaging script.
+- [x] Reuse the proven Project129 no-CRT Z88DK relocation model at #6000.
+- [x] Add BASIC boot markers before and after the TR-DOS CODE load.
+- [x] Validate resident image size, entry symbols, C-entry address and ASM-to-C CALL in the build script.
+- [x] Validate the packaged TR-DOS image is exactly 640 KiB.
 - [ ] Build with the user's local Z88DK + SjASMPlus installation.
-- [ ] Run boot image in Unreal Speccy / target ATM environment and confirm C-entry markers on #EF.
+- [ ] Run boot image in Unreal Speccy / target ATM environment and confirm the full marker sequence on #EF.
+- [ ] Save the first runtime trace as a repository artifact.
 
 ## Stage 1 — ATM host foundation
 
