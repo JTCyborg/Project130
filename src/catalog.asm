@@ -249,7 +249,7 @@ p130_cat_confirm_name:
         ld      a,'.'
         ld      bc,00EFh
         out     (c),a
-        ld      hl,(_p130_cat_selected_entry)
+        ld      hl,(_p130_catalog_selected_entry)
         ld      de,8
         add     hl,de
         ld      a,(hl)
