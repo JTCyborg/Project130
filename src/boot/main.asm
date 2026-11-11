@@ -89,18 +89,18 @@ p130_bios_27c64d:
         INCBIN  "bios/27c64d.bin"
 p130_bios_27c64d_end:
         ASSERT  p130_bios_27c64d_end-p130_bios_27c64d = 8192
-        SAVETRD "disk_A.trd","BIOS1.B",p130_bios_27c64d,p130_bios_27c64d_end-p130_bios_27c64d
+        SAVETRD "disk_A.trd","BIOS1.C",p130_bios_27c64d,p130_bios_27c64d_end-p130_bios_27c64d
 
         ORG     #0000
 p130_bios_generic:
         INCBIN  "bios/Bios.bin"
 p130_bios_generic_end:
         ASSERT  p130_bios_generic_end-p130_bios_generic = 8192
-        SAVETRD "disk_A.trd","BIOS2.B",p130_bios_generic,p130_bios_generic_end-p130_bios_generic
+        SAVETRD "disk_A.trd","BIOS2.C",p130_bios_generic,p130_bios_generic_end-p130_bios_generic
 
         ORG     #0000
 p130_bios_compaq:
         INCBIN  "bios/Compaq Portable Plus 100666-001 Rev C.bin"
 p130_bios_compaq_end:
         ASSERT  p130_bios_compaq_end-p130_bios_compaq = 8192
-        SAVETRD "disk_A.trd","BIOS3.B",p130_bios_compaq,p130_bios_compaq_end-p130_bios_compaq
+        SAVETRD "disk_A.trd","BIOS3.C",p130_bios_compaq,p130_bios_compaq_end-p130_bios_compaq

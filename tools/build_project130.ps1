@@ -140,5 +140,5 @@ if (-not (Test-Path $Out)) { throw "SjASMPlus returned success but disk image is
 $DiskSize = (Get-Item $Out).Length
 if ($DiskSize -ne 655360) { throw "TR-DOS image must be 655360 bytes; actual size: $DiskSize" }
 Write-Host "[P130 BUILD] DISK=$Out SIZE=$DiskSize"
-Write-Host "[P130 BUILD] TR-DOS FILES=boot.B,p130boot.C,NEOBOOT.C,BIOS1.B,BIOS2.B,BIOS3.B"
+Write-Host "[P130 BUILD] TR-DOS FILES=boot.B,p130boot.C,NEOBOOT.C,BIOS1.C,BIOS2.C,BIOS3.C"
 Write-Host "[P130 BUILD] BUILD COMPLETE (runtime test required)"
