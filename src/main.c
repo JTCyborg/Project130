@@ -6,7 +6,7 @@
 #define P130_CATALOGUE_ADDR 0xC800u
 #define P130_CATALOGUE_SIZE 2048u
 
-#define P130_BUILD_ID "BOOTSTRAP-0.3.2-TRDOS-HDD-CATALOG"
+#define P130_BUILD_ID "BOOTSTRAP-0.3.3-TRDOS-FILE-MENU"
 
 static void p130_report_memory(void)
 {
@@ -31,6 +31,8 @@ static void p130_report_memory(void)
 
 
 extern volatile uint8_t p130_trdos_result;
+extern void p130_catalog_init(void);
+extern void p130_catalog_poll(void);
 extern void p130_hdd_probe(void);
 extern void p130_hdd_list_root(void);
 extern volatile uint8_t p130_hdd_present;
@@ -181,6 +183,7 @@ void p130_c_entry(void)
     p130_report_memory();
     p130_rtc_start();
     p130_storage_start();
+    p130_catalog_init();
     p130_debug_puts("[MAP] PHYSICAL W3 MAPPER NOT INITIALIZED\r\n");
     p130_debug_puts("[P130] NEO GS / DMA NOT INITIALIZED\r\n");
 
@@ -190,6 +193,7 @@ void p130_c_entry(void)
         char last_second_tens = p130_rtc_second[0];
         char last_second_ones = p130_rtc_second[1];
         for (;;) {
+            p130_catalog_poll();
             if (!p130_rtc_available) continue;
             ++rtc_poll_divider;
             if (rtc_poll_divider == 0u) {
