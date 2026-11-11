@@ -20,10 +20,8 @@ A milestone is complete when its implementation and stable interfaces are integr
 - [x] Port Project126 ATM-native 80x25 console layout and host-page-preserving renderer.
 - [x] Separate console image at #A000 so video page remapping cannot unmap executing renderer code.
 - [x] Mirror ATM #EF host log output into the lower console log area; no test output is generated.
-
 - [x] Add the minimal ATM #EF diagnostic output path and stable byte/hex helpers.
-- [x] Add an ATM2+ physical-page accounting model with reserve/allocate/free/pin operations.
-- [x] Add production page accounting with reserve/allocate/free/pin operations (no in-emulator self-test).
+- [x] Add an ATM2+ physical-page accounting model with reserve/allocate/free/pin operations (no in-emulator self-test).
 - [ ] Implement physical RAM discovery for the emulator host; current 64-page value is a configured ATM2+ capacity model, not a runtime probe.
 - [ ] Port the physical W3 mapper only after its hidden-port enable sequence and W3 ownership handoff are integrated.
 - [ ] Define ownership/lease rules for banked windows.
@@ -39,14 +37,21 @@ A milestone is complete when its implementation and stable interfaces are integr
 - [ ] Confirm RTC detection, backend selection and live clock updates on the user's local emulator; validation remains external.
 - [ ] Confirm Stage 1 integration on the user's local toolchain/emulator; keep validation outside the emulator runtime.
 
-## Stage 2 — NeoGS transport
+## Stage 2 — NeoGS bootstrap and DMA/IPC transport
 
-- [ ] Audit the exact Project129 DMA routines and Project126 transport design.
-- [ ] Define the Project130 DMA message header, version, sequence, length and CRC.
-- [ ] Implement ATM→NeoGS transfer and verify payload integrity.
-- [ ] Implement NeoGS→ATM transfer and verify payload integrity.
-- [ ] Verify timeouts, cancellation, buffer ownership and safe idle state.
-- [ ] Do not use legacy byte streaming for payloads.
+- [x] Audit Project129 GS105a command/status/data behavior and ZX-DMA constraints.
+- [x] Record the GS105a `#14/#13` bootstrap-only exception; no post-bootstrap GSDAT payload transfer.
+- [x] Record NeoGS-side DMA register ownership and read/write dummy-byte/direction-switch rules.
+- [x] Separate the NeoGS physical memory/DMA-buffer allocation from the x86 guest memory map.
+- [ ] Confirm target NeoGS physical RAM capacity, page size, paging selectors and DMA address range.
+- [ ] Approve the Project130 NeoGS physical memory and ATM staging-buffer map in `docs/NeoGS/MEMORY_MAP.md`.
+- [ ] Add the small Project130 bootstrap image and bounded GS105a `#14/#13` launcher.
+- [ ] Implement bootstrap ROM disable and resident-runtime handoff.
+- [ ] Define Project130 DMA/IPC ABI: header, version, sequence, length, CRC, completion and fragmentation.
+- [ ] Implement ATM→NeoGS DMA and NeoGS→ATM DMA using the approved map.
+- [ ] Verify external transfer integrity, timeouts, cancellation and safe idle state.
+- [ ] Keep IRQ disabled until its vector/stack/acknowledgement contract is approved.
+- [ ] Integrate selected TR-DOS file payload loading only after DMA/IPC is operational.
 
 ## Stage 3 — NeoGS runtime and guest memory
 
@@ -85,7 +90,7 @@ A milestone is complete when its implementation and stable interfaces are integr
 - [ ] Boot the selected 8086 BIOS to a stable diagnostic state.
 - [ ] Resolve BIOS device dependencies through software models/host services.
 - [ ] Add disk boot and real-mode application tests.
-- [ ] Perform external stress validation of memory, DMA, interrupts and video; do not embed test routines in the emulator.
+- [ ] Perform external stress validation of memory, DMA, interrupts and video; do not embed test routines in the emulator runtime.
 
 ## Stage 8 — integration and release
 
