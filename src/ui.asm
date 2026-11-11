@@ -150,6 +150,10 @@ p130_ui_draw:
         ld      a,0
         ld      c,1
         call    p130_ui_print_at
+        ld      hl,p130_ui_line1
+        ld      a,1
+        ld      c,1
+        call    p130_ui_print_at
         ld      hl,p130_ui_line2
         ld      a,2
         ld      c,1
@@ -321,6 +325,9 @@ p130_screen_write_char:
         ld      (p130_ui_char),a
         ld      a,d
         ld      (p130_ui_write_row),a
+        ld      a,e
+        ld      (p130_ui_write_col),a
+        ld      a,(p130_ui_write_row)
         ld      l,a
         ld      h,0
         add     hl,hl
@@ -331,7 +338,7 @@ p130_screen_write_char:
         add     hl,hl
         ld      de,#01C0
         add     hl,de
-        ld      a,e
+        ld      a,(p130_ui_write_col)
         ld      c,a
         and     1
         ld      (p130_ui_parity),a
@@ -452,6 +459,7 @@ p130_ui_scroll:
         ret
 
 p130_ui_line0:  db "PROJECT130  |  ATM TURBO 2+  |  HOST CONSOLE",0
+p130_ui_line1:  db "BOOTSTRAP-0.3.0-P126-ATM-CONSOLE",0
 p130_ui_line2:  db "SYSTEM / HOST STATUS",0
 p130_ui_line3:  db "HOST CPU      : Z80 / ATM TURBO 2+",0
 p130_ui_line4:  db "GUEST CPU     : 8086 REAL MODE / NeoGS",0
@@ -469,6 +477,7 @@ p130_ui_char:        db 0
 p130_ui_parity:      db 0
 p130_ui_attr:        db 0
 p130_ui_write_row:   db 0
+p130_ui_write_col:   db 0
 p130_ui_offset:      dw 0
 p130_ui_text_ptr:    dw 0
 p130_ui_print_row:   db 0
