@@ -1,0 +1,4 @@
+Имя в TR-DOS	Исходный файл
+BIOS1.B	27c64d.bin
+BIOS2.B	Bios.bin
+BIOS3.B	Compaq Portable Plus 100666-001 Rev C.bin
