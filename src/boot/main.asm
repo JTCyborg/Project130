@@ -57,9 +57,6 @@ l21:
 l21_end:
 
 ; Line 30: restore debug channel 2 and enter the loaded resident image.
-        DB      0,30
-        DW      l30_end-l30
-l30:
         DB      OUT_CMD,"239",#0E,#00,#00,#EF,#00,#00
         DB      ",","2",#0E,#00,#00,#02,#00,#00,":"
         DB      RANDOMIZE,USR,VAL,34,"24576",34,#0D
@@ -75,3 +72,35 @@ p130_boot_image:
 p130_boot_image_end:
         ASSERT  p130_boot_image_end > p130_boot_image
         SAVETRD "disk_A.trd","p130boot.C",p130_boot_image,p130_boot_image_end-p130_boot_image
+
+; Small NeoGS bootstrap image, uploaded by the ATM host through GS105a #14/#13.
+        ORG     #0000
+p130_neogs_boot_image:
+        INCBIN  "build/NEOBOOT.bin"
+p130_neogs_boot_image_end:
+        ASSERT  p130_neogs_boot_image_end > p130_neogs_boot_image
+        ASSERT  p130_neogs_boot_image_end-p130_neogs_boot_image <= 256
+        SAVETRD "disk_A.trd","NEOBOOT.C",p130_neogs_boot_image,p130_neogs_boot_image_end-p130_neogs_boot_image
+
+; Three independent 8 KiB BIOS images. bios.asm and bios.txt document Bios.bin;
+; they are not separate BIOS payloads.
+        ORG     #0000
+p130_bios_27c64d:
+        INCBIN  "bios/27c64d.bin"
+p130_bios_27c64d_end:
+        ASSERT  p130_bios_27c64d_end-p130_bios_27c64d = 8192
+        SAVETRD "disk_A.trd","BIOS1.B",p130_bios_27c64d,p130_bios_27c64d_end-p130_bios_27c64d
+
+        ORG     #0000
+p130_bios_generic:
+        INCBIN  "bios/Bios.bin"
+p130_bios_generic_end:
+        ASSERT  p130_bios_generic_end-p130_bios_generic = 8192
+        SAVETRD "disk_A.trd","BIOS2.B",p130_bios_generic,p130_bios_generic_end-p130_bios_generic
+
+        ORG     #0000
+p130_bios_compaq:
+        INCBIN  "bios/Compaq Portable Plus 100666-001 Rev C.bin"
+p130_bios_compaq_end:
+        ASSERT  p130_bios_compaq_end-p130_bios_compaq = 8192
+        SAVETRD "disk_A.trd","BIOS3.B",p130_bios_compaq,p130_bios_compaq_end-p130_bios_compaq

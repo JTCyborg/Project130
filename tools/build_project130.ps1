@@ -31,15 +31,16 @@ New-Item -ItemType Directory -Force -Path $BuildDir | Out-Null
 $Resident = Join-Path $BuildDir "P130BOOT.bin"
 $MapFile = Join-Path $BuildDir "P130BOOT.map"
 $UiImage = Join-Path $BuildDir "P130UI.bin"
+$NeoGsBootstrap = Join-Path $BuildDir "NEOBOOT.bin"
 $Out = [System.IO.Path]::GetFullPath($Output)
 if ([System.IO.Path]::GetFileName($Out) -ne "disk_A.trd") {
     throw "The packaging source writes disk_A.trd; use -Output disk_A.trd"
 }
 
-Remove-Item -Force -ErrorAction SilentlyContinue $Resident, $MapFile, $UiImage, (Join-Path $BuildDir "P130BOOT.sym"), $Out
+Remove-Item -Force -ErrorAction SilentlyContinue $Resident, $MapFile, $UiImage, $NeoGsBootstrap, (Join-Path $BuildDir "P130BOOT.sym"), $Out
 
-Write-Host "[P130 BUILD] VERSION=BOOTSTRAP-0.3.3-TRDOS-FILE-MENU"
-foreach ($Source in @("src/main.c", "src/diag.c", "src/diag.h", "src/memory.c", "src/memory.h", "src/rtc.h", "src/rtc.asm", "src/trdos.asm", "src/hdd.asm", "src/hdd_fat16.asm", "src/catalog.asm", "src/entry.asm", "src/ui.asm", "src/boot/main.asm")) {
+Write-Host "[P130 BUILD] VERSION=BOOTSTRAP-0.4.0-NEOGS-ROM-BOOTSTRAP-BIOS-DISK"
+foreach ($Source in @("src/main.c", "src/diag.c", "src/diag.h", "src/memory.c", "src/memory.h", "src/rtc.h", "src/rtc.asm", "src/trdos.asm", "src/hdd.asm", "src/hdd_fat16.asm", "src/catalog.asm", "src/neogs/loader.asm", "src/neogs/bootstrap.asm", "src/entry.asm", "src/ui.asm", "src/boot/main.asm")) {
     $Hash = (Get-FileHash $Source -Algorithm SHA256).Hash.Substring(0, 8)
     Write-Host "[P130 BUILD] $Source=$Hash"
 }
@@ -49,7 +50,7 @@ Write-Host "[P130 BUILD] Z80ASM=$Z80Asm"
 Write-Host "[P130 BUILD] SJASMPLUS=$SjAsmPlus"
 
 # Same no-CRT link model and relocation used by the proven Project129 build.
-& $Zcc +zx -v -O2 -compiler=sdcc --no-crt -Cl-r24576 -m -s -bn $Resident src/entry.asm src/main.c src/diag.c src/memory.c src/rtc.asm src/trdos.asm src/hdd.asm src/hdd_fat16.asm src/catalog.asm
+& $Zcc +zx -v -O2 -compiler=sdcc --no-crt -Cl-r24576 -m -s -bn $Resident src/entry.asm src/main.c src/diag.c src/memory.c src/rtc.asm src/trdos.asm src/hdd.asm src/hdd_fat16.asm src/catalog.asm src/neogs/loader.asm
 if ($LASTEXITCODE -ne 0) { throw "Z88DK compile/link failed: $LASTEXITCODE" }
 if (-not (Test-Path $Resident)) { throw "Z88DK returned success but did not produce $Resident" }
 if (-not (Test-Path $MapFile)) { throw "Z88DK did not produce required map file: $MapFile" }
@@ -112,10 +113,32 @@ $ResidentSize = $Combined.Length
 $ResidentEnd = 0x6000 + $ResidentSize
 Write-Host ("[P130 BUILD] UI=#A000 UI_SIZE={0} HOST_END=#{1:X4} COMBINED_SIZE={2}" -f $UiBytes.Length, (0x6000 + $HostBytes.Length), $ResidentSize)
 
+# Build the <=256-byte NeoGS stage-0 image first; GS105a #14 uploads this
+# image only. The resident core and application payloads are never GSDAT-streamed.
+& $SjAsmPlus "--raw=$NeoGsBootstrap" src/neogs/bootstrap.asm
+if ($LASTEXITCODE -ne 0) { throw "NeoGS bootstrap assembly failed: $LASTEXITCODE" }
+if (-not (Test-Path $NeoGsBootstrap)) { throw "NeoGS bootstrap image was not produced" }
+$NeoGsBootstrapSize = (Get-Item $NeoGsBootstrap).Length
+if ($NeoGsBootstrapSize -le 0 -or $NeoGsBootstrapSize -gt 256) {
+    throw "NeoGS bootstrap must fit GS105a #14 (1..256 bytes); actual size: $NeoGsBootstrapSize"
+}
+Write-Host "[P130 BUILD] NEOBOOT_SIZE=$NeoGsBootstrapSize (GS105a #14/#13 only)"
+
+# The three BIOS files are independent 8 KiB ROM images. bios.asm/bios.txt
+# describe Bios.bin and are intentionally not packaged as separate images.
+foreach ($Bios in @("bios/27c64d.bin", "bios/Bios.bin", "bios/Compaq Portable Plus 100666-001 Rev C.bin")) {
+    if (-not (Test-Path $Bios)) { throw "Required BIOS image is missing: $Bios" }
+    $BiosSize = (Get-Item $Bios).Length
+    if ($BiosSize -ne 8192) { throw "BIOS image must be exactly 8192 bytes: $Bios ($BiosSize)" }
+    $BiosHash = (Get-FileHash $Bios -Algorithm SHA256).Hash
+    Write-Host "[P130 BUILD] BIOS=$Bios SIZE=$BiosSize SHA256=$BiosHash"
+}
+
 & $SjAsmPlus --dirbol src/boot/main.asm
 if ($LASTEXITCODE -ne 0) { throw "SjASMPlus TR-DOS packaging failed: $LASTEXITCODE" }
 if (-not (Test-Path $Out)) { throw "SjASMPlus returned success but disk image is missing: $Out" }
 $DiskSize = (Get-Item $Out).Length
 if ($DiskSize -ne 655360) { throw "TR-DOS image must be 655360 bytes; actual size: $DiskSize" }
 Write-Host "[P130 BUILD] DISK=$Out SIZE=$DiskSize"
+Write-Host "[P130 BUILD] TR-DOS FILES=boot.B,p130boot.C,NEOBOOT.C,BIOS1.B,BIOS2.B,BIOS3.B"
 Write-Host "[P130 BUILD] BUILD COMPLETE (runtime test required)"

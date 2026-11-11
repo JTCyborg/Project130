@@ -6,7 +6,7 @@
 #define P130_CATALOGUE_ADDR 0xC800u
 #define P130_CATALOGUE_SIZE 2048u
 
-#define P130_BUILD_ID "BOOTSTRAP-0.3.3-TRDOS-FILE-MENU"
+#define P130_BUILD_ID "BOOTSTRAP-0.4.0-NEOGS-ROM-BOOTSTRAP-BIOS-DISK"
 
 static void p130_report_memory(void)
 {
@@ -31,6 +31,7 @@ static void p130_report_memory(void)
 
 
 extern volatile uint8_t p130_trdos_result;
+extern uint8_t p130_neogs_startup(void);
 extern void p130_catalog_init(void);
 extern void p130_catalog_poll(void);
 extern void p130_hdd_probe(void);
@@ -183,6 +184,13 @@ void p130_c_entry(void)
     p130_report_memory();
     p130_rtc_start();
     p130_storage_start();
+    p130_debug_puts("[NEOGS] GS105a BOOTSTRAP LAUNCH BEGIN\r\n");
+    if (p130_neogs_startup() == 0u) {
+        p130_debug_puts("[NEOGS] NEOBOOT STARTED; GS105a ROM DISABLED\r\n");
+        p130_debug_puts("[NEOGS] DMA/IPC PAYLOAD PATH HELD; MEMORY MAP NOT APPROVED\r\n");
+    } else {
+        p130_debug_puts("[NEOGS] BOOTSTRAP LAUNCH FAILED / NOT PRESENT\r\n");
+    }
     p130_catalog_init();
     p130_debug_puts("[MAP] PHYSICAL W3 MAPPER NOT INITIALIZED\r\n");
     p130_debug_puts("[P130] NEO GS / DMA NOT INITIALIZED\r\n");

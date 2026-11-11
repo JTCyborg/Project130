@@ -45,8 +45,10 @@ A milestone is complete when its implementation and stable interfaces are integr
 - [x] Separate the NeoGS physical memory/DMA-buffer allocation from the x86 guest memory map.
 - [ ] Confirm target NeoGS physical RAM capacity, page size, paging selectors and DMA address range.
 - [ ] Approve the Project130 NeoGS physical memory and ATM staging-buffer map in `docs/NeoGS/MEMORY_MAP.md`.
-- [ ] Add the small Project130 bootstrap image and bounded GS105a `#14/#13` launcher.
-- [ ] Implement bootstrap ROM disable and resident-runtime handoff.
+- [x] Add a <=256-byte Project130 stage-0 bootstrap and bounded GS105a `#14/#13` launcher; legacy GSDAT is bootstrap-only.
+- [x] Package the three independent 8 KiB BIOS binaries into the TR-DOS image as BIOS1.B, BIOS2.B and BIOS3.B; keep bios.asm/bios.txt as documentation/source for Bios.bin.
+- [x] Implement stage-0 NOROM transition and A1 ready acknowledgement.
+- [ ] Replace the bootstrap idle endpoint with the DMA/IPC resident runtime after physical memory/DMA buffers are approved.
 - [ ] Define Project130 DMA/IPC ABI: header, version, sequence, length, CRC, completion and fragmentation.
 - [ ] Implement ATM→NeoGS DMA and NeoGS→ATM DMA using the approved map.
 - [ ] Verify external transfer integrity, timeouts, cancellation and safe idle state.
