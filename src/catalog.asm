@@ -27,6 +27,15 @@ _p130_catalog_init:
         or      a
         jr      nz,p130_cat_init_empty
         call    p130_cat_count_files
+        ld      a,(p130_cat_total)
+        or      a
+        jr      nz,p130_cat_init_ready
+        ld      hl,p130_cat_no_files
+        ld      a,2
+        ld      c,1
+        call    0A009h
+        ret
+p130_cat_init_ready:
         ld      a,1
         ld      (p130_cat_enabled),a
         call    p130_cat_draw
