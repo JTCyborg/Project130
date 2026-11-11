@@ -3,7 +3,10 @@
 #include "memory.h"
 #include "rtc.h"
 
-#define P130_BUILD_ID "BOOTSTRAP-0.3.1-DS12887-RTC"
+#define P130_CATALOGUE_ADDR 0xC800u
+#define P130_CATALOGUE_SIZE 2048u
+
+#define P130_BUILD_ID "BOOTSTRAP-0.3.2-TRDOS-HDD-CATALOG"
 
 static void p130_report_memory(void)
 {
@@ -24,6 +27,96 @@ static void p130_report_memory(void)
     p130_debug_puts("[MEM] PAGE MANAGER READY; FREE=");
     p130_debug_hex8(p130_memory_free_count());
     p130_debug_puts("\r\n");
+}
+
+
+extern volatile uint8_t p130_trdos_result;
+extern void p130_hdd_probe(void);
+extern void p130_hdd_list_root(void);
+extern volatile uint8_t p130_hdd_present;
+extern volatile uint8_t p130_hdd_sector_valid;
+extern volatile uint8_t p130_hdd_error;
+extern volatile uint8_t p130_hdd_last_status;
+extern volatile uint8_t p130_hdd_capacity[4];
+extern volatile uint16_t p130_hdd_fat_file_count;
+
+static volatile uint8_t * const p130_trdos_catalogue =
+    (volatile uint8_t *)P130_CATALOGUE_ADDR;
+
+static void p130_trdos_list_catalogue(void)
+{
+    uint16_t offset;
+    uint8_t files = 0u;
+
+    p130_debug_puts("[TR-DOS] CATALOGUE FILES\r\n");
+    for (offset = 0u; offset < P130_CATALOGUE_SIZE; offset += 16u) {
+        uint8_t first = p130_trdos_catalogue[offset];
+        uint8_t type = p130_trdos_catalogue[offset + 8u];
+        uint8_t end = 8u;
+        uint8_t i;
+
+        if (first == 0u || first == 1u) continue;
+        if (type != 'B' && type != 'C' && type != 'D' && type != '#') continue;
+
+        while (end != 0u && p130_trdos_catalogue[offset + end - 1u] == ' ') --end;
+        p130_debug_puts("  ");
+        for (i = 0u; i < end; ++i) {
+            uint8_t ch = p130_trdos_catalogue[offset + i];
+            if (ch < 32u || ch > 126u) ch = '?';
+            p130_debug_putc(ch);
+        }
+        if (end != 0u) {
+            p130_debug_putc('.');
+            p130_debug_putc(type);
+        }
+        p130_debug_puts("\r\n");
+        ++files;
+    }
+
+    p130_debug_puts("[TR-DOS] DIRECTORY READ OK; FILE COUNT=");
+    p130_debug_hex8(files);
+    p130_debug_puts("\r\n");
+}
+
+static void p130_storage_start(void)
+{
+    p130_debug_puts("[TR-DOS] CATALOGUE PRELOAD STATUS=");
+    p130_debug_hex8(p130_trdos_result);
+    p130_debug_puts("\r\n");
+    if (p130_trdos_result == 0u) {
+        p130_debug_puts("[TR-DOS] DIRECTORY READ OK; 8 SECTORS / 2048 BYTES\r\n");
+        p130_trdos_list_catalogue();
+    } else {
+        p130_debug_puts("[TR-DOS] DIRECTORY READ FAILED\r\n");
+    }
+
+    p130_debug_puts("[HDD] NEMO IDE MASTER PROBE BEGIN\r\n");
+    p130_hdd_probe();
+    if (!p130_hdd_present) {
+        p130_debug_puts("[HDD] PROBE FAILED; ERROR=");
+        p130_debug_hex8(p130_hdd_error);
+        p130_debug_puts(" STATUS=");
+        p130_debug_hex8(p130_hdd_last_status);
+        p130_debug_puts("\r\n");
+        return;
+    }
+
+    p130_debug_puts("[HDD] IDENTIFY DEVICE OK; LBA28 SECTORS=");
+    p130_debug_hex8(p130_hdd_capacity[3]);
+    p130_debug_hex8(p130_hdd_capacity[2]);
+    p130_debug_hex8(p130_hdd_capacity[1]);
+    p130_debug_hex8(p130_hdd_capacity[0]);
+    if (!p130_hdd_sector_valid) {
+        p130_debug_puts("\r\n[HDD] LBA 63 READ/BPB VALIDATION FAILED; ERROR=");
+        p130_debug_hex8(p130_hdd_error);
+        p130_debug_puts(" STATUS=");
+        p130_debug_hex8(p130_hdd_last_status);
+        p130_debug_puts("\r\n");
+        return;
+    }
+
+    p130_debug_puts("\r\n[HDD] LBA 63 READ OK; BPB 512B; SIGNATURE 55AA\r\n");
+    p130_hdd_list_root();
 }
 
 static char p130_rtc_display[8];
@@ -87,6 +180,7 @@ void p130_c_entry(void)
     p130_debug_puts("[P130] ATM HOST BOOTSTRAP READY\r\n");
     p130_report_memory();
     p130_rtc_start();
+    p130_storage_start();
     p130_debug_puts("[MAP] PHYSICAL W3 MAPPER NOT INITIALIZED\r\n");
     p130_debug_puts("[P130] NEO GS / DMA NOT INITIALIZED\r\n");
 
