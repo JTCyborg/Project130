@@ -85,7 +85,7 @@ $ResidentEnd = 0x6000 + $ResidentSize
 if ($ResidentEnd -gt 0xB000) { throw "Resident image overlaps BASIC loader at #B000" }
 Write-Host ("[P130 BUILD] IMAGE_SIZE={0} ENTRY=#6000 C_ENTRY=#{1:X4} END=#{2:X4} CALL=VERIFIED" -f $ResidentSize, $CEntryAddress, $ResidentEnd)
 
-& $SjAsmPlus -zx -q src/boot/main.asm
+& $SjAsmPlus --dirbol src/boot/main.asm
 if ($LASTEXITCODE -ne 0) { throw "SjASMPlus TR-DOS packaging failed: $LASTEXITCODE" }
 if (-not (Test-Path $Out)) { throw "SjASMPlus returned success but disk image is missing: $Out" }
 $DiskSize = (Get-Item $Out).Length
