@@ -1,25 +1,22 @@
 #include <stdint.h>
 
 #define P130_BUILD_ID "BOOTSTRAP-0.1.0-SKELETON"
-#define P130_DEBUG_PORT 0x00EF
+
+volatile uint8_t p130_debug_value;
 
 static void p130_debug_putc(uint8_t value)
 {
+    p130_debug_value = value;
     __asm
         ld a,(_p130_debug_value)
-        ld bc,0x00EF
+        ld bc,00EFh
         out (c),a
     __endasm;
 }
 
-volatile uint8_t p130_debug_value;
-
 static void debug_puts(const char *text)
 {
-    while (*text) {
-        p130_debug_value = (uint8_t)*text++;
-        p130_debug_putc(p130_debug_value);
-    }
+    while (*text) p130_debug_putc((uint8_t)*text++);
 }
 
 void p130_c_entry(void)

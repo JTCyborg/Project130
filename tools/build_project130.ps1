@@ -32,6 +32,9 @@ $Resident = Join-Path $BuildDir "P130BOOT.bin"
 $MapFile = Join-Path $BuildDir "P130BOOT.map"
 $SymFile = Join-Path $BuildDir "P130BOOT.sym"
 $Out = [System.IO.Path]::GetFullPath($Output)
+if ([System.IO.Path]::GetFileName($Out) -ne "disk_A.trd") {
+    throw "The packaging source writes disk_A.trd; use -Output disk_A.trd"
+}
 
 Remove-Item -Force -ErrorAction SilentlyContinue $Resident, $MapFile, $SymFile, $Out
 
