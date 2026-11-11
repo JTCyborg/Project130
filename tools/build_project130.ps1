@@ -38,8 +38,8 @@ if ([System.IO.Path]::GetFileName($Out) -ne "disk_A.trd") {
 
 Remove-Item -Force -ErrorAction SilentlyContinue $Resident, $MapFile, $UiImage, (Join-Path $BuildDir "P130BOOT.sym"), $Out
 
-Write-Host "[P130 BUILD] VERSION=BOOTSTRAP-0.3.2-TRDOS-HDD-CATALOG"
-foreach ($Source in @("src/main.c", "src/diag.c", "src/diag.h", "src/memory.c", "src/memory.h", "src/rtc.h", "src/rtc.asm", "src/trdos.asm", "src/hdd.asm", "src/hdd_fat16.asm", "src/entry.asm", "src/ui.asm", "src/boot/main.asm")) {
+Write-Host "[P130 BUILD] VERSION=BOOTSTRAP-0.3.3-TRDOS-FILE-MENU"
+foreach ($Source in @("src/main.c", "src/diag.c", "src/diag.h", "src/memory.c", "src/memory.h", "src/rtc.h", "src/rtc.asm", "src/trdos.asm", "src/hdd.asm", "src/hdd_fat16.asm", "src/catalog.asm", "src/entry.asm", "src/ui.asm", "src/boot/main.asm")) {
     $Hash = (Get-FileHash $Source -Algorithm SHA256).Hash.Substring(0, 8)
     Write-Host "[P130 BUILD] $Source=$Hash"
 }
@@ -49,7 +49,7 @@ Write-Host "[P130 BUILD] Z80ASM=$Z80Asm"
 Write-Host "[P130 BUILD] SJASMPLUS=$SjAsmPlus"
 
 # Same no-CRT link model and relocation used by the proven Project129 build.
-& $Zcc +zx -v -O2 -compiler=sdcc --no-crt -Cl-r24576 -m -s -bn $Resident src/entry.asm src/main.c src/diag.c src/memory.c src/rtc.asm src/trdos.asm src/hdd.asm src/hdd_fat16.asm
+& $Zcc +zx -v -O2 -compiler=sdcc --no-crt -Cl-r24576 -m -s -bn $Resident src/entry.asm src/main.c src/diag.c src/memory.c src/rtc.asm src/trdos.asm src/hdd.asm src/hdd_fat16.asm src/catalog.asm
 if ($LASTEXITCODE -ne 0) { throw "Z88DK compile/link failed: $LASTEXITCODE" }
 if (-not (Test-Path $Resident)) { throw "Z88DK returned success but did not produce $Resident" }
 if (-not (Test-Path $MapFile)) { throw "Z88DK did not produce required map file: $MapFile" }
@@ -99,7 +99,7 @@ $UiOffset = 0x4000
 if ($HostBytes.Length -gt $UiOffset) {
     throw "ATM host image overlaps the fixed console origin #A000; host size: $($HostBytes.Length) bytes"
 }
-if ($UiBytes.Length -lt 9 -or $UiBytes[0] -ne 0xC3 -or $UiBytes[3] -ne 0xC3 -or $UiBytes[6] -ne 0xC3) {
+if ($UiBytes.Length -lt 12 -or $UiBytes[0] -ne 0xC3 -or $UiBytes[3] -ne 0xC3 -or $UiBytes[6] -ne 0xC3 -or $UiBytes[9] -ne 0xC3) {
     throw "ATM console entry table is invalid; expected JP stubs at #A000, #A003 and #A006"
 }
 $CombinedLength = $UiOffset + $UiBytes.Length
