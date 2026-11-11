@@ -99,8 +99,8 @@ $UiOffset = 0x4000
 if ($HostBytes.Length -gt $UiOffset) {
     throw "ATM host image overlaps the fixed console origin #A000; host size: $($HostBytes.Length) bytes"
 }
-if ($UiBytes.Length -lt 6 -or $UiBytes[0] -ne 0xC3 -or $UiBytes[3] -ne 0xC3) {
-    throw "ATM console entry table is invalid; expected JP stubs at #A000 and #A003"
+if ($UiBytes.Length -lt 9 -or $UiBytes[0] -ne 0xC3 -or $UiBytes[3] -ne 0xC3 -or $UiBytes[6] -ne 0xC3) {
+    throw "ATM console entry table is invalid; expected JP stubs at #A000, #A003 and #A006"
 }
 $CombinedLength = $UiOffset + $UiBytes.Length
 if ($CombinedLength -gt 20480) { throw "Combined resident/console image exceeds #6000-#AFFF" }
