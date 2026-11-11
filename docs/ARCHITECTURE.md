@@ -4,7 +4,7 @@
 
 Project130 is a new ATM Turbo 2+ 1024 system implementation using Z88DK. It takes the system-level x86/NeoGS concept from Project126 and the ATM host-side hardware techniques from Project129, without merging either repository into this codebase.
 
-The implementation is emulator-first, but hardware-specific operations must retain explicit ownership and bounded failure behavior.
+Project130 is an emulator. Runtime code contains only production emulator functionality: no self-tests, benchmark code, test payloads, destructive probes or test-only device behavior. Build/runtime validation is performed externally and its evidence is kept in development records. Hardware-specific host operations must retain explicit ownership and bounded failure behavior.
 
 ## 2. System roles
 

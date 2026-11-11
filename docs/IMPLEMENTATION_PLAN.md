@@ -1,6 +1,6 @@
 # Project130 implementation plan
 
-A milestone is complete only when code, a stable interface, boundary/error-path checks and runtime evidence are available. A successful compile alone is not completion.
+A milestone is complete when its implementation and stable interfaces are integrated. Emulator runtime contains production code only: no self-tests, benchmark routines, test payloads or test-only device behavior. Validation is performed externally and recorded as development evidence.
 
 ## Stage 0 — project skeleton and boot chain
 
@@ -19,12 +19,12 @@ A milestone is complete only when code, a stable interface, boundary/error-path 
 
 - [x] Add the minimal ATM #EF diagnostic output path and stable byte/hex helpers.
 - [x] Add an ATM2+ physical-page accounting model with reserve/allocate/free/pin operations.
-- [x] Add metadata-only allocator boundary/exhaustion/pin selftest.
-- [ ] Implement and test physical RAM probing/page discovery; current 64-page value is the ATM2+ capacity model, not a runtime probe.
+- [x] Add production page accounting with reserve/allocate/free/pin operations (no in-emulator self-test).
+- [ ] Implement physical RAM discovery for the emulator host; current 64-page value is a configured ATM2+ capacity model, not a runtime probe.
 - [ ] Port the physical W3 mapper only after its hidden-port enable sequence and W3 ownership handoff are integrated.
-- [ ] Define and test ownership/lease rules for banked windows.
+- [ ] Define ownership/lease rules for banked windows.
 - [ ] Establish host capability/version structure and bounded hardware waits.
-- [ ] Validate the Stage 1 build and runtime log on the user's local toolchain/emulator.
+- [ ] Confirm Stage 1 integration on the user's local toolchain/emulator; keep validation outside the emulator runtime.
 
 ## Stage 2 — NeoGS transport
 
@@ -72,12 +72,12 @@ A milestone is complete only when code, a stable interface, boundary/error-path 
 - [ ] Boot the selected 8086 BIOS to a stable diagnostic state.
 - [ ] Resolve BIOS device dependencies through software models/host services.
 - [ ] Add disk boot and real-mode application tests.
-- [ ] Add stress tests for memory, DMA, interrupts and video.
+- [ ] Perform external stress validation of memory, DMA, interrupts and video; do not embed test routines in the emulator.
 
 ## Stage 8 — integration and release
 
 - [ ] End-to-end boot from TR-DOS to x86 BIOS.
-- [ ] Long-duration and repeated-reset tests.
+- [ ] External long-duration and repeated-reset validation.
 - [ ] Confirm no direct physical I/O from NeoGS.
 - [ ] Publish build ID, source hashes, test logs and known limitations.
 

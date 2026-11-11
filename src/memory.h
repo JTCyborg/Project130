@@ -18,7 +18,6 @@
 #define P130_PAGE_OWNER_VIDEO_CHARS   7u
 
 uint8_t p130_memory_init(void);
-uint8_t p130_memory_selftest(void);
 uint8_t p130_page_alloc_topdown(void);
 uint8_t p130_page_free(uint8_t page);
 uint8_t p130_page_pin(uint8_t page);
