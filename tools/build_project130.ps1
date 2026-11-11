@@ -37,8 +37,8 @@ if ([System.IO.Path]::GetFileName($Out) -ne "disk_A.trd") {
 
 Remove-Item -Force -ErrorAction SilentlyContinue $Resident, $MapFile, (Join-Path $BuildDir "P130BOOT.sym"), $Out
 
-Write-Host "[P130 BUILD] VERSION=BOOTSTRAP-0.1.1-TRDOS-TRACE"
-foreach ($Source in @("src/main.c", "src/entry.asm", "src/boot/main.asm")) {
+Write-Host "[P130 BUILD] VERSION=BOOTSTRAP-0.2.0-ATM-HOST-BASE"
+foreach ($Source in @("src/main.c", "src/memory.c", "src/memory.h", "src/entry.asm", "src/boot/main.asm")) {
     $Hash = (Get-FileHash $Source -Algorithm SHA256).Hash.Substring(0, 8)
     Write-Host "[P130 BUILD] $Source=$Hash"
 }
@@ -48,7 +48,7 @@ Write-Host "[P130 BUILD] Z80ASM=$Z80Asm"
 Write-Host "[P130 BUILD] SJASMPLUS=$SjAsmPlus"
 
 # Same no-CRT link model and relocation used by the proven Project129 build.
-& $Zcc +zx -v -O2 -compiler=sdcc --no-crt -Cl-r24576 -m -s -bn $Resident src/entry.asm src/main.c
+& $Zcc +zx -v -O2 -compiler=sdcc --no-crt -Cl-r24576 -m -s -bn $Resident src/entry.asm src/main.c src/memory.c
 if ($LASTEXITCODE -ne 0) { throw "Z88DK compile/link failed: $LASTEXITCODE" }
 if (-not (Test-Path $Resident)) { throw "Z88DK returned success but did not produce $Resident" }
 if (-not (Test-Path $MapFile)) { throw "Z88DK did not produce required map file: $MapFile" }
@@ -70,7 +70,6 @@ if ($CEntryAddress -lt 0x6000 -or $CEntryAddress -ge (0x6000 + $ResidentSize)) {
     throw ("C entry is outside the loaded resident image: #{0:X4}" -f $CEntryAddress)
 }
 
-# Confirm that the resident ASM entry contains an actual CALL to the linked C entry.
 $ResidentBytes = [System.IO.File]::ReadAllBytes($Resident)
 $CallFound = $false
 for ($i = 0; $i -lt ($ResidentBytes.Length - 2); $i++) {
@@ -91,4 +90,4 @@ if (-not (Test-Path $Out)) { throw "SjASMPlus returned success but disk image is
 $DiskSize = (Get-Item $Out).Length
 if ($DiskSize -ne 655360) { throw "TR-DOS image must be 655360 bytes; actual size: $DiskSize" }
 Write-Host "[P130 BUILD] DISK=$Out SIZE=$DiskSize"
-Write-Host "[P130 BUILD] BUILD COMPLETE (runtime boot not yet validated)"
+Write-Host "[P130 BUILD] BUILD COMPLETE (runtime test required)"

@@ -2,7 +2,7 @@
 
 A milestone is complete only when code, a stable interface, boundary/error-path checks and runtime evidence are available. A successful compile alone is not completion.
 
-## Stage 0 — project skeleton and boot chain (in progress)
+## Stage 0 — project skeleton and boot chain
 
 - [x] Establish repository structure and architecture rules.
 - [x] Record Project126/Project129 source boundaries.
@@ -11,17 +11,20 @@ A milestone is complete only when code, a stable interface, boundary/error-path 
 - [x] Add BASIC boot markers before and after the TR-DOS CODE load.
 - [x] Validate resident image size, entry symbols, C-entry address and ASM-to-C CALL in the build script.
 - [x] Validate the packaged TR-DOS image is exactly 640 KiB.
-- [ ] Build with the user's local Z88DK + SjASMPlus installation.
-- [ ] Run boot image in Unreal Speccy / target ATM environment and confirm the full marker sequence on #EF.
+- [x] Build with the user's local Z88DK + SjASMPlus installation (user-confirmed build output).
+- [x] Run boot image in Unreal Speccy / target ATM environment and confirm the full marker sequence on #EF (user-confirmed runtime trace).
 - [ ] Save the first runtime trace as a repository artifact.
 
 ## Stage 1 — ATM host foundation
 
-- [ ] Port a minimal #EF diagnostic/logging API.
-- [ ] Port and test ATM memory/page discovery and physical W3 mapping from Project129.
-- [ ] Define ownership/lease rules for banked windows.
-- [ ] Establish safe host initialization, bounded waits and error reporting.
-- [ ] Add host capability/version structure.
+- [x] Add the minimal ATM #EF diagnostic output path and stable byte/hex helpers.
+- [x] Add an ATM2+ physical-page accounting model with reserve/allocate/free/pin operations.
+- [x] Add metadata-only allocator boundary/exhaustion/pin selftest.
+- [ ] Implement and test physical RAM probing/page discovery; current 64-page value is the ATM2+ capacity model, not a runtime probe.
+- [ ] Port the physical W3 mapper only after its hidden-port enable sequence and W3 ownership handoff are integrated.
+- [ ] Define and test ownership/lease rules for banked windows.
+- [ ] Establish host capability/version structure and bounded hardware waits.
+- [ ] Validate the Stage 1 build and runtime log on the user's local toolchain/emulator.
 
 ## Stage 2 — NeoGS transport
 
