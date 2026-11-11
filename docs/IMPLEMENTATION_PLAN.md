@@ -27,7 +27,10 @@ A milestone is complete when its implementation and stable interfaces are integr
 - [ ] Implement physical RAM discovery for the emulator host; current 64-page value is a configured ATM2+ capacity model, not a runtime probe.
 - [ ] Port the physical W3 mapper only after its hidden-port enable sequence and W3 ownership handoff are integrated.
 - [ ] Define ownership/lease rules for banked windows.
+- [x] Add the ATM-host DS12887 RTC service using the verified Project129 GLUK/SMUC read-only driver.
+- [x] Display and refresh host RTC time in the ATM-native 80x25 console.
 - [ ] Establish host capability/version structure and bounded hardware waits.
+- [ ] Confirm RTC detection, backend selection and live clock updates on the user's local emulator; validation remains external.
 - [ ] Confirm Stage 1 integration on the user's local toolchain/emulator; keep validation outside the emulator runtime.
 
 ## Stage 2 — NeoGS transport
