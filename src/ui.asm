@@ -1,5 +1,5 @@
 ; Project130 ATM-native host console.
-; UI ABI is fixed at #A000 (init) and #A003 (putc). The module executes
+; UI ABI: #A000 init, #A003 putc, #A006 RTC clock, #A009 fixed-position text output. The module executes
 ; from ATM window 2 while window 1 is temporarily mapped to video RAM.
 ; Layout and physical text-plane addressing are ported from Project126.
 
