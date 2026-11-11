@@ -460,7 +460,7 @@ p130_ui_scroll:
         ret
 
 p130_ui_line0:  db "PROJECT130  |  ATM TURBO 2+  |  HOST CONSOLE",0
-p130_ui_line1:  db "BOOTSTRAP-0.3.0-P126-ATM-CONSOLE",0
+p130_ui_line1:  db "BOOTSTRAP-0.3.1-DS12887-RTC",0
 p130_ui_line2:  db "SYSTEM / HOST STATUS",0
 p130_ui_line3:  db "HOST CPU      : Z80 / ATM TURBO 2+",0
 p130_ui_line4:  db "GUEST CPU     : 8086 REAL MODE / NeoGS",0
