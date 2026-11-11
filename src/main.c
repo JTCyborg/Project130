@@ -2,14 +2,14 @@
 #include "diag.h"
 #include "memory.h"
 
-#define P130_BUILD_ID "BOOTSTRAP-0.2.0-ATM-HOST-BASE"
+#define P130_BUILD_ID "BOOTSTRAP-0.2.1-EMU-RUNTIME-NO-SELFTEST"
 
 static void p130_report_memory(void)
 {
     uint8_t result;
 
     p130_debug_puts("[MEM] ATM2+ CAPACITY MODEL=1M PAGES=64 PAGE_SIZE=16K\r\n");
-    p130_debug_puts("[MEM] PHYSICAL PROBE NOT IMPLEMENTED; NO RAM TEST WRITES\r\n");
+    p130_debug_puts("[MEM] CAPACITY MODEL ONLY; PHYSICAL RAM DISCOVERY NOT IMPLEMENTED\r\n");
 
     result = p130_memory_init();
     if (result != 0u) {
@@ -20,17 +20,9 @@ static void p130_report_memory(void)
     }
 
     p130_debug_puts("[MEM] RESERVED=P0:BOOT-W3 P2:STACK P3:VIDEO-ATTR P5:RESIDENT P7:VIDEO-CHARS\r\n");
-    p130_debug_puts("[MEM] ALLOCATOR/PIN SELFTEST BEGIN\r\n");
-    result = p130_memory_selftest();
-    if (result == 0u) {
-        p130_debug_puts("[MEM] ALLOCATOR/PIN SELFTEST PASS; FREE=");
-        p130_debug_hex8(p130_memory_free_count());
-        p130_debug_puts("\r\n");
-    } else {
-        p130_debug_puts("[MEM] ALLOCATOR/PIN SELFTEST FAILED; TEST=");
-        p130_debug_hex8(result);
-        p130_debug_puts("\r\n");
-    }
+    p130_debug_puts("[MEM] PAGE MANAGER READY; FREE=");
+    p130_debug_hex8(p130_memory_free_count());
+    p130_debug_puts("\r\n");
 }
 
 void p130_c_entry(void)
@@ -45,6 +37,6 @@ void p130_c_entry(void)
     p130_debug_puts("[P130] NEO GS / DMA NOT INITIALIZED\r\n");
 
     for (;;) {
-        /* Stage 1 keeps IRQ disabled and performs metadata-only checks. */
+        /* Emulator host idle: no self-tests or memory probing. */
     }
 }
