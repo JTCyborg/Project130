@@ -7,6 +7,7 @@
 p130_ui_entry:
         jp      p130_ui_init_impl
         jp      p130_ui_putc_impl
+        jp      p130_ui_clock_update
 
 P130_UI_COLUMNS EQU 80
 P130_UI_ROWS    EQU 13
