@@ -465,11 +465,43 @@ p130_ui_line3:  db "HOST CPU      : Z80 / ATM TURBO 2+",0
 p130_ui_line4:  db "GUEST CPU     : 8086 REAL MODE / NeoGS",0
 p130_ui_line5:  db "BIOS          : GUEST ROM NOT LOADED",0
 p130_ui_line6:  db "VIDEO         : ATM RG=6 TEXT 80x25",0
-p130_ui_line7:  db "REAL TIME CLK : HOST RTC SERVICE PENDING",0
+p130_ui_line7:  db "REAL TIME CLK : ?? : ?? : ??",0
+p130_ui_clock_update:
+        push    af
+        push    bc
+        push    de
+        push    hl
+        ld      a,(_p130_rtc_hour)
+        ld      (p130_ui_clock_digits),a
+        ld      a,(_p130_rtc_hour+1)
+        ld      (p130_ui_clock_digits+1),a
+        ld      a,':'
+        ld      (p130_ui_clock_digits+2),a
+        ld      a,(_p130_rtc_minute)
+        ld      (p130_ui_clock_digits+3),a
+        ld      a,(_p130_rtc_minute+1)
+        ld      (p130_ui_clock_digits+4),a
+        ld      a,':'
+        ld      (p130_ui_clock_digits+5),a
+        ld      a,(_p130_rtc_second)
+        ld      (p130_ui_clock_digits+6),a
+        ld      a,(_p130_rtc_second+1)
+        ld      (p130_ui_clock_digits+7),a
+        ld      hl,p130_ui_clock_digits
+        ld      a,7
+        ld      c,17
+        call    p130_ui_print_at
+        pop     hl
+        pop     de
+        pop     bc
+        pop     af
+        ret
+
 p130_ui_line9:  db "NEOGS / IPC",0
 p130_ui_line10: db "DEBUG STREAM  : ATM #EF -> HOST LOG",0
 p130_ui_line11: db "GUEST CLOCK   : VIRTUAL / HOST LOG: LIVE",0
 
+p130_ui_clock_digits: db "??:??:??",0
 p130_ui_ready:       db 0
 p130_ui_row:         db 0
 p130_ui_col:         db 0
