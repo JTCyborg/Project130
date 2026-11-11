@@ -96,6 +96,12 @@ if ($UiBytes.Length -le 0 -or $UiBytes.Length -gt 4096) {
 }
 $HostBytes = [System.IO.File]::ReadAllBytes($Resident)
 $UiOffset = 0x4000
+if ($HostBytes.Length -gt $UiOffset) {
+    throw "ATM host image overlaps the fixed console origin #A000; host size: $($HostBytes.Length) bytes"
+}
+if ($UiBytes.Length -lt 6 -or $UiBytes[0] -ne 0xC3 -or $UiBytes[3] -ne 0xC3) {
+    throw "ATM console entry table is invalid; expected JP stubs at #A000 and #A003"
+}
 $CombinedLength = $UiOffset + $UiBytes.Length
 if ($CombinedLength -gt 20480) { throw "Combined resident/console image exceeds #6000-#AFFF" }
 $Combined = New-Object byte[] $CombinedLength
