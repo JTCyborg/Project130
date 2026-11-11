@@ -30,6 +30,10 @@ A milestone is complete when its implementation and stable interfaces are integr
 - [x] Add the ATM-host DS12887 RTC service using the verified Project129 GLUK/SMUC read-only driver.
 - [x] Display and refresh host RTC time in the ATM-native 80x25 console.
 - [ ] Establish host capability/version structure and bounded hardware waits.
+- [x] Add read-only TR-DOS track-0 catalogue preload through the proven ATM ROM call.
+- [x] Add ATM-host Nemo IDE ATA IDENTIFY and bounded LBA28 sector reads.
+- [x] Add read-only FAT16 root-directory enumeration to the ATM console and #EF log.
+- [ ] Confirm TR-DOS and HDD catalogues on the user's local emulator; validation remains external.
 - [ ] Confirm RTC detection, backend selection and live clock updates on the user's local emulator; validation remains external.
 - [ ] Confirm Stage 1 integration on the user's local toolchain/emulator; keep validation outside the emulator runtime.
 
