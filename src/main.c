@@ -26,9 +26,20 @@ static void p130_report_memory(void)
     p130_debug_puts("\r\n");
 }
 
+static char p130_rtc_display[8];
+
 static void p130_ui_clock_update(void)
 {
+    p130_rtc_display[0] = p130_rtc_hour[0];
+    p130_rtc_display[1] = p130_rtc_hour[1];
+    p130_rtc_display[2] = ':';
+    p130_rtc_display[3] = p130_rtc_minute[0];
+    p130_rtc_display[4] = p130_rtc_minute[1];
+    p130_rtc_display[5] = ':';
+    p130_rtc_display[6] = p130_rtc_second[0];
+    p130_rtc_display[7] = p130_rtc_second[1];
     __asm
+        ld hl,_p130_rtc_display
         call 0A006h
     __endasm;
 }
