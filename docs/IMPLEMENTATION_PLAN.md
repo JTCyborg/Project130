@@ -33,6 +33,8 @@ A milestone is complete when its implementation and stable interfaces are integr
 - [x] Add read-only TR-DOS track-0 catalogue preload through the proven ATM ROM call.
 - [x] Add ATM-host Nemo IDE ATA IDENTIFY and bounded LBA28 sector reads.
 - [x] Add read-only FAT16 root-directory enumeration to the ATM console and #EF log.
+- [x] Port Project126 TR-DOS catalogue selection UI: nine visible rows, 12-character entries, selection marker, edge-triggered keyboard navigation and page scrolling.
+- [x] Record the selected TR-DOS descriptor and load request on Enter; actual payload loading remains gated on the future destination/NeoGS-DMA interface.
 - [ ] Confirm TR-DOS and HDD catalogues on the user's local emulator; validation remains external.
 - [ ] Confirm RTC detection, backend selection and live clock updates on the user's local emulator; validation remains external.
 - [ ] Confirm Stage 1 integration on the user's local toolchain/emulator; keep validation outside the emulator runtime.
