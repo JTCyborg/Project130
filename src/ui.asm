@@ -179,6 +179,10 @@ p130_ui_draw:
         ld      a,7
         ld      c,1
         call    p130_ui_print_at
+        ld      hl,p130_ui_line8
+        ld      a,8
+        ld      c,1
+        call    p130_ui_print_at
         ld      hl,p130_ui_line9
         ld      a,9
         ld      c,1
@@ -460,7 +464,7 @@ p130_ui_scroll:
         ret
 
 p130_ui_line0:  db "PROJECT130  |  ATM TURBO 2+  |  HOST CONSOLE",0
-p130_ui_line1:  db "BOOTSTRAP-0.3.1-DS12887-RTC",0
+p130_ui_line1:  db "BOOTSTRAP-0.3.2-TRDOS-HDD-CATALOG",0
 p130_ui_line2:  db "SYSTEM / HOST STATUS",0
 p130_ui_line3:  db "HOST CPU      : Z80 / ATM TURBO 2+",0
 p130_ui_line4:  db "GUEST CPU     : 8086 REAL MODE / NeoGS",0
@@ -492,6 +496,7 @@ p130_ui_clock_update:
         pop     af
         ret
 
+p130_ui_line8:  db "STORAGE       : TR-DOS + NEMO IDE / READ ONLY",0
 p130_ui_line9:  db "NEOGS / IPC",0
 p130_ui_line10: db "DEBUG STREAM  : ATM #EF -> HOST LOG",0
 p130_ui_line11: db "GUEST CLOCK   : VIRTUAL / HOST LOG: LIVE",0
