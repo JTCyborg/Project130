@@ -4,6 +4,7 @@
 ; No disk writes, blocking key-release waits, or unbounded I/O.
 
 SECTION CODE
+EXTERN _p130_trdos_result
 PUBLIC _p130_catalog_init
 PUBLIC _p130_catalog_poll
 PUBLIC _p130_catalog_load_request
@@ -217,7 +218,7 @@ p130_cat_confirm:
         ld      a,(p130_cat_selected)
         call    p130_cat_find_index
         ret     c
-        ld      (p130_cat_selected_entry),hl
+        ld      (_p130_catalog_selected_entry),hl
         ld      a,(p130_cat_selected)
         ld      (_p130_catalog_selected_index),a
         ld      a,1
