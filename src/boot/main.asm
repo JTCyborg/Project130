@@ -57,6 +57,9 @@ l21:
 l21_end:
 
 ; Line 30: restore debug channel 2 and enter the loaded resident image.
+        DB      0,30
+        DW      l30_end-l30
+l30:
         DB      OUT_CMD,"239",#0E,#00,#00,#EF,#00,#00
         DB      ",","2",#0E,#00,#00,#02,#00,#00,":"
         DB      RANDOMIZE,USR,VAL,34,"24576",34,#0D
