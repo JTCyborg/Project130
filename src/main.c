@@ -186,17 +186,17 @@ void p130_c_entry(void)
      * catalogue mirror. Preloading it first changes the known-good startup
      * environment and is deliberately not allowed here.
      */
-    p130_debug_puts("[NEOGS] GS105a BOOTSTRAP LAUNCH BEGIN; TRACE=");
+    p130_debug_puts("[NEOGS] GS105a BOOTSTRAP LAUNCH BEGIN\r\n");
     if (p130_neogs_startup() == 0u) {
         neogs_ready = 1u;
-        p130_debug_puts("[NEOGS] P126 RESIDENT + SIX OVERLAYS INSTALLED\\r\\n");
+        p130_debug_puts("[NEOGS] P126 RESIDENT + SIX OVERLAYS INSTALLED\r\n");
     } else {
-        p130_debug_puts("\\r\\n[NEOGS] BOOTSTRAP LAUNCH FAILED; STAGE=");
+        p130_debug_puts("\r\n[NEOGS] BOOTSTRAP LAUNCH FAILED; STAGE=");
         p130_debug_putc(p130_neogs_stage);
-        p130_debug_puts("\\r\\n");
+        p130_debug_puts("\r\n");
     }
 
-    p130_debug_puts("[TR-DOS] CATALOGUE PRELOAD BEGIN\\r\\n");
+    p130_debug_puts("[TR-DOS] CATALOGUE PRELOAD BEGIN\r\n");
     (void)p130_trdos_preload();
     /* Project126 order: ATM video mode first, then RTC, then console. */
     __asm
