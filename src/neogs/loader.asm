@@ -274,20 +274,30 @@ p130_ngs_stream_done:
         ld      (_p130_neogs_stage),a
         ld      a,'9'
         call    p130_ngs_trace
+        ; Split the jump handoff into observable sub-stages. 'J' means the
+        ; target byte is about to be sent; 'W' means the host is waiting for
+        ; the bootstrap response.
+        ld      a,'J'
+        call    p130_ngs_trace
         ld      a,040h
         call    p130_ngs_send_byte
         jr      nc,p130_ngs_jump_tx_done
         ; Project126 fallback: the #13 target byte may still be pending
         ; while GS105a has already switched to the bootstrap receiver.
         in      a,(P130_GSSTAT)
+        ld      (p130_ngs_last_status),a
         bit     7,a
-        jp      z,p130_ngs_fail
+        jp      z,p130_ngs_jump_tx_fail
+        ld      a,'W'
+        call    p130_ngs_trace
         call    p130_ngs_receive_byte
-        jp      c,p130_ngs_fail
+        jr      c,p130_ngs_ack_timeout
         jr      p130_ngs_ack_check
 p130_ngs_jump_tx_done:
+        ld      a,'W'
+        call    p130_ngs_trace
         call    p130_ngs_receive_byte
-        jp      c,p130_ngs_fail
+        jr      c,p130_ngs_ack_timeout
 p130_ngs_ack_check:
         ld      (p130_ngs_ack_value),a
         ; One A1 acknowledgement, matching Project126. It is emitted only
@@ -307,8 +317,20 @@ p130_ngs_ack_bad:
         ld      a,(p130_ngs_ack_value)
         call    p130_ngs_trace_hex
         jp      p130_ngs_fail
-        xor     a
-        jp      p130_ngs_finish
+
+p130_ngs_ack_timeout:
+        ld      a,'!'
+        call    p130_ngs_trace
+        ld      a,(p130_ngs_last_status)
+        call    p130_ngs_trace_hex
+        jp      p130_ngs_fail
+
+p130_ngs_jump_tx_fail:
+        ld      a,'j'
+        call    p130_ngs_trace
+        ld      a,(p130_ngs_last_status)
+        call    p130_ngs_trace_hex
+        jp      p130_ngs_fail
 
 p130_ngs_fail:
         ld      a,1
@@ -471,6 +493,7 @@ p130_ngs_wait_dbit_set:
         ld      bc,0FFFFh
 p130_ngs_dbit_set_loop:
         in      a,(P130_GSSTAT)
+        ld      (p130_ngs_last_status),a
         bit     7,a
         jr      nz,p130_ngs_ok
         dec     bc
