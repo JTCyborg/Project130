@@ -738,9 +738,11 @@ x86_vga_capture_text_frame_gate_impl:
         ld      a,#80
         call    x86_vga_read_text_cell_impl
         jr      c,.capture_fail
+        push    af
         ld      a,P126_NGS_DMA_PAGE
         rrca
         out     (P126_NGS_BANK_WINDOW_PORT),a
+        pop     af
         ld      (de),a
         inc     de
         ld      hl,(x86_vga_capture_index)
