@@ -208,7 +208,7 @@ x86_bios_startup_trace:
         ld      (x86_bios_trace_low_ip_once),a
         xor     a
         ld      (x86_bios_trace_first_slice_once),a
-        ld      a,1
+        ld      (x86_bios_rep_stosw_active),a
         ld      (x86_bios_trace_active),a
 .run_slice:
         ; 256 instructions per pass; service IPC between bounded slices.
@@ -344,6 +344,9 @@ x86_bios_startup_trace:
         call    x86_bios_trace_log_registers
         pop     hl
 .trace_cs_expected:
+        ; Live progress for the BIOS REP STOSW RAM-clear phase. Emit one
+        ; update per 256 words and a final 100% line when CX reaches zero.
+        call    x86_bios_rep_stosw_progress
         ld      hl,(x86_bios_trace_executed)
         inc     hl
         ld      (x86_bios_trace_executed),hl
@@ -428,6 +431,75 @@ x86_bios_startup_trace:
         ret     z
         scf
         ret
+
+; Track BIOS REP STOSW at F000:E12F and report completed/total words
+; on the same #EF debug console used by the existing BIOS trace.
+x86_bios_rep_stosw_progress:
+        push    af
+        push    bc
+        push    de
+        push    hl
+        ld      a,(x86_exec_opcode)
+        cp      #AB
+        jr      nz,.rep_done
+        ld      hl,(x86_reg_cs)
+        ld      de,#F000
+        or      a
+        sbc     hl,de
+        jr      nz,.rep_done
+        ld      a,(x86_bios_rep_stosw_active)
+        or      a
+        jr      nz,.rep_started
+        ; First completed STOSW has already decremented CX once.
+        ld      hl,(x86_reg_cx)
+        inc     hl
+        ld      (x86_bios_rep_stosw_total),hl
+        ld      a,1
+        ld      (x86_bios_rep_stosw_active),a
+.rep_started:
+        ld      hl,(x86_reg_cx)
+        ld      a,h
+        or      l
+        jr      z,.rep_emit
+        ; Avoid flooding the debug window: report each 256-word boundary.
+        ld      a,l
+        or      a
+        jr      nz,.rep_done
+.rep_emit:
+        ld      hl,x86_bios_rep_stosw_prefix
+        call    p126_ngs_resident_log
+        ld      hl,(x86_bios_rep_stosw_total)
+        ld      de,(x86_reg_cx)
+        or      a
+        sbc     hl,de
+        call    x86_bios_trace_emit_hex16
+        ld      hl,x86_bios_rep_stosw_separator
+        call    p126_ngs_resident_log
+        ld      hl,(x86_bios_rep_stosw_total)
+        call    x86_bios_trace_emit_hex16
+        ld      hl,x86_bios_rep_stosw_suffix
+        call    p126_ngs_resident_log
+        ld      a,(x86_reg_cx)
+        or      (hl)
+        ; CX=0 marks the completed clear; stop tracking this phase.
+        ld      hl,(x86_reg_cx)
+        ld      a,h
+        or      l
+        jr      nz,.rep_done
+        xor     a
+        ld      (x86_bios_rep_stosw_active),a
+.rep_done:
+        pop     hl
+        pop     de
+        pop     bc
+        pop     af
+        ret
+
+x86_bios_rep_stosw_prefix:    db "[BIOS] REP STOSW WORDS ",0
+x86_bios_rep_stosw_separator: db "/",0
+x86_bios_rep_stosw_suffix:    db 13,10,0
+x86_bios_rep_stosw_active:    db 0
+x86_bios_rep_stosw_total:     dw 0
 
 ; A=0 logs SS:SP; A=1 logs SS:(SP-2). Used only by the one-shot
 ; BIOS checksum-entry / invalid-return diagnostics.
