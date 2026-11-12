@@ -2,7 +2,8 @@
 ; Read-only mirror of the proven Project127 ROM call contract:
 ;   ROM entry #3D13, E=zero-based sector, HL=destination, B=1, C=5.
 ; Reads track 0 sectors 1..8 into the host W3/page-0 buffer at #C800.
-; No disk writes, IM or EI are performed here.
+; No disk writes or interrupt mode changes are performed here. The
+; TR-DOS shadow-off trampoline briefly reenables interrupts on return.
 
 SECTION CODE
 PUBLIC _p130_trdos_preload
