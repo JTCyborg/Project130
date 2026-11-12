@@ -14,8 +14,10 @@
 | 8 | `Rr...` | NeoGS loader | NEOBOOT open/validation, GS105a reset, #14 transfer, X86CORE preflight, #13/A1 handshake |
 | 9 | `[NEOGS] STAGE0 A1 ACK RECEIVED; BOOTSTRAP IDLE` | C entry | Only stage-0 A1 passed; resident firmware and DMA/IPC are not running |
 | 10 | `[TR-DOS] CATALOGUE PRELOAD BEGIN` | C entry | Full 8-sector catalogue preload, after NeoGS launch |
-| 11 | `[ATM] VIDEO/UI INIT DONE` | C entry | ATM shadow/video mode and host console initialized |
-| 12 | `[RTC]`, `[MEM]`, `[HDD]` | C entry | Project130-specific host services initialized after the P126-ordered startup stages |
+| 11 | `[ATM] VIDEO MODE INIT DONE` | C entry | ATM shadow/video mode initialized before RTC, matching Project126 |
+| 12 | `[RTC]` | C entry | RTC probed after video mode initialization |
+| 13 | `[ATM] CONSOLE INIT DONE` | C entry | Visible console drawn after RTC, matching Project126 |
+| 14 | `[MEM]`, `[HDD]` | C entry | Project130-specific host services initialized after the shared startup stages |
 
 The NeoGS loader trace uses R/r for NEOBOOT lookup and validation, 5 for GS105a reset, 6 for the #14 header, 7 for bootstrap bytes, 8 for X86CORE preflight, 9 for #13, and a1 for the accepted A1 acknowledgement. A failure line includes the stage number.
 

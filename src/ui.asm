@@ -1,5 +1,5 @@
 ; Project130 ATM-native host console.
-; UI ABI: #A000 init, #A003 putc, #A006 RTC clock, #A009 fixed-position text output. The module executes
+; UI ABI: #A000 console init, #A003 putc, #A006 RTC clock, #A009 fixed-position text output, #A00C video init. The module executes
 ; from ATM window 2 while window 1 is temporarily mapped to video RAM.
 ; Layout and physical text-plane addressing are ported from Project126.
 
@@ -9,6 +9,7 @@ p130_ui_entry:
         jp      p130_ui_putc_impl
         jp      p130_ui_clock_update
         jp      p130_ui_print_at
+        jp      p130_ui_video_init_impl
 
 P130_UI_COLUMNS EQU 80
 P130_UI_ROWS    EQU 13
@@ -23,7 +24,7 @@ p130_ui_init_impl:
         push    bc
         push    de
         push    hl
-        call    p130_atm_video_init
+        call    p130_ui_video_init_impl
         call    p130_ui_clear
         call    p130_ui_draw
         xor     a
@@ -35,6 +36,17 @@ p130_ui_init_impl:
         pop     de
         pop     bc
         pop     af
+        ret
+
+; Initialize only the ATM video/shadow-port layer. Project126 performs this
+; before RTC, while the visible console is drawn only after RTC setup.
+p130_ui_video_init_impl:
+        ld      a,(p130_ui_video_ready)
+        or      a
+        ret     nz
+        call    p130_atm_video_init
+        ld      a,1
+        ld      (p130_ui_video_ready),a
         ret
 
 ; ATM shadow-port activation and RG=6 text-mode setup from Project126.
@@ -459,6 +471,7 @@ p130_ui_line11: db "TR-DOS FILES: UP/DOWN SELECT  CAPS+5/8 PAGE  ENTER LOAD",0
 
 p130_ui_clock_digits: db "??:??:??",0
 p130_ui_ready:       db 0
+p130_ui_video_ready: db 0
 p130_ui_row:         db 0
 p130_ui_col:         db 0
 p130_ui_char:        db 0

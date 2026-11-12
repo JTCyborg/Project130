@@ -147,7 +147,6 @@ static void p130_rtc_start(void)
     p130_debug_puts("[RTC] DS12887 PROBE BEGIN (GLUK/SMUC)\r\n");
     p130_rtc_probe();
     p130_rtc_read_current();
-    p130_ui_clock_update();
 
     if (p130_rtc_available) {
         p130_debug_puts("[RTC] DS12887 ONLINE; BACKEND=");
@@ -197,14 +196,21 @@ void p130_c_entry(void)
     p130_debug_puts("[TR-DOS] CATALOGUE PRELOAD BEGIN\r\n");
     (void)p130_trdos_preload();
 
-    /* Project126 initializes ATM video after NeoGS and catalogue startup. */
+    /* Project126 order: ATM video mode first, then RTC, then console. */
+    __asm
+        call 0A00Ch
+    __endasm;
+    p130_debug_puts("[ATM] VIDEO MODE INIT DONE\r\n");
+
+    p130_rtc_start();
+
+    /* Project126 draws/initializes the visible console after RTC setup. */
     __asm
         call 0A000h
     __endasm;
-    p130_debug_puts("[ATM] VIDEO/UI INIT DONE\r\n");
+    p130_debug_puts("[ATM] CONSOLE INIT DONE\r\n");
+    p130_ui_clock_update();
 
-    /* RTC uses the shadow-port/video configuration established by the UI. */
-    p130_rtc_start();
     p130_report_memory();
     p130_storage_start();
     p130_catalog_init();
