@@ -157,23 +157,6 @@ p130_ngs_len_ok:
         ld      (_p130_neogs_stage),a
         ld      a,'3'
         call    p130_ngs_trace
-        ; Stage-0 must fit one ROM receive block (1..256 bytes).
-        ld      hl,(05CE8h)
-        ld      a,h
-        or      l
-        jp      z,p130_ngs_fail
-        ld      a,h
-        or      a
-        jr      z,p130_ngs_len_ok
-        cp      1
-        jp      nz,p130_ngs_fail
-        ld      a,l
-        or      a
-        jp      nz,p130_ngs_fail
-p130_ngs_len_ok:
-        ld      hl,(05CE8h)
-        ld      (p130_ngs_length),hl
-
         ld      a,4
         ld      (_p130_neogs_stage),a
         ld      a,'4'
@@ -289,11 +272,6 @@ p130_ngs_finish:
         ld      l,a
         ld      h,0
         ret
-
-; Abort safely if TR-DOS attempts a BASIC error callback.
-p130_ngs_rom_error:
-        ld      a,1
-        jp      p130_ngs_finish
 
 ; Emit a one-character progress marker on the existing #EF debug channel.
 p130_ngs_trace:
