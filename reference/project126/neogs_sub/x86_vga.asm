@@ -1471,18 +1471,14 @@ x86_vga_capture_text_frame_impl:
         ld      hl,0
         ld      (x86_vga_capture_index),hl
 .capture_cell_loop:
-        ; Source offset = cell_index * 4 + selected plane.
+        ; Match Project125's physical VGA plane layout exactly:
+        ; plane 0 occupies VRAM offsets 00000h..0FFFFh (pages 30h..33h),
+        ; plane 1 occupies 10000h..1FFFFh (pages 34h..37h).
+        ; Do NOT interleave as cell*4: the backing store is four separate
+        ; 64 KiB planes, just like Project125 pages 83..86 / 87..90.
         ld      hl,(x86_vga_capture_index)
-        add     hl,hl
-        add     hl,hl
-        ld      a,(x86_vga_capture_plane)
-        add     a,l
-        ld      l,a
-        jr      nc,.capture_src_ready
-        inc     h
-.capture_src_ready:
         ld      (x86_vga_vram_offset),hl
-        xor     a
+        ld      a,(x86_vga_capture_plane)
         ld      (x86_vga_vram_offset+2),a
         call    x86_vga_vram_read_at_offset
         ld      (x86_vga_capture_data),a
