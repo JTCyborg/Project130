@@ -39,8 +39,8 @@ if ([System.IO.Path]::GetFileName($Out) -ne "disk_A.trd") {
 
 Remove-Item -Force -ErrorAction SilentlyContinue $Resident, $MapFile, $UiImage, $NeoGsBootstrap, (Join-Path $BuildDir "P130BOOT.sym"), $Out
 
-Write-Host "[P130 BUILD] VERSION=P130-0.5.2-RESIDENT-LOG-NAMESPACE"
-foreach ($Source in @("src/main.c", "src/diag.c", "src/diag.h", "src/memory.c", "src/memory.h", "src/rtc.h", "src/rtc.asm", "src/trdos.asm", "src/hdd.asm", "src/hdd_fat16.asm", "src/catalog.asm", "src/neogs/loader.asm", "src/neogs/bootstrap.asm", "src/entry.asm", "src/ui.asm", "src/boot/main.asm")) {
+Write-Host "[P130 BUILD] VERSION=P130-0.5.3-P126-BOOTSTRAP-BIN"
+foreach ($Source in @("src/main.c", "src/diag.c", "src/diag.h", "src/memory.c", "src/memory.h", "src/rtc.h", "src/rtc.asm", "src/trdos.asm", "src/hdd.asm", "src/hdd_fat16.asm", "src/catalog.asm", "src/neogs/loader.asm", "src/neogs/bootstrap.asm", "src/neogs/bootstrap_assemble.asm", "src/entry.asm", "src/ui.asm", "src/boot/main.asm")) {
     $Hash = (Get-FileHash $Source -Algorithm SHA256).Hash.Substring(0, 8)
     Write-Host "[P130 BUILD] $Source=$Hash"
 }
@@ -115,14 +115,14 @@ Write-Host ("[P130 BUILD] UI=#A000 UI_SIZE={0} HOST_END=#{1:X4} COMBINED_SIZE={2
 
 # Build the <=256-byte NeoGS stage-0 image first; GS105a #14 uploads this
 # image only. The resident core and application payloads are never GSDAT-streamed.
-& $SjAsmPlus "--raw=$NeoGsBootstrap" src/neogs/bootstrap.asm
+& $SjAsmPlus src/neogs/bootstrap_assemble.asm
 if ($LASTEXITCODE -ne 0) { throw "NeoGS bootstrap assembly failed: $LASTEXITCODE" }
 if (-not (Test-Path $NeoGsBootstrap)) { throw "NeoGS bootstrap image was not produced" }
 $NeoGsBootstrapSize = (Get-Item $NeoGsBootstrap).Length
 if ($NeoGsBootstrapSize -le 0 -or $NeoGsBootstrapSize -gt 256) {
     throw "NeoGS bootstrap must fit GS105a #14 (1..256 bytes); actual size: $NeoGsBootstrapSize"
 }
-Write-Host "[P130 BUILD] NEOBOOT_SIZE=$NeoGsBootstrapSize (GS105a #14/#13 only)"
+Write-Host "[P130 BUILD] NEOBOOT_SIZE=$NeoGsBootstrapSize (SAVEBIN #4000..#40FF; GS105a #14/#13 only)"
 
 # The three BIOS files are independent 8 KiB ROM images. bios.asm/bios.txt
 # describe Bios.bin and are intentionally not packaged as separate images.

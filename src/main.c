@@ -6,7 +6,7 @@
 #define P130_CATALOGUE_ADDR 0xC800u
 #define P130_CATALOGUE_SIZE 2048u
 
-#define P130_BUILD_ID "P130-0.5.2-RESIDENT-LOG-NAMESPACE"
+#define P130_BUILD_ID "P130-0.5.3-P126-BOOTSTRAP-BIN"
 
 static void p130_report_memory(void)
 {
