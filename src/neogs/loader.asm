@@ -72,6 +72,29 @@ p130_ngs_boot_len_ok:
         call    p130_ngs_send_command_long
         jp      c,p130_ngs_fail
 
+        ; Exact Project125/126 ROM synchronization step: query GS105a total
+        ; RAM (#20) and consume all three response bytes before #14.
+        ; This is not optional: it leaves the stock ROM command/data channel
+        ; in the same state as the proven launcher before RECEIVE BLOCK.
+        ld      a,5
+        ld      (_p130_neogs_stage),a
+        ld      a,'m'
+        call    p130_ngs_trace
+        ld      a,020h
+        call    p130_ngs_send_command
+        jp      c,p130_ngs_fail
+        call    p130_ngs_receive_byte
+        jp      c,p130_ngs_fail
+        ld      (p130_ngs_ram_report),a
+        call    p130_ngs_receive_byte
+        jp      c,p130_ngs_fail
+        ld      (p130_ngs_ram_report+1),a
+        call    p130_ngs_receive_byte
+        jp      c,p130_ngs_fail
+        ld      (p130_ngs_ram_report+2),a
+        ld      a,'M'
+        call    p130_ngs_trace
+
         ld      a,6
         ld      (_p130_neogs_stage),a
         ld      a,'6'
@@ -476,6 +499,7 @@ p130_ngs_old_status: db 0
 p130_ngs_sector: db 0
 p130_ngs_track: db 0
 p130_ngs_ack_value: db 0
+p130_ngs_ram_report: db 0,0,0
 p130_ngs_last_status: db 0
 p130_ngs_scan_left: db 0
 

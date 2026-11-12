@@ -88,3 +88,8 @@ Build `P130-0.6.5-BOOT-ENTRY-PROBE` adds a stackless DBIT entry signature `A0` a
 Build `P130-0.6.6-P126-EXACT-BOOT-HANDSHAKE` removes the experimental A0 entry probe. The Project130 bootstrap now follows the proven Project126 entry order: DI, establish SP=#3FFF, local entry log, stop ZX DMA and settle, apply the same GSCFG0 NOROM/EXPAG transition, map the temporary windows, set SP=#FFFE, perform the #FF02 dummy read, and publish A1 as its first DBIT byte. The ATM host consumes exactly one A1 byte after the #13 high-address transfer. No extra byte is inserted into the Project126 protocol.
 
 This is a source-level restoration of the proven bootstrap entry/handshake, not a claim of a successful target build or Unreal Speccy runtime test. Those remain required.
+
+
+## 2026-11-12 — restore mandatory GS105a #20 RAM probe before #14
+
+Build `P130-0.6.7-P126-ROM-RAM-PROBE` restores a missing step from the proven Project125 GS105a launcher: after cold reset, issue ROM command #20 (GET TOTAL RAM) and consume all three response bytes before RECEIVE BLOCK (#14). Project130 previously skipped this transaction and proceeded directly from #F4 to #14. The bootstrap bytes and #13 jump transaction are unchanged. Trace marker `m` is emitted before #20 and `M` after all three response bytes have been consumed. Target build and runtime test are pending.
