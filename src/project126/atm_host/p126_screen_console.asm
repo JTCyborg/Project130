@@ -44,6 +44,62 @@ p126_screen_trace_offset: db "[SCREEN DBG] OFFSET=",0
 p126_screen_trace_parity: db " PARITY=",0
 p126_screen_trace_readback: db "[SCREEN DBG] READBACK CHAR/ATTR=",0
 
+; Port-only trace helpers: never mirror diagnostics into the ATM text console,
+; because that console itself uses p126_screen_write_guest_cell.
+p126_screen_trace_string:
+        push    af
+        push    bc
+        ld      bc,#00EF
+.p126_screen_trace_string_loop:
+        ld      a,(hl)
+        inc     hl
+        or      a
+        jr      z,.p126_screen_trace_string_done
+        out     (c),a
+        jr      .p126_screen_trace_string_loop
+.p126_screen_trace_string_done:
+        pop     bc
+        pop     af
+        ret
+
+p126_screen_trace_hex_byte:
+        push    af
+        push    bc
+        ld      b,a
+        rrca
+        rrca
+        rrca
+        rrca
+        and     #0F
+        call    p126_screen_trace_hex_nibble
+        ld      a,b
+        and     #0F
+        call    p126_screen_trace_hex_nibble
+        pop     bc
+        pop     af
+        ret
+p126_screen_trace_hex_nibble:
+        add     a,'0'
+        cp      '9'+1
+        jr      c,.p126_screen_trace_hex_emit
+        add     a,7
+.p126_screen_trace_hex_emit:
+        out     (#EF),a
+        ret
+
+p126_screen_trace_crlf:
+        push    af
+        push    bc
+        ld      bc,#00EF
+        ld      a,13
+        out     (c),a
+        ld      a,10
+        out     (c),a
+        pop     bc
+        pop     af
+        ret
+
+
 
 Console_X: db 0
 Console_Y: db BIOS_DEBUG_TOP
@@ -544,22 +600,22 @@ p126_screen_write_guest_cell:
         push    de
         push    hl
         ld      hl,p126_screen_trace_first
-        call    p126_ipc_debug_string
+        call    p126_screen_trace_string
         ld      a,(bios_dbg_write_row)
-        call    p126_ipc_debug_hex_byte
+        call    p126_screen_trace_hex_byte
         ld      hl,p126_screen_trace_col
-        call    p126_ipc_debug_string
+        call    p126_screen_trace_string
         ld      a,(bios_dbg_write_col)
-        call    p126_ipc_debug_hex_byte
+        call    p126_screen_trace_hex_byte
         ld      hl,p126_screen_trace_char
-        call    p126_ipc_debug_string
+        call    p126_screen_trace_string
         ld      a,(bios_dbg_char)
-        call    p126_ipc_debug_hex_byte
+        call    p126_screen_trace_hex_byte
         ld      hl,p126_screen_trace_attr
-        call    p126_ipc_debug_string
+        call    p126_screen_trace_string
         ld      a,(bios_dbg_attr)
-        call    p126_ipc_debug_hex_byte
-        call    p126_ipc_debug_crlf
+        call    p126_screen_trace_hex_byte
+        call    p126_screen_trace_crlf
         pop     hl
         pop     de
         pop     bc
@@ -597,17 +653,17 @@ p126_screen_write_guest_cell:
         push    de
         push    hl
         ld      hl,p126_screen_trace_offset
-        call    p126_ipc_debug_string
+        call    p126_screen_trace_string
         ld      hl,(bios_dbg_offset)
         ld      a,h
-        call    p126_ipc_debug_hex_byte
+        call    p126_screen_trace_hex_byte
         ld      a,l
-        call    p126_ipc_debug_hex_byte
+        call    p126_screen_trace_hex_byte
         ld      hl,p126_screen_trace_parity
-        call    p126_ipc_debug_string
+        call    p126_screen_trace_string
         ld      a,(bios_dbg_parity)
-        call    p126_ipc_debug_hex_byte
-        call    p126_ipc_debug_crlf
+        call    p126_screen_trace_hex_byte
+        call    p126_screen_trace_crlf
         pop     hl
         pop     de
         pop     bc
@@ -649,7 +705,7 @@ p126_screen_write_guest_cell:
         push    de
         push    hl
         ld      hl,p126_screen_trace_readback
-        call    p126_ipc_debug_string
+        call    p126_screen_trace_string
         ld      a,(bios_dbg_parity)
         or      a
         jr      nz,.screen_trace_readback_odd
@@ -657,27 +713,27 @@ p126_screen_write_guest_cell:
         ld      de,#4000
         add     hl,de
         ld      a,(hl)
-        call    p126_ipc_debug_hex_byte
+        call    p126_screen_trace_hex_byte
         ld      hl,(bios_dbg_offset)
         ld      de,#E000
         add     hl,de
         ld      a,(hl)
-        call    p126_ipc_debug_hex_byte
+        call    p126_screen_trace_hex_byte
         jr      .screen_trace_readback_end
 .screen_trace_readback_odd:
         ld      hl,(bios_dbg_offset)
         ld      de,#6000
         add     hl,de
         ld      a,(hl)
-        call    p126_ipc_debug_hex_byte
+        call    p126_screen_trace_hex_byte
         ld      hl,(bios_dbg_offset)
         ld      de,#C000
         add     hl,de
         inc     hl
         ld      a,(hl)
-        call    p126_ipc_debug_hex_byte
+        call    p126_screen_trace_hex_byte
 .screen_trace_readback_end:
-        call    p126_ipc_debug_crlf
+        call    p126_screen_trace_crlf
         pop     hl
         pop     de
         pop     bc
@@ -734,7 +790,7 @@ p126_screen_apply_text_frame::
         ; Keep the two stream pointers in HL/DE and the original 25x80
         ; nested loop; each cell is written by the same ATM-native primitive.
         ld      hl,p126_screen_trace_renderer_enter
-        call    p126_ipc_debug_string
+        call    p126_screen_trace_string
         xor     a
         ld      (p126_screen_trace_first_cell),a
         ld      hl,P126_IPC_DMA_RX_BUFFER+P126_IPC_HEADER_SIZE
@@ -750,10 +806,10 @@ p126_screen_apply_text_frame::
         jr      nz,.apply_row_trace_done
         push    hl
         ld      hl,p126_screen_trace_row
-        call    p126_ipc_debug_string
+        call    p126_screen_trace_string
         ld      a,(p126_screen_frame_row)
-        call    p126_ipc_debug_hex_byte
-        call    p126_ipc_debug_crlf
+        call    p126_screen_trace_hex_byte
+        call    p126_screen_trace_crlf
         pop     hl
 .apply_row_trace_done:
         ld      c,P126_ATM_TEXT_WIDTH
@@ -789,7 +845,7 @@ p126_screen_apply_text_frame::
         ld      (p126_screen_frame_row),a
         djnz    .apply_text_row
         ld      hl,p126_screen_trace_renderer_done
-        call    p126_ipc_debug_string
+        call    p126_screen_trace_string
         xor     a
         ret
 .apply_text_bad:
