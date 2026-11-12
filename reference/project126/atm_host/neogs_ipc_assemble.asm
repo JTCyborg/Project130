@@ -7,7 +7,7 @@
         ORG     0
 
 p126_atm_ipc_module_start:
-        INCLUDE "atm_host/neogs_ipc.asm"
+        INCLUDE "reference/project126/atm_host/neogs_ipc.asm"
 p126_atm_ipc_module_end:
 
 ; The standalone IPC audit unit does not link the ATM screen-console module.

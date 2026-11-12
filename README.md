@@ -23,6 +23,8 @@ On Windows with Z88DK and SjASMPlus available in PATH:
 powershell -ExecutionPolicy Bypass -File tools/build_project130.ps1
 ```
 
-The build creates `build/P130BOOT.bin` and packages `disk_A.trd`. The first milestone is only a resident C/ASM entry and #EF diagnostics; it does not yet initialize NeoGS or implement DMA.
+The build creates `build/P130BOOT.bin` and packages `disk_A.trd`. The current ATM host initializes the console and RTC, preloads the TR-DOS catalogue, probes Nemo IDE and enumerates the FAT16 root directory. NeoGS stage-0 bootstrap handoff is under integration; the resident DMA/IPC transport is not yet operational, and the NeoGS physical memory map remains unapproved.
 
-See [docs/IMPLEMENTATION_PLAN.md](docs/IMPLEMENTATION_PLAN.md) for milestones and acceptance criteria.
+Only the `src/` tree is the active Project130 implementation. Project126 reference sources are isolated under `reference/project126/` and are not runtime build inputs. The standalone `PCem/` tree is a read-only CPU/VGA reference.
+
+See [docs/IMPLEMENTATION_PLAN.md](docs/IMPLEMENTATION_PLAN.md) for milestones and acceptance criteria, and [docs/PROJECT126_IMPORT.md](docs/PROJECT126_IMPORT.md) for the reference boundary.

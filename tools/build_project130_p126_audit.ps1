@@ -75,7 +75,7 @@ foreach ($Name in $CoreOutputs) {
 }
 
 Write-Host "[P130 P126 AUDIT] UNIT=NeoGS resident and split overlays"
-& $Assembler --msg=all "--lst=build/P130_P126_NGS.lst" --lstlab=sort "--sym=build/P130_P126_NGS.map" "neogs_sub/x86_cpu_state_assemble.asm"
+& $Assembler --msg=all "--lst=build/P130_P126_NGS.lst" --lstlab=sort "--sym=build/P130_P126_NGS.map" "reference/project126/neogs_sub/x86_cpu_state_assemble.asm"
 if ($LASTEXITCODE -ne 0) {
     throw "SjASMPlus failed for Project126 NeoGS resident with exit code $LASTEXITCODE"
 }
@@ -104,9 +104,9 @@ foreach ($Name in @("X86EXEC.C", "X86VGA.C", "X86VID.C")) {
     }
 }
 
-Invoke-AssemblyAudit -Name "ATM IPC" -Source "atm_host/neogs_ipc_assemble.asm" -Binary "P130_P126_ATM_IPC.raw" -Listing "P130_P126_ATM_IPC.lst" -Symbols "P130_P126_ATM_IPC.map" -MaximumBytes 65536
-Invoke-AssemblyAudit -Name "NeoGS IPC" -Source "neogs_sub/p126_ipc_assemble.asm" -Binary "P130_P126_NGS_IPC.raw" -Listing "P130_P126_NGS_IPC.lst" -Symbols "P130_P126_NGS_IPC.map" -MaximumBytes 65536
-Invoke-AssemblyAudit -Name "GS105a bootstrap reference" -Source "neogs_sub/p126_bootstrap_assemble.asm" -Binary "P130_P126_BOOTSTRAP.raw" -Listing "P130_P126_BOOTSTRAP.lst" -Symbols "P130_P126_BOOTSTRAP.map" -MaximumBytes 256
+Invoke-AssemblyAudit -Name "ATM IPC" -Source "reference/project126/atm_host/neogs_ipc_assemble.asm" -Binary "P130_P126_ATM_IPC.raw" -Listing "P130_P126_ATM_IPC.lst" -Symbols "P130_P126_ATM_IPC.map" -MaximumBytes 65536
+Invoke-AssemblyAudit -Name "NeoGS IPC" -Source "reference/project126/neogs_sub/p126_ipc_assemble.asm" -Binary "P130_P126_NGS_IPC.raw" -Listing "P130_P126_NGS_IPC.lst" -Symbols "P130_P126_NGS_IPC.map" -MaximumBytes 65536
+Invoke-AssemblyAudit -Name "GS105a bootstrap reference" -Source "reference/project126/neogs_sub/p126_bootstrap_assemble.asm" -Binary "P130_P126_BOOTSTRAP.raw" -Listing "P130_P126_BOOTSTRAP.lst" -Symbols "P130_P126_BOOTSTRAP.map" -MaximumBytes 256
 
 $Bootstrap = Join-Path $Build "P126_BOOTSTRAP.bin"
 if (-not (Test-Path $Bootstrap)) {
