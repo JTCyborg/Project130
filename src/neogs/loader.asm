@@ -523,4 +523,5 @@ p130_ngs_old_status: db 0
 p130_ngs_sector: db 0
 p130_ngs_track: db 0
 p130_ngs_ack_value: db 0
+p130_ngs_last_status: db 0
 p130_ngs_scan_left: db 0
