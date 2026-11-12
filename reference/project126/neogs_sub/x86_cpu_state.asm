@@ -1453,7 +1453,7 @@ x86_guest_ram_write8:
         ret
 
 ; Select WIN3 physical page and return HL=C000h|(guest_address&3FFFh).
-; Physical page = 44h + guest_address[19:14].
+; Physical page = 63h + guest_address[19:14].
 ; Clobbers AF, BC, HL; does not touch DE or guest CPU registers.
 x86_guest_ram_select_page:
         ld      a,(x86_phys_addr+2)
@@ -1488,15 +1488,14 @@ x86_guest_ram_select_page:
 ; Unified guest memory interface
 ;
 ; Guest physical address is classified before selecting its physical backing:
-;   00000-9FFFF / C8000-FDFFF : guest RAM, pages 44h-83h
-;   A0000-BFFFF               : linear VGA aperture backing, pages 30h-37h
+;   00000-9FFFF / C8000-FDFFF : guest RAM, pages 63h-A2h
+;   A0000-BFFFF               : VGA aperture decoded into four planes, pages 53h-62h
 ;   C0000-C7FFF               : VGA BIOS slot, pages 20h-21h
 ;   FE000-FFFFF               : system BIOS slot, page 10h (8 KiB image)
 ;
-; The VGA aperture backend is deliberately a byte-linear staging layer over
-; the first 128 KiB of the 256 KiB VRAM allocation. It is NOT yet IBM VGA
-; plane/latch/read-mode/write-mode emulation. VGA register semantics are a
-; separate implementation stage.
+; The VGA aperture is routed through the Project125-compatible planar VGA
+; model. Plane storage is physically backed by pages 53h-62h; do not map the
+; aperture linearly onto the physical pages.
 ;
 ; All backing is reached through WIN3. A is the page bias for the address
 ; formula: page = (guest_high_nibble*4)+(guest_middle>>6)+bias.
