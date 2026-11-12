@@ -6,7 +6,7 @@
 #define P130_CATALOGUE_ADDR 0xC800u
 #define P130_CATALOGUE_SIZE 2048u
 
-#define P130_BUILD_ID "BOOTSTRAP-0.4.0-NEOGS-ROM-BOOTSTRAP-BIOS-DISK"
+#define P130_BUILD_ID "BOOTSTRAP-0.4.1-NEOGS-STAGE-TRACE"
 
 static void p130_report_memory(void)
 {
@@ -32,6 +32,7 @@ static void p130_report_memory(void)
 
 extern volatile uint8_t p130_trdos_result;
 extern uint8_t p130_neogs_startup(void);
+extern volatile uint8_t p130_neogs_stage;
 extern void p130_catalog_init(void);
 extern void p130_catalog_poll(void);
 extern void p130_hdd_probe(void);
