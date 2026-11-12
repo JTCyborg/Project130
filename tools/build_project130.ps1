@@ -44,7 +44,7 @@ SAVEBIN "build/P126_BOOTSTRAP.bin",p126_bootstrap_start,p126_bootstrap_end-p126_
 '@
 Set-Content -Path (Join-Path $Root "project130_p126_bootstrap.generated.asm") -Value $bootAsm -Encoding ASCII
 Remove-Item -Force -ErrorAction SilentlyContinue (Join-Path $Build "P126_BOOTSTRAP.bin")
-& $SjAsmPlus --msg=all "--lst=build/P130_P126_BOOTSTRAP.lst" "--sym=build/P130_P126_BOOTSTRAP.map" "--raw=build/P126_BOOTSTRAP_AUDIT.bin" "project130_p126_bootstrap.generated.asm"
+& $SjAsmPlus --dirbol --msg=all "--lst=build/P130_P126_BOOTSTRAP.lst" "--sym=build/P130_P126_BOOTSTRAP.map" "--raw=build/P126_BOOTSTRAP_AUDIT.bin" "project130_p126_bootstrap.generated.asm"
 if ($LASTEXITCODE -ne 0){throw "Project126 bootstrap assembly failed: $LASTEXITCODE"}
 $bootBin=Join-Path $Build "P126_BOOTSTRAP.bin"
 if (-not (Test-Path $bootBin)){throw "P126_BOOTSTRAP.bin was not generated"}
@@ -55,7 +55,7 @@ if ($bootSize -lt 1 -or $bootSize -gt 256){throw "P126BOOT size invalid: $bootSi
 $names=@("X86CORE.C","X86IO.C","X86ALU.C","X86DEV.C","X86EXEC.C","X86VGA.C","X86VID.C","x86_cpu_state.bin")
 foreach ($n in $names) {Remove-Item -Force -ErrorAction SilentlyContinue (Join-Path $Build $n)}
 Remove-Item -Force -ErrorAction SilentlyContinue (Join-Path $Build "P130_X86CORE.lst"),(Join-Path $Build "P130_X86CORE.map")
-& $SjAsmPlus --msg=all "--lst=build/P130_X86CORE.lst" "--lstlab=sort" "--sym=build/P130_X86CORE.map" "reference/project126/neogs_sub/x86_cpu_state_assemble.asm"
+& $SjAsmPlus --dirbol --msg=all "--lst=build/P130_X86CORE.lst" "--lstlab=sort" "--sym=build/P130_X86CORE.map" "reference/project126/neogs_sub/x86_cpu_state_assemble.asm"
 if ($LASTEXITCODE -ne 0){throw "Project126 resident/overlay assembly failed: $LASTEXITCODE"}
 foreach ($n in $names) {
  $target=Join-Path $Build $n
@@ -118,7 +118,7 @@ Set-Content -Path (Join-Path $Build "P130_P126_boot_loader.generated.asm") -Valu
 # Use the original Project126 TR-DOS packaging source and directory names.
 $diskText=(Get-Content -Raw "src/project126/project126_disk.asm").Replace("@@HOST_NAME@@","p130boot").Replace("@@BOOT_NAME@@","boot")
 Set-Content -Path (Join-Path $Root "project130_disk.generated.asm") -Value $diskText -Encoding ASCII
-& $SjAsmPlus --msg=all "--lst=build/P130_DISK.lst" "--lstlab=sort" "--sym=build/P130_DISK.map" "project130_disk.generated.asm"
+& $SjAsmPlus --dirbol --msg=all "--lst=build/P130_DISK.lst" "--lstlab=sort" "--sym=build/P130_DISK.map" "project130_disk.generated.asm"
 if ($LASTEXITCODE -ne 0){throw "Project126 TR-DOS packaging failed: $LASTEXITCODE"}
 if (-not (Test-Path $Out)){throw "disk_A.trd was not produced"}
 $diskSize=(Get-Item $Out).Length
