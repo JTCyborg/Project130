@@ -6,7 +6,7 @@
 #define P130_CATALOGUE_ADDR 0xC800u
 #define P130_CATALOGUE_SIZE 2048u
 
-#define P130_BUILD_ID "P130-0.6.4-GS105A-JUMP-16BIT"
+#define P130_BUILD_ID "P130-0.6.5-BOOT-ENTRY-PROBE"
 
 static void p130_report_memory(void)
 {
