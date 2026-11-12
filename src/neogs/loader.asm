@@ -146,7 +146,11 @@ p130_ngs_core_size_low:
         ld      (_p130_neogs_stage),a
         ld      a,'9'
         call    p130_ngs_trace
-        xor     a
+        ; GS105a #13 takes its one-byte jump target as a command argument:
+        ; preload #40 in GSDAT BEFORE writing #13 to GSCOM. Command arguments
+        ; do not use DBIT handshaking; the ROM consumes the byte as it starts
+        ; the command. Sending #40 after #13 incorrectly jumps to address 0000.
+        ld      a,040h
         call    p130_ngs_send_argument
         jp      c,p130_ngs_fail
         ld      a,P130_CMD_JUMP
@@ -156,17 +160,7 @@ p130_ngs_core_size_low:
         ld      (_p130_neogs_stage),a
         ld      a,'9'
         call    p130_ngs_trace
-        ; P126's exact #13 target-byte send and DBIT fallback.
-        ld      a,040h
-        call    p130_ngs_send_byte
-        jr      nc,p130_ngs_jump_tx_done
-        in      a,(P130_GSSTAT)
-        bit     7,a
-        jp      z,p130_ngs_fail
-        call    p130_ngs_receive_byte
-        jr      c,p130_ngs_ack_timeout
-        jr      p130_ngs_ack_check
-p130_ngs_jump_tx_done:
+        ; Bootstrap's first DBIT response after entering #4000 is A1.
         call    p130_ngs_receive_byte
         jr      c,p130_ngs_ack_timeout
 p130_ngs_ack_check:
