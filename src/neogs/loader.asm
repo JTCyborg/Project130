@@ -141,84 +141,10 @@ p130_ngs_core_size_low:
         jp      z,p130_ngs_fail
         ld      (p130_ngs_core_length),hl
 
-        ld      a,2
+        ld      a,9
         ld      (_p130_neogs_stage),a
-        ld      a,'2'
+        ld      a,'9'
         call    p130_ngs_trace
-        ld      a,3
-        ld      (_p130_neogs_stage),a
-        ld      a,'3'
-        call    p130_ngs_trace
-        ld      a,4
-        ld      (_p130_neogs_stage),a
-        ld      a,'4'
-        call    p130_ngs_trace
-        ; TR-DOS has already loaded the complete file at #C000.
-
-        ld      a,5
-        ld      (_p130_neogs_stage),a
-        ld      a,'5'
-        call    p130_ngs_trace
-        ; Restart the stock ROM into its known command receive state.
-        ld      a,P130_CMD_RESET
-        call    p130_ngs_send_command_long
-        jp      c,p130_ngs_fail
-
-        ld      a,6
-        ld      (_p130_neogs_stage),a
-        ld      a,'6'
-        call    p130_ngs_trace
-        ; GS105a #14 encodes the byte count as a 16-bit two's-complement
-        ; negative length (same as Project126), not the positive file size.
-        ; The low byte is preloaded before command dispatch; the high byte
-        ; follows #14. For 1..256 bytes this is FFxx or FF00.
-        ld      hl,0
-        ld      de,(p130_ngs_length)
-        or      a
-        sbc     hl,de
-        ld      (p130_ngs_block_length),hl
-        ld      a,l
-        call    p130_ngs_send_argument
-        jp      c,p130_ngs_fail
-        ld      a,P130_CMD_RECV
-        call    p130_ngs_send_command
-        jp      c,p130_ngs_fail
-        ld      a,(p130_ngs_block_length+1)
-        call    p130_ngs_send_byte
-        jp      c,p130_ngs_fail
-        xor     a
-        call    p130_ngs_send_byte
-        jp      c,p130_ngs_fail
-        ld      a,040h
-        call    p130_ngs_send_byte
-        jp      c,p130_ngs_fail
-
-        ld      a,7
-        ld      (_p130_neogs_stage),a
-        ld      a,'7'
-        call    p130_ngs_trace
-        ; The only GSDAT payload is the small bootstrap image.
-        ld      hl,0C000h
-        ld      de,(p130_ngs_length)
-p130_ngs_stream:
-        ld      a,d
-        or      e
-        jr      z,p130_ngs_stream_done
-        ld      a,(hl)
-        call    p130_ngs_send_byte
-        jp      c,p130_ngs_fail
-        inc     hl
-        dec     de
-        jr      p130_ngs_stream
-p130_ngs_stream_done:
-        ld      a,8
-        ld      (_p130_neogs_stage),a
-        ld      a,'8'
-        call    p130_ngs_trace
-        ; Project126's X86CORE read before #13 prepares the resident
-        ; payload which Project126 streams after A1. Project130 has no such
-        ; GSDAT payload, so the unrelated TR-DOS transaction is omitted.
-        ; Continue directly with the GS105a #13 handoff.
         xor     a
         call    p130_ngs_send_argument
         jp      c,p130_ngs_fail
