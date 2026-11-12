@@ -54,17 +54,17 @@ x86_cpu_fetch_trace_bios_window:
         ld      de,#F000
         or      a
         sbc     hl,de
-        jr      nz,.trace_done
+        jp      nz,.trace_done
         ld      hl,(x86_reg_ip)
         ld      de,#E0C0
         or      a
         sbc     hl,de
-        jr      c,.trace_done
+        jp      c,.trace_done
         ld      hl,(x86_reg_ip)
         ld      de,#E0C4
         or      a
         sbc     hl,de
-        jr      nc,.trace_done
+        jp      nc,.trace_done
 
         ld      hl,x86_fetch_trace_prefix
         call    p126_ngs_resident_log
