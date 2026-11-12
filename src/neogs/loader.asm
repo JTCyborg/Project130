@@ -15,6 +15,26 @@ P130_CMD_RESET   EQU 0F4h
 P130_ACK_READY   EQU 0A1h
 
 _p130_neogs_startup:
+        ; TR-DOS ROM calls require the isolated scratch stack used by P127.
+        push    af
+        push    bc
+        push    de
+        push    hl
+        push    ix
+        push    iy
+        exx
+        push    bc
+        push    de
+        push    hl
+        exx
+        ex      af,af'
+        push    af
+        ex      af,af'
+        ld      (p130_ngs_saved_sp),sp
+        ld      sp,0B7F0h
+        xor     a
+        ld      (p130_ngs_result),a
+
         ld      hl,p130_ngs_boot_name
         ld      de,05CDDh
         ld      bc,8
@@ -27,8 +47,15 @@ _p130_neogs_startup:
         ld      (_p130_neogs_stage),a
         ld      a,'1'
         call    p130_ngs_trace
+        ; Raw markers bracket the ROM call without invoking the UI routine.
+        ld      bc,00EFh
+        ld      a,'R'
+        out     (c),a
         ld      c,10
         call    03D13h
+        ld      bc,00EFh
+        ld      a,'r'
+        out     (c),a
         ld      a,c
         cp      0FFh
         jp      z,p130_ngs_fail
@@ -168,12 +195,31 @@ p130_ngs_stream_done:
         cp      P130_ACK_READY
         jp      nz,p130_ngs_fail
         xor     a
-        ld      (_p130_neogs_stage),a
-        ld      hl,0
-        ret
+        jp      p130_ngs_finish
 
 p130_ngs_fail:
-        ld      hl,1
+        ld      a,1
+
+p130_ngs_finish:
+        ld      (p130_ngs_result),a
+        ld      sp,(p130_ngs_saved_sp)
+        ex      af,af'
+        pop     af
+        ex      af,af'
+        exx
+        pop     hl
+        pop     de
+        pop     bc
+        exx
+        pop     iy
+        pop     ix
+        pop     hl
+        pop     de
+        pop     bc
+        pop     af
+        ld      a,(p130_ngs_result)
+        ld      l,a
+        ld      h,0
         ret
 
 ; Emit a one-character progress marker on the existing #EF debug channel.
@@ -284,3 +330,5 @@ _p130_neogs_stage: db 0
 p130_ngs_boot_name: db "NEOBOOT "
 p130_ngs_length:    dw 0
 p130_ngs_tx:        db 0
+p130_ngs_saved_sp:  dw 0
+p130_ngs_result:    db 0
