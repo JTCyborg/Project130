@@ -1617,8 +1617,8 @@ p126_ngs_overlay_test_restore_maps:
 p126_ngs_overlay_test_old04: db 0
 p126_ngs_overlay_test_old05: db 0
 p126_ngs_overlay_test_fail_stage: db 0
-p126_ngs_overlay_test_fail_prefix: db "[NGS] WIN2 FAIL STAGE ",0
-p126_ngs_overlay_win2_test_pass_log: db "[NGS] WIN2 MAP/GATE TEST PASS",13,10,0
+p126_ngs_overlay_test_fail_prefix: db "[P130 NGS] WIN2 FAIL STAGE ",0
+p126_ngs_overlay_win2_test_pass_log: db "[P130 NGS] WIN2 MAP/GATE TEST PASS",13,10,0
 
 p126_ngs_overlay_log_test_failure:
         ld      hl,p126_ngs_overlay_test_fail_prefix
@@ -1646,23 +1646,23 @@ p126_ngs_image_kind:         db 0
 p126_ngs_image_dest_selector: db 0
 p126_ngs_image_verify_count: dw 0
 p126_ngs_image_verify_byte:  db 0
-p126_ngs_input_keyboard_log: db "[NGS] X86 KEY EVENT",13,10,0
-p126_ngs_image_begin_log:    db "[NGS] IMG BEGIN",13,10,0
-p126_ngs_image_fragment_log: db "[NGS] IMG FRAG",13,10,0
-p126_ngs_image_finish_log:   db "[NGS] IMG FINISH",13,10,0
-p126_ngs_image_installed_log: db "[NGS] SYSBIOS PAGE10 OK",13,10,0
-p126_ngs_image_verify_ok_log: db "[NGS] SYSBIOS RD OK",13,10,0
-p126_ngs_io_overlay_installed_log: db "[NGS] X86IO PAGE04 WIN2 OK",13,10,0
-p126_ngs_io_overlay_verify_ok_log: db "[NGS] X86IO RD OK",13,10,0
-p126_ngs_alu_overlay_verify_ok_log: db "[NGS] X86ALU RD OK",13,10,0
-p126_ngs_alu_overlay_installed_log: db "[NGS] X86ALU GATE OK",13,10,0
-p126_ngs_alu_overlay_probe_fail_log: db "[NGS] X86ALU GATE FAIL",13,10,0
-p126_ngs_exec_overlay_installed_log: db "[NGS] X86EXEC PAGE07 GATE OK",13,10,0
-p126_ngs_exec_overlay_probe_fail_log: db "[NGS] X86EXEC GATE FAIL",13,10,0
-p126_ngs_vga_overlay_installed_log: db "[NGS] X86VGA DYNAMIC PAGE08 GATE OK",13,10,0
-p126_ngs_image_begin_rejected_log: db "[NGS] IMG BEGIN BAD",13,10,0
-p126_ngs_image_fragment_rejected_log: db "[NGS] IMG FRAG BAD",13,10,0
-p126_ngs_image_finish_rejected_log: db "[NGS] IMG FINISH BAD",13,10,0
+p126_ngs_input_keyboard_log: db "[P130 NGS] X86 KEY EVENT",13,10,0
+p126_ngs_image_begin_log:    db "[P130 NGS] IMG BEGIN",13,10,0
+p126_ngs_image_fragment_log: db "[P130 NGS] IMG FRAG",13,10,0
+p126_ngs_image_finish_log:   db "[P130 NGS] IMG FINISH",13,10,0
+p126_ngs_image_installed_log: db "[P130 NGS] SYSBIOS PAGE10 OK",13,10,0
+p126_ngs_image_verify_ok_log: db "[P130 NGS] SYSBIOS RD OK",13,10,0
+p126_ngs_io_overlay_installed_log: db "[P130 NGS] X86IO PAGE04 WIN2 OK",13,10,0
+p126_ngs_io_overlay_verify_ok_log: db "[P130 NGS] X86IO RD OK",13,10,0
+p126_ngs_alu_overlay_verify_ok_log: db "[P130 NGS] X86ALU RD OK",13,10,0
+p126_ngs_alu_overlay_installed_log: db "[P130 NGS] X86ALU GATE OK",13,10,0
+p126_ngs_alu_overlay_probe_fail_log: db "[P130 NGS] X86ALU GATE FAIL",13,10,0
+p126_ngs_exec_overlay_installed_log: db "[P130 NGS] X86EXEC PAGE07 GATE OK",13,10,0
+p126_ngs_exec_overlay_probe_fail_log: db "[P130 NGS] X86EXEC GATE FAIL",13,10,0
+p126_ngs_vga_overlay_installed_log: db "[P130 NGS] X86VGA DYNAMIC PAGE08 GATE OK",13,10,0
+p126_ngs_image_begin_rejected_log: db "[P130 NGS] IMG BEGIN BAD",13,10,0
+p126_ngs_image_fragment_rejected_log: db "[P130 NGS] IMG FRAG BAD",13,10,0
+p126_ngs_image_finish_rejected_log: db "[P130 NGS] IMG FINISH BAD",13,10,0
 
 ; Standard CRC-16/CCITT-FALSE regression vector.
 ; OUT: Carry clear and HL=#29B1 on pass; Carry set on failure.
@@ -1696,29 +1696,29 @@ p126_ngs_ipc_crc16_test_vector:
         db "123456789"
 
 ; Independent NeoGS #EF diagnostics for the DMA transaction lifecycle.
-p126_ngs_ipc_log_dma_e0:          db "[NGS] DMA E0",13,10,0
-p126_ngs_ipc_log_dma_cfg_begin:   db "[NGS] DMA CFG",13,10,0
-p126_ngs_ipc_log_dma_armed:       db "[NGS] DMA ARMED",13,10,0
-p126_ngs_ipc_log_dma_ready:       db "[NGS] DMA READY",13,10,0
-p126_ngs_ipc_log_dma_host_end:    db "[NGS] DMA HOST END",13,10,0
-p126_ngs_ipc_log_dma_timeout:     db "[NGS] DMA TIMEOUT",13,10,0
-p126_ngs_ipc_log_dma_timeout_addr: db "[NGS] DMA TIMEOUT ADDR=",0
-p126_ngs_ipc_log_dma_timeout_hdr:  db "[NGS] DMA TIMEOUT HDR=",0
-p126_ngs_ipc_log_bad_length:      db "[NGS] DMA BAD LENGTH",13,10,0
-p126_ngs_ipc_log_dma_stopped:     db "[NGS] DMA STOPPED",13,10,0
-p126_ngs_ipc_log_dma_page42_premapped: db "[NGS] P42 PRE",13,10,0
-p126_ngs_ipc_log_dma_page42_mapped: db "[NGS] DMA P42 MAP",13,10,0
-p126_ngs_ipc_log_dma_end:         db "[NGS] DMA END",13,10,0
-p126_ngs_ipc_log_dma_addr:        db "[NGS] DMA ADDR=",0
-p126_ngs_ipc_log_rx_header:       db "[NGS] RX HDR=",0
-p126_ngs_ipc_log_frame_valid:     db "[NGS] FRAME OK",13,10,0
-p126_ngs_ipc_log_frame_rejected:  db "[NGS] FRAME BAD=",0
-p126_ngs_ipc_log_dma_rx_request: db "[NGS] DMA RX REQ",13,10,0
-p126_ngs_ipc_log_dma_rx_armed:   db "[NGS] DMA RX ARMED",13,10,0
-p126_ngs_ipc_log_dma_rx_end:     db "[NGS] DMA RX END",13,10,0
-p126_ngs_ipc_log_dma_rx_addr:    db "[NGS] RX ADDR=",0
-p126_ngs_ipc_log_dma_rx_timeout: db "[NGS] DMA RX TIMEOUT",13,10,0
-p126_ngs_ipc_log_dma_rx_length_bad: db "[NGS] RX LEN BAD",13,10,0
+p126_ngs_ipc_log_dma_e0:          db "[P130 NGS] DMA E0",13,10,0
+p126_ngs_ipc_log_dma_cfg_begin:   db "[P130 NGS] DMA CFG",13,10,0
+p126_ngs_ipc_log_dma_armed:       db "[P130 NGS] DMA ARMED",13,10,0
+p126_ngs_ipc_log_dma_ready:       db "[P130 NGS] DMA READY",13,10,0
+p126_ngs_ipc_log_dma_host_end:    db "[P130 NGS] DMA HOST END",13,10,0
+p126_ngs_ipc_log_dma_timeout:     db "[P130 NGS] DMA TIMEOUT",13,10,0
+p126_ngs_ipc_log_dma_timeout_addr: db "[P130 NGS] DMA TIMEOUT ADDR=",0
+p126_ngs_ipc_log_dma_timeout_hdr:  db "[P130 NGS] DMA TIMEOUT HDR=",0
+p126_ngs_ipc_log_bad_length:      db "[P130 NGS] DMA BAD LENGTH",13,10,0
+p126_ngs_ipc_log_dma_stopped:     db "[P130 NGS] DMA STOPPED",13,10,0
+p126_ngs_ipc_log_dma_page42_premapped: db "[P130 NGS] P42 PRE",13,10,0
+p126_ngs_ipc_log_dma_page42_mapped: db "[P130 NGS] DMA P42 MAP",13,10,0
+p126_ngs_ipc_log_dma_end:         db "[P130 NGS] DMA END",13,10,0
+p126_ngs_ipc_log_dma_addr:        db "[P130 NGS] DMA ADDR=",0
+p126_ngs_ipc_log_rx_header:       db "[P130 NGS] RX HDR=",0
+p126_ngs_ipc_log_frame_valid:     db "[P130 NGS] FRAME OK",13,10,0
+p126_ngs_ipc_log_frame_rejected:  db "[P130 NGS] FRAME BAD=",0
+p126_ngs_ipc_log_dma_rx_request: db "[P130 NGS] DMA RX REQ",13,10,0
+p126_ngs_ipc_log_dma_rx_armed:   db "[P130 NGS] DMA RX ARMED",13,10,0
+p126_ngs_ipc_log_dma_rx_end:     db "[P130 NGS] DMA RX END",13,10,0
+p126_ngs_ipc_log_dma_rx_addr:    db "[P130 NGS] RX ADDR=",0
+p126_ngs_ipc_log_dma_rx_timeout: db "[P130 NGS] DMA RX TIMEOUT",13,10,0
+p126_ngs_ipc_log_dma_rx_length_bad: db "[P130 NGS] RX LEN BAD",13,10,0
 
 ; Emit CR/LF on NeoGS's independent #EF diagnostic channel.
 p126_ngs_ipc_log_crlf:

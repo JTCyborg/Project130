@@ -938,13 +938,13 @@ p126_overlay_manager_id:       db 0
 p126_overlay_manager_page:     db 0
 p126_overlay_manager_test_id:  db 0
 p126_overlay_manager_test_stage: db 0
-p126_overlay_manager_stage1_log: db "[NGS] MODULE MANAGER FAIL STAGE 01 ALLOCATE",13,10,0
-p126_overlay_manager_stage2_log: db "[NGS] MODULE MANAGER FAIL STAGE 02 TEMP RELEASE",13,10,0
-p126_overlay_manager_stage3_log: db "[NGS] MODULE MANAGER FAIL STAGE 03 REGISTER",13,10,0
-p126_overlay_manager_stage4_log: db "[NGS] MODULE MANAGER FAIL STAGE 04 LOOKUP",13,10,0
-p126_overlay_manager_stage5_log: db "[NGS] MODULE MANAGER FAIL STAGE 05 UNREGISTER",13,10,0
-p126_overlay_manager_stage6_log: db "[NGS] MODULE MANAGER FAIL STAGE 06 CLEAR",13,10,0
-p126_overlay_manager_stage7_log: db "[NGS] MODULE MANAGER FAIL STAGE 07 REUSE",13,10,0
-p126_overlay_manager_stage8_log: db "[NGS] MODULE MANAGER FAIL STAGE 08 RELEASE",13,10,0
+p126_overlay_manager_stage1_log: db "[P130 NGS] MODULE MANAGER FAIL STAGE 01 ALLOCATE",13,10,0
+p126_overlay_manager_stage2_log: db "[P130 NGS] MODULE MANAGER FAIL STAGE 02 TEMP RELEASE",13,10,0
+p126_overlay_manager_stage3_log: db "[P130 NGS] MODULE MANAGER FAIL STAGE 03 REGISTER",13,10,0
+p126_overlay_manager_stage4_log: db "[P130 NGS] MODULE MANAGER FAIL STAGE 04 LOOKUP",13,10,0
+p126_overlay_manager_stage5_log: db "[P130 NGS] MODULE MANAGER FAIL STAGE 05 UNREGISTER",13,10,0
+p126_overlay_manager_stage6_log: db "[P130 NGS] MODULE MANAGER FAIL STAGE 06 CLEAR",13,10,0
+p126_overlay_manager_stage7_log: db "[P130 NGS] MODULE MANAGER FAIL STAGE 07 REUSE",13,10,0
+p126_overlay_manager_stage8_log: db "[P130 NGS] MODULE MANAGER FAIL STAGE 08 RELEASE",13,10,0
 p126_overlay_alloc_state:      defs 9,0
 p126_overlay_allocator_test_pages: defs 8,0

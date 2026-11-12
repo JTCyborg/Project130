@@ -491,7 +491,7 @@ p126_ipc_tx_byte:     db 0
 p126_ipc_rx_byte:     db 0
 
 p126_ipc_version_text:
-        db "[P126 ATM_IPC v0.3.0]", 13, 10, 0
+        db "[P130 IPC v0.3.0]", 13, 10, 0
 
 ; -------------------------------------------------------------------------
 ; Send one complete ATM -> NeoGS ABI 1.0 frame through the ZX DMA aperture.
@@ -995,14 +995,14 @@ p126_ipc_console_hex_nibble:
         jp      p126_ipc_console_char
 
 p126_ipc_console_hex_byte: db 0
-p126_ipc_debug_budget: db "[X86] BIOS PAUSED: 16-INSTRUCTION SLICE COMPLETE; CS:IP=",0
-p126_ipc_debug_halted: db "[X86] BIOS HALTED BY GUEST; CS:IP=",0
-p126_ipc_debug_fault: db "[X86] BIOS STOPPED: OPCODE OR MEMORY FAULT; CS:IP=",0
-p126_ipc_debug_reset_fault: db "[X86] BIOS RESET VECTOR FAILED; CS:IP=",0
-p126_ipc_debug_event_missing: db "[X86] BIOS TRACE EVENT INVALID; FRAME=",0
-p126_ipc_debug_dma_failed: db "[X86] DIAGNOSTIC DMA FAILED",13,10,0
-p126_ipc_video_frame_applied: db "[VIDEO] RG6 FRAME APPLIED",13,10,0
-p126_ipc_video_dma_failed: db "[VIDEO] FRAME RECEIVE/APPLY FAILED",13,10,0
+p126_ipc_debug_budget: db "[P130 X86] BIOS PAUSED: 16-INSTRUCTION SLICE COMPLETE; CS:IP=",0
+p126_ipc_debug_halted: db "[P130 X86] BIOS HALTED BY GUEST; CS:IP=",0
+p126_ipc_debug_fault: db "[P130 X86] BIOS STOPPED: OPCODE OR MEMORY FAULT; CS:IP=",0
+p126_ipc_debug_reset_fault: db "[P130 X86] BIOS RESET VECTOR FAILED; CS:IP=",0
+p126_ipc_debug_event_missing: db "[P130 X86] BIOS TRACE EVENT INVALID; FRAME=",0
+p126_ipc_debug_dma_failed: db "[P130 X86] DIAGNOSTIC DMA FAILED",13,10,0
+p126_ipc_video_frame_applied: db "[P130 VIDEO] RG6 FRAME APPLIED",13,10,0
+p126_ipc_video_dma_failed: db "[P130 VIDEO] FRAME RECEIVE/APPLY FAILED",13,10,0
 
 ; Print A as two hexadecimal digits on ATM's independent #EF stream.
 ; Preserves AF and BC.
@@ -1097,30 +1097,30 @@ p126_ipc_debug_string:
         pop     af
         ret
 
-p126_ipc_log_crc_calculated:      db "[ATM IPC] CRC CALCULATED=",0
+p126_ipc_log_crc_calculated:      db "[P130 IPC] CRC CALCULATED=",0
 p126_ipc_log_crc_expected:        db " FRAME CRC=",0
-p126_ipc_log_bad_magic_ptr: db "[ATM IPC] BAD MAGIC PTR=",0
+p126_ipc_log_bad_magic_ptr: db "[P130 IPC] BAD MAGIC PTR=",0
 p126_ipc_log_bad_magic_data: db " DATA=",0
-p126_ipc_log_dma_tx_begin:        db "[ATM IPC] DMA TX BEGIN",13,10,0
-p126_ipc_log_dma_tx_validate_ok:  db "[ATM IPC] FRAME STRUCTURE VALID",13,10,0
-p126_ipc_log_dma_tx_validate_bad: db "[ATM IPC] FRAME STRUCTURE INVALID status=",0
+p126_ipc_log_dma_tx_begin:        db "[P130 IPC] DMA TX BEGIN",13,10,0
+p126_ipc_log_dma_tx_validate_ok:  db "[P130 IPC] FRAME STRUCTURE VALID",13,10,0
+p126_ipc_log_dma_tx_validate_bad: db "[P130 IPC] FRAME STRUCTURE INVALID status=",0
 p126_ipc_log_dma_tx_bad_size:    db " size=",0
 p126_ipc_log_dma_tx_bad_header:  db " hdr=",0
-p126_ipc_log_dma_tx_e0:           db "[ATM IPC] SEND E0",13,10,0
-p126_ipc_log_dma_tx_e0_timeout:   db "[ATM IPC] E0 ACK TIMEOUT",13,10,0
-p126_ipc_log_dma_tx_ready:        db "[ATM IPC] E0 ACK / READY",13,10,0
-p126_ipc_log_dma_tx_copy_begin:   db "[ATM IPC] DMA COPY BEGIN",13,10,0
-p126_ipc_log_dma_tx_copy_done:    db "[ATM IPC] DMA COPY DONE",13,10,0
-p126_ipc_log_dma_tx_ff:           db "[ATM IPC] SEND FF",13,10,0
-p126_ipc_log_dma_tx_ff_timeout:   db "[ATM IPC] FF ACK TIMEOUT",13,10,0
-p126_ipc_log_dma_tx_done:         db "[ATM IPC] DMA TX COMPLETE",13,10,0
-p126_ipc_log_dma_rx_begin:        db "[ATM IPC] DMA RX MAX FRAME BEGIN",13,10,0
-p126_ipc_log_dma_rx_copy_done:    db "[ATM IPC] DMA RX 16K COPY DONE",13,10,0
-p126_ipc_log_dma_rx_crc_ok:       db "[ATM IPC] DMA RX FRAME CRC VALID",13,10,0
-p126_ipc_log_dma_rx_crc_bad:      db "[ATM IPC] DMA RX FRAME VALIDATION FAILED STATUS=",0
-p126_ipc_log_dma_rx_pattern_ok:   db "[ATM IPC] DMA RX 16K PATTERN PASS",13,10,0
-p126_ipc_log_dma_rx_pattern_bad:  db "[ATM IPC] DMA RX PATTERN FAIL",13,10,0
-p126_ipc_log_dma_rx_transport_bad: db "[ATM IPC] DMA RX TRANSPORT FAILED STAGE=",0
+p126_ipc_log_dma_tx_e0:           db "[P130 IPC] SEND E0",13,10,0
+p126_ipc_log_dma_tx_e0_timeout:   db "[P130 IPC] E0 ACK TIMEOUT",13,10,0
+p126_ipc_log_dma_tx_ready:        db "[P130 IPC] E0 ACK / READY",13,10,0
+p126_ipc_log_dma_tx_copy_begin:   db "[P130 IPC] DMA COPY BEGIN",13,10,0
+p126_ipc_log_dma_tx_copy_done:    db "[P130 IPC] DMA COPY DONE",13,10,0
+p126_ipc_log_dma_tx_ff:           db "[P130 IPC] SEND FF",13,10,0
+p126_ipc_log_dma_tx_ff_timeout:   db "[P130 IPC] FF ACK TIMEOUT",13,10,0
+p126_ipc_log_dma_tx_done:         db "[P130 IPC] DMA TX COMPLETE",13,10,0
+p126_ipc_log_dma_rx_begin:        db "[P130 IPC] DMA RX MAX FRAME BEGIN",13,10,0
+p126_ipc_log_dma_rx_copy_done:    db "[P130 IPC] DMA RX 16K COPY DONE",13,10,0
+p126_ipc_log_dma_rx_crc_ok:       db "[P130 IPC] DMA RX FRAME CRC VALID",13,10,0
+p126_ipc_log_dma_rx_crc_bad:      db "[P130 IPC] DMA RX FRAME VALIDATION FAILED STATUS=",0
+p126_ipc_log_dma_rx_pattern_ok:   db "[P130 IPC] DMA RX 16K PATTERN PASS",13,10,0
+p126_ipc_log_dma_rx_pattern_bad:  db "[P130 IPC] DMA RX PATTERN FAIL",13,10,0
+p126_ipc_log_dma_rx_transport_bad: db "[P130 IPC] DMA RX TRANSPORT FAILED STAGE=",0
 ; DMA RX storage aliases the 16 KiB ATM page-0 staging buffer at C000h.
 ; It is intentionally shared with the forward test because the transfers
 ; are sequential and the reverse test overwrites the request after TX.
