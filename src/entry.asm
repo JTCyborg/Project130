@@ -10,7 +10,7 @@ _p130_entry:
         ld      bc,00EFh
         out     (c),a
         di
-        ld      sp,0BFFFh
+        ld      sp,0AFFFh
 
 ; Mark that control reached the resident entry before calling C.
         ld      a,'1'
