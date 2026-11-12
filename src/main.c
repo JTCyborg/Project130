@@ -183,17 +183,17 @@ void p130_c_entry(void)
      *   4) initialize ATM video, RTC, then visible console.
      * Do not launch GS105a before the directory/ROM-call environment is ready.
      */
-    p130_debug_puts("[TR-DOS] CATALOGUE PRELOAD BEGIN\\r\\n");
+    p130_debug_puts("[TR-DOS] CATALOGUE PRELOAD BEGIN\r\n");
     (void)p130_trdos_preload();
 
     p130_debug_puts("[NEOGS] GS105a BOOTSTRAP LAUNCH BEGIN; TRACE=");
     if (p130_neogs_startup() == 0u) {
-        p130_debug_puts("[NEOGS] STAGE0 A1 ACK RECEIVED; BOOTSTRAP IDLE\\r\\n");
-        p130_debug_puts("[NEOGS] DMA/IPC NOT STARTED; RESIDENT HANDOFF PENDING\\r\\n");
+        p130_debug_puts("[NEOGS] STAGE0 A1 ACK RECEIVED; BOOTSTRAP IDLE\r\n");
+        p130_debug_puts("[NEOGS] DMA/IPC NOT STARTED; RESIDENT HANDOFF PENDING\r\n");
     } else {
-        p130_debug_puts("\\r\\n[NEOGS] BOOTSTRAP LAUNCH FAILED; STAGE=");
+        p130_debug_puts("\r\n[NEOGS] BOOTSTRAP LAUNCH FAILED; STAGE=");
         p130_debug_hex8(p130_neogs_stage);
-        p130_debug_puts("\\r\\n");
+        p130_debug_puts("\r\n");
     }
 
     /* Project126 order: ATM video mode first, then RTC, then console. */
