@@ -21,6 +21,7 @@ $required=@(
  "src/project126/atm_host/ds12887_rtc.asm",
  "src/project126/atm_host/neogs_ipc.asm",
  "src/project126/atm_host/neogs_ipc.inc",
+ "shared/p126_ipc_protocol.inc",
  "src/project126/atm_host/p126_disk_catalog.asm",
  "src/project126/atm_host/p126_neogs_loader.asm",
  "src/project126/atm_host/p126_bios_loader.asm",
