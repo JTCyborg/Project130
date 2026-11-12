@@ -13,9 +13,13 @@ P130_CMD_JUMP    EQU 013h
 P130_CMD_RECV    EQU 014h
 P130_CMD_RESET   EQU 0F4h
 P130_ACK_READY   EQU 0A1h
+P130_GFX_MODE    EQU 0C3h
+P130_HOST_PAGE5  EQU 07Ah
+P130_HOST_PAGE0  EQU 07Fh
 
 _p130_neogs_startup:
-        ; TR-DOS ROM calls require the isolated scratch stack used by P127.
+        ; TR-DOS ROM calls require the Project127 ATM bank/port transition.
+; Current Project130 RG6 80x25 mode is #C3 (set by ui.asm via #3D2F).
         push    af
         push    bc
         push    de
@@ -128,12 +132,55 @@ p130_ngs_len_ok:
         xor     a
         ld      (05D0Fh),a
         ld      (05D10h),a
-        call    03D13h
+
+        ; Project127 sys_SHADOFF sequence:
+        ; map the BASIC-48/DOS page into window 0, then write the saved
+        ; RG6 mode to the ATM system port #FF77 (shadow ports off).
+        ld      a,083h
+        ld      bc,0FFF7h
+        out     (c),a
+        ld      a,P130_GFX_MODE
+        ld      bc,0FF77h
+        out     (c),a
+
+        ; TR-DOS expects its return address through system variable 23613,
+        ; not an ordinary CALL return alone. Project127 installs this
+        ; trampoline and enters #3D13 with JP.
+        ld      hl,p130_ngs_trdos_return
+        push    hl
+        ld      (23613),sp
+        xor     a
+        ld      (23801),a
+        ld      (23823),a
+        ld      (23824),a
+        jp      03D13h
+
+p130_ngs_trdos_return:
         push    af
         ld      bc,00EFh
         ld      a,'t'
         out     (c),a
         pop     af
+
+        ; Restore Project130 host mapping and re-enable the same shadow
+        ; ports/video mode using the #3D2F sequence from ui.asm.
+        di
+        ld      a,P130_HOST_PAGE5
+        ld      bc,07FF7h
+        out     (c),a
+        ld      a,P130_HOST_PAGE0
+        ld      bc,0FFF7h
+        out     (c),a
+        ei
+        ld      bc,p130_ngs_trdos_video_restored
+        push    bc
+        ld      bc,02A53h
+        push    bc
+        ld      bc,00177h
+        ld      a,P130_GFX_MODE
+        jp      03D2Fh
+
+p130_ngs_trdos_video_restored:
         ld      a,(05D0Fh)
         ld      b,a
         ld      a,(05D10h)
