@@ -286,6 +286,14 @@ p130_neogs_startup_impl__p130_neogs_module_loop:
         call    p130_neogs_load_fixed_overlay
         pop     bc
         pop     hl
+        push    af
+        push    bc
+        push    hl
+        ld      hl,p130_neogs_module_return_log
+        call    p130_neogs_log_text
+        pop     hl
+        pop     bc
+        pop     af
         ret     c
         djnz    p130_neogs_startup_impl__p130_neogs_module_loop
 
@@ -750,6 +758,12 @@ p130_neogs_load_fixed_overlay__fixed_overlay_log_vga_ready:
         ld      hl,p130_neogs_exec_log_ready
 p130_neogs_load_fixed_overlay__fixed_overlay_log_ready:
         call    p130_neogs_log_text
+        push    af
+        push    hl
+        ld      hl,p130_neogs_overlay_return_log
+        call    p130_neogs_log_text
+        pop     hl
+        pop     af
         or      a
         ret
 
@@ -1300,6 +1314,8 @@ p130_neogs_overlay_data_ptr: dw 0C11Ch
 p130_neogs_overlay_open_begin: db "[NGS HOST] OVERLAY OPEN BEGIN",13,10,0
 p130_neogs_overlay_open_ok:    db "[NGS HOST] OVERLAY OPEN OK",13,10,0
 p130_neogs_overlay_open_failed: db "[NGS HOST] OVERLAY OPEN FAILED",13,10,0
+p130_neogs_module_return_log: db "[NGS HOST] MODULE CALL RETURNED",13,10,0
+p130_neogs_overlay_return_log: db "[NGS HOST] OVERLAY ROUTINE RETURNING",13,10,0
 p130_neogs_io_log_begin: db "[NGS HOST] X86IO IMAGE BEGIN",13,10,0
 p130_neogs_io_log_ready: db "[NGS HOST] X86IO IMAGE TX COMPLETE",13,10,0
 p130_neogs_alu_log_begin: db "[NGS HOST] X86ALU IMAGE BEGIN",13,10,0
