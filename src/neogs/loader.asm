@@ -35,50 +35,65 @@ _p130_neogs_startup:
         xor     a
         ld      (p130_ngs_result),a
 
+        ; Save and install the TR-DOS #3D13 error/stack context.
+        ld      hl,(05C3Dh)
+        ld      (p130_ngs_old_errsp),hl
+        ld      hl,(05D03h)
+        ld      (p130_ngs_old_hook_addr),hl
+        ld      a,(05D02h)
+        ld      (p130_ngs_old_hook_op),a
+        ld      a,(05D06h)
+        ld      (p130_ngs_old_name_len),a
+        ld      a,(05CF9h)
+        ld      (p130_ngs_old_drive),a
+        ld      a,(05D10h)
+        ld      (p130_ngs_old_status),a
+
         ld      hl,p130_ngs_boot_name
         ld      de,05CDDh
-        ld      bc,8
+        ld      bc,9
         ldir
-        ld      a,'C'
-        ld      (05CE5h),a
         ld      a,9
         ld      (05D06h),a
+        xor     a
+        ld      (05CF9h),a
+        ld      (05D0Fh),a
+        ld      (05D10h),a
+        ld      hl,0B7F0h
+        ld      (05C3Dh),hl
+        ld      a,0C3h
+        ld      (05D02h),a
+        ld      hl,p130_ngs_rom_error
+        ld      (05D03h),hl
+
         ld      a,1
         ld      (_p130_neogs_stage),a
         ld      a,'1'
         call    p130_ngs_trace
-        ; Raw markers bracket the ROM call without invoking the UI routine.
+        ; A=1: destination DE, length from catalogue; BC=14 loads the file.
         ld      bc,00EFh
         ld      a,'R'
         out     (c),a
-        ld      c,10
+        ld      a,1
+        ld      hl,05CDDh
+        ld      de,0C000h
+        ld      bc,14
         call    03D13h
         push    bc
         ld      bc,00EFh
         ld      a,'r'
         out     (c),a
         pop     bc
-        ld      a,c
-        cp      0FFh
-        jp      z,p130_ngs_fail
-
-        push    af
-        xor     a
-        ld      (05D0Fh),a
-        ld      (05D10h),a
-        pop     af
-        ld      a,2
-        ld      (_p130_neogs_stage),a
-        ld      a,'2'
-        call    p130_ngs_trace
-        ld      c,8
-        call    03D13h
         ld      a,(05D0Fh)
         ld      b,a
         ld      a,(05D10h)
         or      b
         jp      nz,p130_ngs_fail
 
+        ld      a,2
+        ld      (_p130_neogs_stage),a
+        ld      a,'2'
+        call    p130_ngs_trace
         ld      a,3
         ld      (_p130_neogs_stage),a
         ld      a,'3'
@@ -104,23 +119,7 @@ p130_ngs_len_ok:
         ld      (_p130_neogs_stage),a
         ld      a,'4'
         call    p130_ngs_trace
-        ; Read the first and only sector into ATM W3 scratch at #C000.
-        ld      a,(05CEBh)
-        ld      e,a
-        ld      a,(05CECh)
-        ld      d,a
-        ld      hl,0C000h
-        ld      b,1
-        ld      c,5
-        xor     a
-        ld      (05D0Fh),a
-        ld      (05D10h),a
-        call    03D13h
-        ld      a,(05D0Fh)
-        ld      b,a
-        ld      a,(05D10h)
-        or      b
-        jp      nz,p130_ngs_fail
+        ; TR-DOS has already loaded the complete file at #C000.
 
         ld      a,5
         ld      (_p130_neogs_stage),a
@@ -204,6 +203,18 @@ p130_ngs_fail:
 
 p130_ngs_finish:
         ld      (p130_ngs_result),a
+        ld      a,(p130_ngs_old_hook_op)
+        ld      (05D02h),a
+        ld      hl,(p130_ngs_old_hook_addr)
+        ld      (05D03h),hl
+        ld      hl,(p130_ngs_old_errsp)
+        ld      (05C3Dh),hl
+        ld      a,(p130_ngs_old_name_len)
+        ld      (05D06h),a
+        ld      a,(p130_ngs_old_drive)
+        ld      (05CF9h),a
+        ld      a,(p130_ngs_old_status)
+        ld      (05D10h),a
         ld      sp,(p130_ngs_saved_sp)
         ex      af,af'
         pop     af
@@ -223,6 +234,11 @@ p130_ngs_finish:
         ld      l,a
         ld      h,0
         ret
+
+; Abort safely if TR-DOS attempts a BASIC error callback.
+p130_ngs_rom_error:
+        ld      a,1
+        jp      p130_ngs_finish
 
 ; Emit a one-character progress marker on the existing #EF debug channel.
 p130_ngs_trace:
@@ -334,3 +350,9 @@ p130_ngs_length:    dw 0
 p130_ngs_tx:        db 0
 p130_ngs_saved_sp:  dw 0
 p130_ngs_result:    db 0
+p130_ngs_old_errsp: dw 0
+p130_ngs_old_hook_addr: dw 0
+p130_ngs_old_hook_op: db 0
+p130_ngs_old_name_len: db 0
+p130_ngs_old_drive: db 0
+p130_ngs_old_status: db 0
