@@ -158,7 +158,7 @@ p126_boot_log:
         pop     af
         ret
 
-p126_boot_msg_enter: db "[NGS] BOOTSTRAP ENTER",13,10,0
-p126_boot_msg_norom: db "[NGS] NOROM ENABLED",13,10,0
+p126_boot_msg_enter: db "[P130 NGS] BOOTSTRAP ENTER",13,10,0
+p126_boot_msg_norom: db "[P130 NGS] NOROM ENABLED",13,10,0
 p126_boot_tx: db 0
 p126_bootstrap_end:
