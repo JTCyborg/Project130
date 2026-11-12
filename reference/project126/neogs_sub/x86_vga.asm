@@ -770,11 +770,9 @@ x86_vga_mem_read8_impl:
         ret
 
 .mem_read_chain2:
-        ; Chain-2 read selects plane (readplane&2)|(address&1), while
-        ; latches are loaded from the unmodified byte address.
-        call    x86_vga_make_planar_offset
-        call    x86_vga_save_vram_base
-        call    x86_vga_load_latches
+        ; Odd/even addressing converts CPU byte addresses to word addresses:
+        ; plane offset = (guest byte address >> 1) * 4. Preserve the low
+        ; address bit first because it selects plane 0/1 (or 2/3).
         ld      hl,(x86_vga_guest_offset)
         ld      a,l
         and     1
@@ -787,14 +785,17 @@ x86_vga_mem_read8_impl:
         ld      a,l
         and     #FE
         ld      l,a
+        srl     h
+        rr      l
         ld      (x86_vga_guest_offset),hl
         call    x86_vga_make_planar_offset
+        call    x86_vga_save_vram_base
+        call    x86_vga_load_latches
         ld      a,(x86_vga_selected_plane)
         call    x86_vga_add_plane_offset
         call    x86_vga_vram_read_at_offset
         or      a
         ret
-
 .mem_read_chain4:
         ; Chain-4 reads return the packed byte directly, but still refresh
         ; the four latches from its aligned four-byte group.
@@ -855,7 +856,9 @@ x86_vga_mem_write8_impl:
         jp      .mem_write_base_ready
 
 .mem_write_chain2:
-        ; Chain-2 enables only planes 0/2 for even addresses and 1/3 for odd.
+        ; Chain-2 enables planes 0/2 for even CPU addresses and 1/3 for odd.
+        ; The planar word address is the aligned CPU byte address divided by
+        ; two; omitting this shift makes writes disagree with text capture.
         ld      a,(x86_vga_writemask)
         and     #05
         ld      hl,(x86_vga_guest_offset)
@@ -864,12 +867,14 @@ x86_vga_mem_write8_impl:
         add     a,a
 .mem_write_chain2_mask_ready:
         ld      (x86_vga_write_plane_mask),a
+        ld      hl,(x86_vga_guest_offset)
         ld      a,l
         and     #FE
         ld      l,a
+        srl     h
+        rr      l
         ld      (x86_vga_guest_offset),hl
         call    x86_vga_make_planar_offset
-
 .mem_write_base_ready:
         call    x86_vga_save_vram_base
         call    x86_vga_rotate_cpu_value
