@@ -1531,12 +1531,14 @@ x86_vga_capture_text_frame_impl:
         ld      (x86_vga_capture_plane),a
         cp      2
         jr      nz,.capture_plane_loop
-        ; Emit one complete 4000-byte snapshot of the DMA frame payload.
-        ; The dump is split into 256-byte blocks and is deliberately one-shot:
-        ; repeated video refreshes must not flood the diagnostic stream.
+        ; Do not consume the one-shot dump on the initial blank frame.
+        ; Wait until the captured character plane contains actual text.
         ld      a,(x86_vga_capture_dumped)
         or      a
         jp      nz,.capture_dump_done
+        call    x86_vga_frame_has_text
+        or      a
+        jp      z,.capture_dump_done
         ld      a,1
         ld      (x86_vga_capture_dumped),a
         call    x86_vga_dump_dma_frame
@@ -1549,6 +1551,38 @@ x86_vga_capture_index: dw 0
 x86_vga_capture_dst:   dw 0
 x86_vga_capture_data:  db 0
 x86_vga_capture_dumped: db 0
+
+; Return A=1 once at least one character byte in the captured frame is nonzero.
+; Initial POST clear frames are skipped so they cannot consume the dump.
+x86_vga_frame_has_text:
+        push    bc
+        push    hl
+        ld      a,P126_NGS_DMA_PROD_PAGE
+        rrca
+        out     (P126_NGS_BANK_WINDOW_PORT),a
+        ld      hl,P126_IPC_HEADER_SIZE
+        ld      bc,P126_VIDEO_TEXT80_CELLS
+.frame_scan:
+        ld      a,h
+        and     #3F
+        or      #C0
+        ld      h,a
+        ld      a,(hl)
+        or      a
+        jr      nz,.frame_found
+        inc     hl
+        dec     bc
+        ld      a,b
+        or      c
+        jr      nz,.frame_scan
+        xor     a
+        jr      .frame_scan_done
+.frame_found:
+        ld      a,1
+.frame_scan_done:
+        pop     hl
+        pop     bc
+        ret
 
 ; One-shot diagnostic: dump all 4000 bytes of the captured 80x25 text frame.
 ; Payload layout is 2000 character bytes followed by 2000 attribute bytes.
@@ -1662,9 +1696,7 @@ x86_vga_dump_nibble:
 
 x86_vga_dump_char:
         push    bc
-        ld      bc,#00EF
-        out     (c),a
-        pop     bc
+        out     (#EF),a
         ret
 
 x86_vga_dump_offset: dw 0
