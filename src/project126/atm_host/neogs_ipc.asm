@@ -763,72 +763,133 @@ p126_ipc_dma_receive_debug_frame::
         call    p126_ipc_validate_frame
         jp      c,.debug_dma_failed
 
-        ; Decode the compact stop event from the first five payload bytes.
+        ; Retain the live 8086 snapshot for the ATM screen overlay.
+        ; This is updated every E1 poll, including while BIOS owns the full
+        ; screen. Do not append it to the scrolling console: BIOS frame DMA
+        ; replaces that console anyway.
         ld      a,(P126_IPC_DMA_RX_BUFFER+P126_IPC_HEADER_SIZE)
-        cp      1
-        jr      z,.debug_budget
-        cp      2
-        jr      z,.debug_halted
-        cp      3
-        jr      z,.debug_fault
-        cp      4
-        jr      z,.debug_reset_fault
-        ; Unknown event payload is not a CPU register snapshot. Report
-        ; the actual frame envelope and first payload bytes instead of
-        ; misleadingly formatting arbitrary data as CS:IP.
-        ld      hl,p126_ipc_debug_event_missing
-        call    p126_ipc_console_string
-        ld      a,(P126_IPC_DMA_RX_BUFFER+6)
-        call    p126_ipc_console_hex_byte
-        ld      a,(P126_IPC_DMA_RX_BUFFER+7)
-        call    p126_ipc_console_hex_byte
-        ld      a,(P126_IPC_DMA_RX_BUFFER+8)
-        call    p126_ipc_console_hex_byte
-        ld      a,':'
-        call    p126_ipc_console_char
-        ld      a,(P126_IPC_DMA_RX_BUFFER+P126_IPC_HEADER_SIZE)
-        call    p126_ipc_console_hex_byte
-        ld      a,(P126_IPC_DMA_RX_BUFFER+P126_IPC_HEADER_SIZE+1)
-        call    p126_ipc_console_hex_byte
-        ld      a,(P126_IPC_DMA_RX_BUFFER+P126_IPC_HEADER_SIZE+2)
-        call    p126_ipc_console_hex_byte
-        ld      a,13
-        call    p126_ipc_console_char
-        ld      a,10
-        call    p126_ipc_console_char
-        or      a
-        ret
-.debug_budget:
-        ld      hl,p126_ipc_debug_budget
-        jr      .debug_render
-.debug_halted:
-        ld      hl,p126_ipc_debug_halted
-        jr      .debug_render
-.debug_fault:
-        ld      hl,p126_ipc_debug_fault
-        jr      .debug_render
-.debug_reset_fault:
-        ld      hl,p126_ipc_debug_reset_fault
-.debug_render:
-        call    p126_ipc_console_string
+        ld      (p126_ipc_debug_state),a
         ld      hl,(P126_IPC_DMA_RX_BUFFER+P126_IPC_HEADER_SIZE+1)
-        call    p126_ipc_console_hex16
-        ld      a,':'
-        call    p126_ipc_console_char
+        ld      (p126_ipc_debug_cs),hl
         ld      hl,(P126_IPC_DMA_RX_BUFFER+P126_IPC_HEADER_SIZE+3)
-        call    p126_ipc_console_hex16
-        ld      a,13
-        call    p126_ipc_console_char
-        ld      a,10
-        call    p126_ipc_console_char
+        ld      (p126_ipc_debug_ip),hl
+        ld      a,(P126_IPC_DMA_RX_BUFFER+P126_IPC_HEADER_SIZE+5)
+        ld      (p126_ipc_debug_opcode),a
+        xor     a
+        ld      (p126_ipc_debug_opcode+1),a
         or      a
         ret
 
 .debug_dma_failed:
+        ld      a,8
+        ld      (p126_ipc_debug_state),a
         ld      hl,p126_ipc_debug_dma_failed
         call    p126_ipc_console_string
         scf
         ret
+
+; Redraw the live 8086 state in the final two rows of the ATM 80x25
+; screen. The BIOS video frame owns rows 0..24; this ATM-side overlay is
+; applied after each frame, so BIOS CLS/scroll operations cannot erase it.
+p126_ipc_debug_draw_status::
+        push    af
+        push    bc
+        push    hl
+        ld      a,(p126_ipc_debug_state)
+        or      a
+        jr      z,.draw_running
+        cp      1
+        jr      z,.draw_budget
+        cp      2
+        jr      z,.draw_halted
+        cp      3
+        jr      z,.draw_fault
+        cp      4
+        jr      z,.draw_reset_fault
+        cp      5
+        jr      z,.draw_watchdog
+        cp      6
+        jr      z,.draw_starting
+        cp      7
+        jr      z,.draw_waiting
+        cp      8
+        jr      z,.draw_link_error
+        ld      hl,p126_ipc_debug_status_unknown
+        jr      .draw_status_line
+.draw_running:
+        ld      hl,p126_ipc_debug_status_running
+        jr      .draw_status_line
+.draw_budget:
+        ld      hl,p126_ipc_debug_status_budget
+        jr      .draw_status_line
+.draw_halted:
+        ld      hl,p126_ipc_debug_status_halted
+        jr      .draw_status_line
+.draw_fault:
+        ld      hl,p126_ipc_debug_status_fault
+        jr      .draw_status_line
+.draw_reset_fault:
+        ld      hl,p126_ipc_debug_status_reset_fault
+        jr      .draw_status_line
+.draw_watchdog:
+        ld      hl,p126_ipc_debug_status_watchdog
+        jr      .draw_status_line
+.draw_starting:
+        ld      hl,p126_ipc_debug_status_starting
+        jr      .draw_status_line
+.draw_waiting:
+        ld      hl,p126_ipc_debug_status_waiting
+        jr      .draw_status_line
+.draw_link_error:
+        ld      hl,p126_ipc_debug_status_link_error
+.draw_status_line:
+        ld      a,23
+        ld      c,0
+        call    BIOS_DebugConsole_PrintAt
+
+        ld      hl,p126_ipc_debug_csip_label
+        ld      a,24
+        ld      c,0
+        call    BIOS_DebugConsole_PrintAt
+        ld      a,12
+        ld      c,6
+        call    BIOS_DebugConsole_SetCursor
+        ld      hl,(p126_ipc_debug_cs)
+        call    BIOS_DebugConsole_PrintHex16
+        ld      a,':'
+        call    BIOS_DebugConsole_PrintChar
+        ld      hl,(p126_ipc_debug_ip)
+        call    BIOS_DebugConsole_PrintHex16
+        ld      hl,p126_ipc_debug_opcode_label
+        ld      a,24
+        ld      c,15
+        call    BIOS_DebugConsole_PrintAt
+        ld      a,12
+        ld      c,19
+        call    BIOS_DebugConsole_SetCursor
+        ld      hl,(p126_ipc_debug_opcode)
+        call    BIOS_DebugConsole_PrintHex16
+        pop     hl
+        pop     bc
+        pop     af
+        ret
+
+p126_ipc_debug_state:  db 7
+p126_ipc_debug_cs:     dw 0
+p126_ipc_debug_ip:     dw 0
+p126_ipc_debug_opcode: dw 0
+p126_ipc_debug_status_running: db "[NEOGS] 8086 RUNNING - BIOS EXECUTING               ",0
+p126_ipc_debug_status_budget: db "[NEOGS] BIOS SLICE COMPLETE - NEXT POLL             ",0
+p126_ipc_debug_status_halted: db "[NEOGS] BIOS HALTED - SAFE TO EXIT                  ",0
+p126_ipc_debug_status_fault: db "[NEOGS] CPU FAULT - SAFE TO EXIT                    ",0
+p126_ipc_debug_status_reset_fault: db "[NEOGS] RESET VECTOR FAULT - SAFE TO EXIT           ",0
+p126_ipc_debug_status_watchdog: db "[NEOGS] WATCHDOG STOP - SAFE TO EXIT                ",0
+p126_ipc_debug_status_starting: db "[NEOGS] BIOS READY - STARTING 8086 CPU              ",0
+p126_ipc_debug_status_waiting: db "[NEOGS] WAITING FOR BIOS IMAGE                      ",0
+p126_ipc_debug_status_link_error: db "[NEOGS] IPC LINK ERROR - CHECK AFTER EXIT           ",0
+p126_ipc_debug_status_unknown: db "[NEOGS] 8086 STATUS UNKNOWN                         ",0
+p126_ipc_debug_csip_label: db "CS:IP=",0
+p126_ipc_debug_opcode_label: db " OP=",0
 
 ; Request one converted frame from NeoGS and apply the RG6 text payload
 ; to the ATM's active page7/page3 text memory. A NO_OPERATION/F2 response is

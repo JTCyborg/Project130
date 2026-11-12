@@ -248,16 +248,18 @@ p126_host_idle:
         ; bounded 64-instruction slice before returning its stop/status frame.
         ; Polling VIDEO alone leaves the guest frozen after the first slice.
         call    p126_ipc_dma_receive_debug_frame
-        jr      c,.host_idle_continue
+        jr      c,.host_idle_draw_status
 
-        ; E2 converts the current VGA state. F2 ("not in a supported text
-        ; mode yet") is a normal pending result; keep polling until BIOS
-        ; actually produces a renderable frame.
+        ; E4 converts the current VGA state. F2 ("not in a supported text
+        ; mode yet") is a normal pending state. Once a frame is applied,
+        ; redraw the ATM-owned diagnostic strip over its final two rows.
         call    p126_ipc_dma_receive_video_frame
-        jr      nc,.host_idle_continue
-        ; A transport/validation failure is fatal to the current video poll.
+        jr      nc,.host_idle_draw_status
+        ; A transport/validation failure disables further video polling.
         xor     a
         ld      (p126_atm_video_enabled),a
+.host_idle_draw_status:
+        call    p126_ipc_debug_draw_status
 .host_idle_continue:
         jr      p126_host_idle
 

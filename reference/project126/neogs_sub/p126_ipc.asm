@@ -402,15 +402,17 @@ p126_ngs_ipc_dma_send_test_frame::
         or      c
         jr      nz,.ngs_fill
 
-        ; Payload[0] = stop reason, [1..2] = CS, [3..4] = IP.
-        ; The remainder is zero-filled; the complete fixed-size DMA frame
-        ; remains protected by the shared ABI CRC.
+        ; Payload[0] = state, [1..2] = CS, [3..4] = IP,
+        ; [5] = last executed opcode. The host overlays these values on
+        ; the bottom two ATM text rows after every BIOS video frame.
         ld      a,(x86_bios_trace_event_status)
         ld      (#C012),a
         ld      hl,(x86_bios_trace_event_cs)
         ld      (#C013),hl
         ld      hl,(x86_bios_trace_event_ip)
         ld      (#C015),hl
+        ld      a,(x86_exec_opcode)
+        ld      (#C017),a
 
         jp      p126_ngs_ipc_dma_send_staged_frame
 
@@ -735,6 +737,32 @@ p126_ngs_ipc_dispatch_once::
         ; Complete the requested response frame before advancing the guest CPU.
         ; The host waits for the DMA END acknowledgement; running a BIOS slice
         ; before that acknowledgement can exhaust the host's READY watchdog.
+        ; Publish a live architectural snapshot before sending E1. The
+        ; response is consumed by ATM while the next 64-instruction slice
+        ; runs only after DMA completion. Status 0=running, 6=starting,
+        ; 7=waiting for a BIOS image. Nonzero terminal stop reasons persist.
+        ld      a,(p126_ngs_bios_image_ready)
+        or      a
+        jr      z,.debug_state_waiting_bios
+        cp      1
+        jr      z,.debug_state_starting
+        ld      a,(x86_bios_trace_active)
+        or      a
+        jr      z,.debug_state_snapshot_ready
+        xor     a
+        jr      .debug_state_store
+.debug_state_starting:
+        ld      a,6
+        jr      .debug_state_store
+.debug_state_waiting_bios:
+        ld      a,7
+.debug_state_store:
+        ld      (x86_bios_trace_event_status),a
+        ld      hl,(x86_reg_cs)
+        ld      (x86_bios_trace_event_cs),hl
+        ld      hl,(x86_reg_ip)
+        ld      (x86_bios_trace_event_ip),hl
+.debug_state_snapshot_ready:
         ld      hl,p126_ngs_ipc_log_dma_rx_request
         call    p126_ngs_ipc_log
         call    p126_ngs_ipc_dma_send_test_frame
