@@ -548,3 +548,23 @@ p130_ngs_track: db 0
 p130_ngs_ack_value: db 0
 p130_ngs_last_status: db 0
 p130_ngs_scan_left: db 0
+
+; File-open state shared by the NEOBOOT.C and X86CORE pre-A1 paths.
+; Keep these buffers in CODE's writable data area, as in the P126 loader.
+p130_ngs_core_name: db "X86CORE "
+p130_ngs_file_extension: db 'C'
+p130_ngs_name_ptr: dw 0
+p130_ngs_core_length: dw 0
+p130_ngs_file_sectors_left: db 0
+p130_ngs_file_sector: db 0
+p130_ngs_file_track: db 0
+
+; TR-DOS #3D13 wrapper: saved entry registers and returned registers.
+p130_ngs_trdos_in_a: db 0
+p130_ngs_trdos_in_bc: dw 0
+p130_ngs_trdos_in_de: dw 0
+p130_ngs_trdos_in_hl: dw 0
+p130_ngs_trdos_a: db 0
+p130_ngs_trdos_bc: dw 0
+p130_ngs_trdos_de: dw 0
+p130_ngs_trdos_hl: dw 0
