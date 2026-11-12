@@ -631,6 +631,7 @@ bios_video_write_guest_byte:
         ; INT10 owns VGA text output. Route B800 writes through the VGA
         ; overlay explicitly instead of the generic guest-RAM writer.
         ld      a,(bios_video_guest_value)
+        ld      b,a
         ld      a,P126_NGS_X86VGA_MODULE_ID
         ld      ix,x86_vga_mem_write8_gate_impl
         jp      p126_overlay_call_module
