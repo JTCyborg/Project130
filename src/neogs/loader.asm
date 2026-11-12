@@ -1,8 +1,8 @@
 ; Project130 ATM-side GS105a bootstrap launcher.
-; The host launch order and GS105a #F4/#14/#13 handshake follow Project126.
-; Only NEOBOOT.C is sent through the legacy byte channel. The X86CORE.C
-; open/first-sector read is retained as the P126 pre-JUMP disk transaction.
-; After A1, Project130 must continue with its separately approved DMA/IPC path.
+; Startup transaction is ported from the working Project126
+; atm_host/p126_neogs_loader.asm: #F4 -> #14 -> #13 -> A1 -> A3 -> image -> A2.
+; Keep the caller's stack exactly as Project126 does; do not switch to a
+; Project130-private stack during TR-DOS ROM calls or the GS105a handshake.
 
 SECTION CODE
 PUBLIC _p130_neogs_startup
@@ -33,8 +33,6 @@ _p130_neogs_startup:
         ex      af,af'
         push    af
         ex      af,af'
-        ld      (p130_ngs_saved_sp),sp
-        ld      sp,0B7F0h
         xor     a
         ld      (p130_ngs_result),a
 
@@ -287,7 +285,6 @@ p130_ngs_finish:
         ld      (05CE5h),a
         ld      a,(p130_ngs_old_status)
         ld      (05D10h),a
-        ld      sp,(p130_ngs_saved_sp)
         ex      af,af'
         pop     af
         ex      af,af'
@@ -587,7 +584,6 @@ p130_ngs_buffer_ptr: dw 0
 p130_ngs_buffer_remaining: dw 0
 p130_ngs_block_length: dw 0
 p130_ngs_tx:        db 0
-p130_ngs_saved_sp:  dw 0
 p130_ngs_result:    db 0
 p130_ngs_old_name_len: db 0
 p130_ngs_old_drive: db 0
