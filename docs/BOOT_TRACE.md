@@ -76,3 +76,8 @@ Build `P130-0.6.3-GS105A-JUMP-ARG` corrects the #13 launch transaction. The GS10
 ## 2026-11-12 — restore the full GS105a #13 address transaction
 
 Build `P130-0.6.4-GS105A-JUMP-16BIT` corrects the #13 jump address according to the working Project126/125 host transport: preload the low address byte `#00` into GSDAT before writing command `#13`, wait for CBIT completion, then transmit the high address byte `#40` through the DBIT data channel. The jump target is therefore `#4000`. The previous 0.6.3 change incorrectly preloaded `#40` and omitted the post-command high byte, so the bootstrap was not entered and the host timed out waiting for A1. Target build and Unreal Speccy runtime verification are pending.
+
+
+## 2026-11-12 — GS105a jump entry probe
+
+Build `P130-0.6.5-BOOT-ENTRY-PROBE` adds a stackless DBIT entry signature `A0` as the first operation at `#4000`, before the bootstrap performs CALLs, changes GSCFG0, maps pages or initializes DMA. The ATM host now requires `A0` followed by `A1`: `A0` proves that #13 entered the uploaded image; `A1` proves that the bootstrap completed its setup. If the trace remains `!7E`, execution did not publish the first byte. If it reaches `b0` and then times out, the fault is inside bootstrap setup/ready transmission. This is a diagnostic handshake only; it does not start resident payload or DMA/IPC. Target build and runtime verification are pending.
