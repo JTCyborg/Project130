@@ -956,8 +956,34 @@ p126_ipc_dma_receive_video_frame::
 
         ld      hl,p126_ipc_video_frame_rx_ok
         call    p126_ipc_debug_string
+
+        ; Dump the actual payload at the ATM receiver, not just its CRC.
+        ld      hl,p126_ipc_dbg_payload_char
+        call    p126_ipc_debug_string
+        ld      a,(P126_IPC_DMA_RX_BUFFER+P126_IPC_HEADER_SIZE)
+        call    p126_ipc_debug_hex_byte
+        ld      hl,p126_ipc_dbg_payload_attr
+        call    p126_ipc_debug_string
+        ld      a,(P126_IPC_DMA_RX_BUFFER+P126_IPC_HEADER_SIZE+P126_VIDEO_TEXT80_CELLS)
+        call    p126_ipc_debug_hex_byte
+        call    p126_ipc_debug_crlf
+
+        ld      hl,p126_ipc_dbg_apply_enter
+        call    p126_ipc_debug_string
         call    p126_screen_apply_text_frame
+        push    af
+        push    hl
+        ld      hl,p126_ipc_dbg_apply_return
+        call    p126_ipc_debug_string
+        pop     hl
+        pop     af
+        push    af
+        call    p126_ipc_debug_hex_byte
+        call    p126_ipc_debug_crlf
+        pop     af
         jr      c,.video_apply_failed
+        ld      hl,p126_ipc_dbg_apply_ok
+        call    p126_ipc_debug_string
         ld      hl,p126_ipc_video_frame_applied
         call    p126_ipc_console_string
         or      a
@@ -1088,6 +1114,11 @@ p126_ipc_debug_event_missing: db "[X86] BIOS TRACE EVENT INVALID; FRAME=",0
 p126_ipc_debug_dma_failed: db "[X86] DIAGNOSTIC DMA FAILED",13,10,0
 p126_ipc_video_frame_rx_ok: db "[TRACE] ATM FRAME RX / CRC OK",13,10,0
 p126_ipc_video_frame_applied: db "[VIDEO] RG6 FRAME APPLIED",13,10,0
+p126_ipc_dbg_payload_char: db "[VIDEO DBG] RX CHAR[0]=",0
+p126_ipc_dbg_payload_attr: db " ATTR[0]=",0
+p126_ipc_dbg_apply_enter: db "[VIDEO DBG] APPLY ENTER",13,10,0
+p126_ipc_dbg_apply_return: db "[VIDEO DBG] APPLY RETURN A=",0
+p126_ipc_dbg_apply_ok: db "[VIDEO DBG] APPLY OK",13,10,0
 p126_ipc_video_dma_failed: db "[VIDEO] FRAME RECEIVE/APPLY FAILED",13,10,0
 
 ; Print A as two hexadecimal digits on ATM's independent #EF stream.
