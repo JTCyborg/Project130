@@ -479,8 +479,6 @@ x86_bios_rep_stosw_progress:
         call    x86_bios_trace_emit_hex16
         ld      hl,x86_bios_rep_stosw_suffix
         call    p126_ngs_resident_log
-        ld      a,(x86_reg_cx)
-        or      (hl)
         ; CX=0 marks the completed clear; stop tracking this phase.
         ld      hl,(x86_reg_cx)
         ld      a,h
