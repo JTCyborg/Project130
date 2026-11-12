@@ -86,8 +86,8 @@ p130_ngs_scan_found:
         ld      a,'r'
         out     (c),a
 
-        ; On-disk descriptor fields: length at +11/+12,
-        ; first sector at +13, logical track at +14.
+        ; TR-DOS descriptor: length +11/+12, sector count +13,
+        ; first sector +14, track +15.
         ld      a,(ix+11)
         ld      l,a
         ld      a,(ix+12)
@@ -105,11 +105,11 @@ p130_ngs_scan_found:
         jp      nz,p130_ngs_fail
 p130_ngs_len_ok:
         ld      (p130_ngs_length),hl
-        ld      a,(ix+13)
+        ld      a,(ix+14)
         cp      16
         jp      nc,p130_ngs_fail
         ld      (p130_ngs_sector),a
-        ld      a,(ix+14)
+        ld      a,(ix+15)
         ld      (p130_ngs_track),a
 
         ; C=05, B=1, HL=#C000, DE=track:sector.
