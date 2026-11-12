@@ -32,6 +32,17 @@ p126_atm_video_mode: db P126_ATM_VIDEO_MODE_RG6_TEXT80X25
 p126_atm_video_enabled: db 0
 p126_screen_frame_row:      db 0
 p126_screen_frame_col:      db 0
+p126_screen_trace_renderer_enter: db "[SCREEN DBG] RENDERER ENTER",13,10,0
+p126_screen_trace_renderer_done: db "[SCREEN DBG] RENDERER DONE 25X80",13,10,0
+p126_screen_trace_first_cell: db 0
+p126_screen_trace_first: db "[SCREEN DBG] FIRST ROW=",0
+p126_screen_trace_col: db " COL=",0
+p126_screen_trace_char: db " CHAR=",0
+p126_screen_trace_attr: db " ATTR=",0
+p126_screen_trace_offset: db "[SCREEN DBG] OFFSET=",0
+p126_screen_trace_parity: db " PARITY=",0
+p126_screen_trace_readback: db "[SCREEN DBG] READBACK CHAR/ATTR=",0
+
 
 Console_X: db 0
 Console_Y: db BIOS_DEBUG_TOP
@@ -520,6 +531,39 @@ p126_screen_write_guest_cell:
         ld      (bios_dbg_write_row),a
         ld      a,e
         ld      (bios_dbg_write_col),a
+
+        ; One detailed trace of the first physical cell write.
+        ld      a,(p126_screen_trace_first_cell)
+        or      a
+        jr      nz,.screen_trace_first_done
+        inc     a
+        ld      (p126_screen_trace_first_cell),a
+        push    af
+        push    bc
+        push    de
+        push    hl
+        ld      hl,p126_screen_trace_first
+        call    p126_ipc_debug_string
+        ld      a,(bios_dbg_write_row)
+        call    p126_ipc_debug_hex_byte
+        ld      hl,p126_screen_trace_col
+        call    p126_ipc_debug_string
+        ld      a,(bios_dbg_write_col)
+        call    p126_ipc_debug_hex_byte
+        ld      hl,p126_screen_trace_char
+        call    p126_ipc_debug_string
+        ld      a,(bios_dbg_char)
+        call    p126_ipc_debug_hex_byte
+        ld      hl,p126_screen_trace_attr
+        call    p126_ipc_debug_string
+        ld      a,(bios_dbg_attr)
+        call    p126_ipc_debug_hex_byte
+        call    p126_ipc_debug_crlf
+        pop     hl
+        pop     de
+        pop     bc
+        pop     af
+.screen_trace_first_done:
         call    p126_screen_map_video_pages
         ld      a,(bios_dbg_write_row)
         ld      l,a
@@ -542,6 +586,32 @@ p126_screen_write_guest_cell:
         ld      d,0
         add     hl,de
         ld      (bios_dbg_offset),hl
+
+        ; Report computed ATM row offset and even/odd character lane.
+        ld      a,(p126_screen_trace_first_cell)
+        cp      1
+        jr      nz,.screen_trace_offset_done
+        push    af
+        push    bc
+        push    de
+        push    hl
+        ld      hl,p126_screen_trace_offset
+        call    p126_ipc_debug_string
+        ld      hl,(bios_dbg_offset)
+        ld      a,h
+        call    p126_ipc_debug_hex_byte
+        ld      a,l
+        call    p126_ipc_debug_hex_byte
+        ld      hl,p126_screen_trace_parity
+        call    p126_ipc_debug_string
+        ld      a,(bios_dbg_parity)
+        call    p126_ipc_debug_hex_byte
+        call    p126_ipc_debug_crlf
+        pop     hl
+        pop     de
+        pop     bc
+        pop     af
+.screen_trace_offset_done:
         ld      hl,(bios_dbg_offset)
         ld      a,(bios_dbg_parity)
         or      a
@@ -568,6 +638,50 @@ p126_screen_write_guest_cell:
         ld      a,(bios_dbg_attr)
         ld      (hl),a
 .guest_done:
+        ; Read back the first character and attribute while video pages
+        ; are still mapped. This separates wrong addressing from bad source.
+        ld      a,(p126_screen_trace_first_cell)
+        cp      1
+        jr      nz,.screen_trace_readback_done
+        push    af
+        push    bc
+        push    de
+        push    hl
+        ld      hl,p126_screen_trace_readback
+        call    p126_ipc_debug_string
+        ld      a,(bios_dbg_parity)
+        or      a
+        jr      nz,.screen_trace_readback_odd
+        ld      hl,(bios_dbg_offset)
+        ld      de,#4000
+        add     hl,de
+        ld      a,(hl)
+        call    p126_ipc_debug_hex_byte
+        ld      hl,(bios_dbg_offset)
+        ld      de,#E000
+        add     hl,de
+        ld      a,(hl)
+        call    p126_ipc_debug_hex_byte
+        jr      .screen_trace_readback_end
+.screen_trace_readback_odd:
+        ld      hl,(bios_dbg_offset)
+        ld      de,#6000
+        add     hl,de
+        ld      a,(hl)
+        call    p126_ipc_debug_hex_byte
+        ld      hl,(bios_dbg_offset)
+        ld      de,#C000
+        add     hl,de
+        inc     hl
+        ld      a,(hl)
+        call    p126_ipc_debug_hex_byte
+.screen_trace_readback_end:
+        call    p126_ipc_debug_crlf
+        pop     hl
+        pop     de
+        pop     bc
+        pop     af
+.screen_trace_readback_done:
         call    p126_screen_restore_host_pages
         pop     hl
         pop     de
@@ -618,6 +732,10 @@ p126_screen_apply_text_frame::
         ; DMA payload is contiguous chars[2000] followed by attrs[2000].
         ; Keep the two stream pointers in HL/DE and the original 25x80
         ; nested loop; each cell is written by the same ATM-native primitive.
+        ld      hl,p126_screen_trace_renderer_enter
+        call    p126_ipc_debug_string
+        xor     a
+        ld      (p126_screen_trace_first_cell),a
         ld      hl,P126_IPC_DMA_RX_BUFFER+P126_IPC_HEADER_SIZE
         ld      de,P126_IPC_DMA_RX_BUFFER+P126_IPC_HEADER_SIZE+P126_VIDEO_TEXT80_CELLS
         xor     a
@@ -657,6 +775,8 @@ p126_screen_apply_text_frame::
         inc     a
         ld      (p126_screen_frame_row),a
         djnz    .apply_text_row
+        ld      hl,p126_screen_trace_renderer_done
+        call    p126_ipc_debug_string
         xor     a
         ret
 .apply_text_bad:
