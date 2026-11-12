@@ -674,6 +674,7 @@ x86_vga_read_text_cell_impl:
         ld      a,l
         ld      (x86_mem_addr),a
         ld      a,h
+        add     a,#80
         ld      (x86_mem_addr+1),a
         ld      a,#0B
         ld      (x86_mem_addr+2),a
