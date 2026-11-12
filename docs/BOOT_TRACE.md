@@ -71,3 +71,8 @@ Build `P130-0.6.2-P127-TRDOS-HL-PRESERVE` fixes the remaining hang before the fi
 ## 2026-11-12 — GS105a #13 jump argument ordering
 
 Build `P130-0.6.3-GS105A-JUMP-ARG` corrects the #13 launch transaction. The GS105a programming protocol specifies that a one-byte command argument is written to GSDAT before the command is written to GSCOM; this argument transfer does not use DBIT handshaking. Project130 previously preloaded zero, issued #13, and then attempted to send #40 as a DBIT-stream byte. That caused the ROM to receive jump target #0000 rather than #4000. The host now preloads #40 with `p130_ngs_send_argument`, issues #13, waits for CBIT completion, then receives the bootstrap's A1 byte over DBIT. Target build and runtime verification remain pending.
+
+
+## 2026-11-12 — restore the full GS105a #13 address transaction
+
+Build `P130-0.6.4-GS105A-JUMP-16BIT` corrects the #13 jump address according to the working Project126/125 host transport: preload the low address byte `#00` into GSDAT before writing command `#13`, wait for CBIT completion, then transmit the high address byte `#40` through the DBIT data channel. The jump target is therefore `#4000`. The previous 0.6.3 change incorrectly preloaded `#40` and omitted the post-command high byte, so the bootstrap was not entered and the host timed out waiting for A1. Target build and Unreal Speccy runtime verification are pending.
