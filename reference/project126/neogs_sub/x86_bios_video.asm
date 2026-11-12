@@ -105,7 +105,8 @@ bios_video_set_vga_text_state:
         ret
 
 bios_video_vga_index_data:
-        ld      (bios_video_vga_data),d
+        ld      a,d
+        ld      (bios_video_vga_data),a
         ld      (bios_video_vga_port),hl
         call    bios_video_vga_write
         ret     c
