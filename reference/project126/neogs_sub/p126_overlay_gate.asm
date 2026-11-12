@@ -336,17 +336,27 @@ p126_overlay_call_module:
         cp      16
         jr      nc,.module_call_not_loaded
         ld      (p126_overlay_manager_id),a
+        ; Module lookup uses DE/HL, but both are part of the module ABI.
+        ; Preserve the caller's input pointers/arguments until the selected
+        ; overlay is entered; the overlay may then return its own HL/DE.
+        push    de
+        push    hl
         ld      e,a
         ld      d,0
         ld      hl,p126_overlay_module_page_table
         add     hl,de
         ld      a,(hl)
         or      a
-        jr      z,.module_call_not_loaded
+        jr      z,.module_call_lookup_failed
         rrca
         ld      (p126_overlay_request_selector),a
+        pop     hl
+        pop     de
         ld      a,(p126_overlay_manager_id)
         jp      p126_overlay_call
+.module_call_lookup_failed:
+        pop     hl
+        pop     de
 .module_call_not_loaded:
         ld      a,P126_STATUS_NO_SERVICE
         scf
