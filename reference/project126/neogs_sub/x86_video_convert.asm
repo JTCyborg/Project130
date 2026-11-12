@@ -26,8 +26,8 @@ x86_video_vga_read_text_cell:
         ld      ix,x86_vga_read_text_cell_gate_impl
         jp      p126_overlay_call_module
 
-; Convert one complete VGA text screen using the ATM mode descriptor
-; received over the VIDEO service. OUT: A=0, HL=frame byte count, CF=0.
+; Convert one complete 80x25 B800 text page using the Project125 capture
+; contract. OUT: A=0, HL=frame byte count, CF=0.
 x86_video_convert_impl:
         xor     a
         ld      (x86_video_frame_ready),a
@@ -57,34 +57,18 @@ x86_video_convert_impl:
         sbc     hl,de
         jp      nz,.video_convert_bad_mode
 
-        ; X86VGA returns the text aperture base, CRTC start and row stride
-        ; calculated with the same MA units as PCem's text renderer.
-        call    x86_video_vga_get_text_snapshot
-        jp      c,.video_convert_unsupported
+        ; Project125-compatible capture policy:
+        ; always pull the legacy 80x25 colour text page at B800:0000.
+        ; Do not wait for CRTC/Sequencer/GDC mode programming. Real BIOS POST
+        ; writes its first status strings to B8000h before completing VGA init.
+        ; Project125 captured the backing character and attribute planes
+        ; directly; this uses the X86VGA cell API over the same fixed aperture.
+        ld      a,#80
         ld      (x86_video_text_base_mid),a
+        ld      hl,0
         ld      (x86_video_row_offset),hl
-        ld      (x86_video_stride),de
-
-        ; The CPU text aperture is 32 KiB. Reject a CRTC start/stride that
-        ; would make the 80x25 capture cross into the VGA BIOS window.
-        ld      hl,(x86_video_stride)
-        ld      de,160
-        or      a
-        sbc     hl,de
-        jp      c,.video_convert_unsupported
-        ld      hl,(x86_video_row_offset)
-        ld      de,(x86_video_stride)
-        ld      b,P126_VIDEO_TEXT80_HEIGHT-1
-.video_convert_bounds:
-        add     hl,de
-        jp      c,.video_convert_unsupported
-        djnz    .video_convert_bounds
-        ld      de,160
-        add     hl,de
-        jp      c,.video_convert_unsupported
-        ld      a,h
-        cp      #80
-        jp      nc,.video_convert_unsupported
+        ld      hl,160
+        ld      (x86_video_stride),hl
 
         ld      hl,0
         ld      (x86_video_frame_index),hl
