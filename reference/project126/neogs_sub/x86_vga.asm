@@ -1452,6 +1452,82 @@ x86_vga_read_text_cell_impl:
         or      a
         ret
 
+; Bulk equivalent of Project125 command_video_pull plane gathering.
+; One overlay call captures 2000 chars, then 2000 attributes into the
+; existing P126 framed-DMA producer page. VGA backing is interleaved:
+; cell N = planar offset N*4, plane0 at +0, plane1 at +1.
+; No guest mode validation: BIOS POST text at B8000 is visible immediately.
+x86_vga_capture_text_frame_gate_impl:
+        jp      x86_vga_capture_text_frame_impl
+
+x86_vga_capture_text_frame_impl:
+        xor     a
+        ld      (x86_vga_capture_plane),a
+        ld      hl,0
+        ld      (x86_vga_capture_index),hl
+        ld      hl,P126_IPC_HEADER_SIZE
+        ld      (x86_vga_capture_dst),hl
+.capture_plane_loop:
+        ld      hl,0
+        ld      (x86_vga_capture_index),hl
+.capture_cell_loop:
+        ; Source offset = cell_index * 4 + selected plane.
+        ld      hl,(x86_vga_capture_index)
+        add     hl,hl
+        add     hl,hl
+        ld      a,(x86_vga_capture_plane)
+        add     a,l
+        ld      l,a
+        jr      nc,.capture_src_ready
+        inc     h
+.capture_src_ready:
+        ld      (x86_vga_vram_offset),hl
+        xor     a
+        ld      (x86_vga_vram_offset+2),a
+        call    x86_vga_vram_read_at_offset
+        ld      (x86_vga_capture_data),a
+
+        ; Write sequentially into the P126 video frame payload.
+        ld      a,P126_NGS_DMA_PROD_PAGE
+        rrca
+        out     (P126_NGS_BANK_WINDOW_PORT),a
+        ld      hl,(x86_vga_capture_dst)
+        ld      de,P126_IPC_HEADER_SIZE
+        or      a
+        sbc     hl,de
+        ld      de,P126_IPC_HEADER_SIZE
+        add     hl,de
+        ld      a,h
+        and     #3F
+        or      #C0
+        ld      h,a
+        ld      a,(x86_vga_capture_data)
+        ld      (hl),a
+        ld      hl,(x86_vga_capture_dst)
+        inc     hl
+        ld      (x86_vga_capture_dst),hl
+
+        ld      hl,(x86_vga_capture_index)
+        inc     hl
+        ld      (x86_vga_capture_index),hl
+        ld      de,P126_VIDEO_TEXT80_CELLS
+        or      a
+        sbc     hl,de
+        jr      nz,.capture_cell_loop
+
+        ld      a,(x86_vga_capture_plane)
+        inc     a
+        ld      (x86_vga_capture_plane),a
+        cp      2
+        jr      nz,.capture_plane_loop
+        xor     a
+        ret
+
+x86_vga_capture_plane: db 0
+x86_vga_capture_index: dw 0
+x86_vga_capture_dst:   dw 0
+x86_vga_capture_data:  db 0
+
 x86_vga_set_text_phys_addr:
         ld      hl,(x86_vga_text_offset)
         ld      a,(x86_vga_text_base_mid)

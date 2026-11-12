@@ -13,21 +13,16 @@ x86_video_overlay_probe:
         ld      hl,#A55A
         ret
 
-; X86VGA is a separate dynamic overlay (module 05/page08). Never call
-; its routines directly while X86VID (module 06/page09) occupies WIN2.
-x86_video_vga_get_text_snapshot:
+; X86VGA is a separate dynamic overlay (module 05/page08).
+; Capture is performed inside that overlay in one call, matching the
+; Project125 bulk plane-gather contract while retaining the P126 frame ABI.
+x86_video_vga_capture_text_frame:
         ld      a,P126_NGS_X86VGA_MODULE_ID
-        ld      ix,x86_vga_get_text_snapshot_impl
+        ld      ix,x86_vga_capture_text_frame_gate_impl
         jp      p126_overlay_call_module
 
-x86_video_vga_read_text_cell:
-        ld      b,a
-        ld      a,P126_NGS_X86VGA_MODULE_ID
-        ld      ix,x86_vga_read_text_cell_gate_impl
-        jp      p126_overlay_call_module
-
-; Convert one complete 80x25 B800 text page using the Project125 capture
-; contract. OUT: A=0, HL=frame byte count, CF=0.
+; Convert one complete 80x25 B800 text page.
+; OUT: A=0, HL=frame byte count, CF=0.
 x86_video_convert_impl:
         xor     a
         ld      (x86_video_frame_ready),a
@@ -35,7 +30,6 @@ x86_video_convert_impl:
         or      a
         jp      z,.video_convert_no_mode
 
-        ; Revalidate the resident descriptor at the point of use.
         ld      a,(p126_ngs_video_mode_desc)
         cp      P126_VIDEO_DESC_VERSION
         jp      nz,.video_convert_bad_mode
@@ -57,74 +51,10 @@ x86_video_convert_impl:
         sbc     hl,de
         jp      nz,.video_convert_bad_mode
 
-        ; Project125-compatible capture policy:
-        ; always pull the legacy 80x25 colour text page at B800:0000.
-        ; Do not wait for CRTC/Sequencer/GDC mode programming. Real BIOS POST
-        ; writes its first status strings to B8000h before completing VGA init.
-        ; Project125 captured the backing character and attribute planes
-        ; directly; this uses the X86VGA cell API over the same fixed aperture.
-        ld      a,#80
-        ld      (x86_video_text_base_mid),a
-        ld      hl,0
-        ld      (x86_video_row_offset),hl
-        ld      hl,160
-        ld      (x86_video_stride),hl
-
-        ld      hl,0
-        ld      (x86_video_frame_index),hl
-        xor     a
-        ld      (x86_video_row),a
-.video_convert_row:
-        ld      hl,(x86_video_row_offset)
-        ld      (x86_video_cell_offset),hl
-        xor     a
-        ld      (x86_video_col),a
-.video_convert_col:
-        ld      a,(x86_video_text_base_mid)
-        ld      hl,(x86_video_cell_offset)
-        call    x86_video_vga_read_text_cell
-        ld      (x86_video_char),a
-        ld      a,d
-        ld      (x86_video_attr),a
-
-        ; Character plane followed by attribute plane.
-        ld      hl,(x86_video_frame_index)
-        ld      a,(x86_video_char)
-        call    x86_video_write_frame_byte
-        ld      hl,(x86_video_frame_index)
-        ld      de,P126_VIDEO_TEXT80_CELLS
-        add     hl,de
-        ld      a,(x86_video_attr)
-        call    x86_video_write_frame_byte
-
-        ld      hl,(x86_video_frame_index)
-        inc     hl
-        ld      (x86_video_frame_index),hl
-        ld      hl,(x86_video_cell_offset)
-        inc     hl
-        inc     hl
-        ld      (x86_video_cell_offset),hl
-        ld      a,(x86_video_col)
-        inc     a
-        ld      (x86_video_col),a
-        cp      P126_VIDEO_TEXT80_WIDTH
-        jp      c,.video_convert_col
-
-        ld      hl,(x86_video_row_offset)
-        ld      de,(x86_video_stride)
-        add     hl,de
-        ld      (x86_video_row_offset),hl
-        ld      a,(x86_video_row)
-        inc     a
-        ld      (x86_video_row),a
-        cp      P126_VIDEO_TEXT80_HEIGHT
-        jp      c,.video_convert_row
-
-        ld      hl,(x86_video_frame_index)
-        ld      de,P126_VIDEO_TEXT80_CELLS
-        or      a
-        sbc     hl,de
-        jp      nz,.video_convert_bad_mode
+        ; Project125's essential operation: gather plane 0 and plane 1
+        ; into contiguous char[2000] + attr[2000] arrays before presenting.
+        ; The VGA overlay owns the physical 256 KiB backing-store mapping.
+        call    x86_video_vga_capture_text_frame
         ld      hl,P126_VIDEO_TEXT80_FRAME_SIZE
         ld      (x86_video_frame_size),hl
         ld      a,1
@@ -135,10 +65,6 @@ x86_video_convert_impl:
 
 .video_convert_no_mode:
         ld      a,#F1
-        scf
-        ret
-.video_convert_unsupported:
-        ld      a,#F2
         scf
         ret
 .video_convert_bad_mode:
