@@ -1476,33 +1476,31 @@ x86_vga_capture_text_frame_impl:
         ld      hl,0
         ld      (x86_vga_capture_index),hl
 .capture_cell_loop:
-        ; Match the VGA write/read backend and the single-cell text reader:
-        ; planar byte address = cell index * 4, character at +0,
-        ; attribute at +1. The four planes are interleaved, not 64K-banked.
+        ; Project125-compatible capture: read the guest-visible B800 aperture,
+        ; not the private physical VRAM backing-store layout. In VGA text mode
+        ; the CPU sees char/attribute bytes at B800:0000 + cell*2 + plane;
+        ; the VGA chain-2 read path selects the corresponding plane.
         ld      hl,(x86_vga_capture_index)
         add     hl,hl
-        add     hl,hl
+        ld      de,#8000
+        add     hl,de
         ld      a,(x86_vga_capture_plane)
         or      a
-        jr      z,.capture_plane_offset_ready
+        jr      z,.capture_cpu_address_ready
         inc     hl
-.capture_plane_offset_ready:
-        ld      (x86_vga_vram_offset),hl
-        xor     a
-        ld      (x86_vga_vram_offset+2),a
-        call    x86_vga_vram_read_at_offset
+.capture_cpu_address_ready:
+        ld      (x86_phys_addr),hl
+        ld      a,#0B
+        ld      (x86_phys_addr+2),a
+        call    x86_vga_mem_read8_impl
         ld      (x86_vga_capture_data),a
 
-        ; Write sequentially into the P126 video frame payload.
+        ; Write sequentially into the P126 video frame payload:
+        ; first all 2000 character bytes, then all 2000 attributes.
         ld      a,P126_NGS_DMA_PROD_PAGE
         rrca
         out     (P126_NGS_BANK_WINDOW_PORT),a
         ld      hl,(x86_vga_capture_dst)
-        ld      de,P126_IPC_HEADER_SIZE
-        or      a
-        sbc     hl,de
-        ld      de,P126_IPC_HEADER_SIZE
-        add     hl,de
         ld      a,h
         and     #3F
         or      #C0
