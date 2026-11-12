@@ -1786,6 +1786,14 @@ IF X86_FE_TRACE_DIAGNOSTICS
 
         ld      hl,x86_exec_group45_trace_prefix
         call    p126_ngs_resident_log
+        ld      a,(x86_modrm_byte)
+        call    x86_bios_trace_emit_hex8
+        ld      hl,x86_exec_group45_trace_ext
+        call    p126_ngs_resident_log
+        ld      a,(x86_exec_group45_ext)
+        call    x86_bios_trace_emit_hex8
+        ld      hl,x86_exec_group45_trace_input
+        call    p126_ngs_resident_log
         ld      a,(x86_exec_group45_input8)
         call    x86_bios_trace_emit_hex8
         ld      hl,x86_exec_group45_trace_alu
@@ -1821,7 +1829,9 @@ IF X86_FE_TRACE_DIAGNOSTICS
 ENDIF
         ret
 
-x86_exec_group45_trace_prefix: db "[X86 FE E0C0] IN=",0
+x86_exec_group45_trace_prefix: db "[X86 FE E0C0] MODRM=",0
+x86_exec_group45_trace_ext: db " EXT=",0
+x86_exec_group45_trace_input: db " IN=",0
 x86_exec_group45_trace_alu: db " ALU=",0
 x86_exec_group45_trace_writeback: db " WB=",0
 x86_exec_group45_trace_flags: db " FLAGS=",0
