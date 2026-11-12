@@ -1,106 +1,72 @@
 # Project130 NeoGS bootstrap and DMA transport architecture
 
-Status: stage-0 bootstrap and GS105a launcher implemented in source; DMA/IPC payload transport and physical map remain gated. No target validation is implied.
+Status: GS105a stage-0 launcher is implemented in source. The Project126 NeoGS physical map is approved for Project130. The resident DMA/IPC payload transport and BIOS execution path remain to be implemented; no target validation is implied.
 
-## 1. Startup decision
+## 1. Startup and ownership
 
 The stock NeoGS GS105a ROM is retained only as a temporary bootstrap launcher.
 
-1. ATM host locates and validates the small Project130 bootstrap image.
-2. ATM host uses the stock GS105a receive command `#14` to place that image at the ROM-defined receive address (`#4000`). The byte count is encoded as a 16-bit two's-complement negative length, matching Project126; the low byte is preloaded before command dispatch and the high byte follows `#14`.
-3. After the bootstrap bytes are transferred, ATM opens `X86CORE.C`, reads its first sector and validates the 1..16 KiB length, matching Project126's pre-`#13` TR-DOS transaction. Project130 does not send those bytes through GSDAT. The host then uses command `#13` to transfer control to `#4000`.
-4. The bootstrap follows the Project126 stage-0 order: `DI`, temporary `SP=#3FFF`, emit `[NGS] BOOTSTRAP ENTER`, disable ZX DMA (`#1B/#1F`), settle delay, set `GSCFG0` NOROM+EXPAG with RAMRO clear, emit `[NGS] NOROM ENABLED`, establish the temporary WIN0/WIN3 mapping (`#20/#00/#10`), then move the stack to `#FFFE`.
-5. The bootstrap publishes exactly one `A1` ready acknowledgement using the ZX DBIT producer handshake and idles. There is no `E0` pre-ack. In the current implementation `A1` proves only that stage-0 reached its ready point; it does not prove resident firmware, DMA or IPC is running. Project130 must not report full NeoGS startup success at this boundary.
-6. After the handoff, the stock ROM byte-stream protocol is closed. No resident firmware, module, command, response, event, diagnostic or video payload may be transferred through GSDAT.
+1. ATM locates and validates NEOBOOT.C.
+2. ATM uses stock GS105a command #14 to place the bootstrap at ROM receive address #4000. Length is a 16-bit two's-complement negative value; low byte is preloaded before command dispatch and high byte follows #14.
+3. ATM opens X86CORE.C, reads its first sector and validates the 1..16 KiB length, matching the Project126 pre-#13 TR-DOS transaction. Project130 does not send core bytes through GSDAT.
+4. ATM issues #13 to transfer control to #4000.
+5. Bootstrap follows Project126 stage-0 order: DI, temporary SP=#3FFF, disable ZX DMA (#1B/#1F), settle, set GSCFG0 NOROM+EXPAG with RAMRO clear, establish temporary WIN0/WIN3 mapping (#20/#00/#10), then move stack to #FFFE.
+6. Bootstrap publishes one A1 ready acknowledgement and idles. A1 confirms only stage-0 readiness, not resident runtime, DMA, IPC or x86 CPU operation.
 
-The GS105a `#14/#13` exchange is the only legacy byte-channel exception in Project130. It transfers the bootstrap image itself and nothing else. Project126's subsequent resident-core transfer over GSDAT is intentionally not part of Project130's agreed transport boundary.
-
-## 1.1 Bootstrap diagnostics
-
-The ATM launcher emits progress characters `1` through `9` on the existing debug channel `#EF`. The trace routine does not call the UI renderer, particularly during the `#13`/`A1` handshake. The corresponding stage codes are:
-
-1. TR-DOS catalogue lookup of `NEOBOOT.C`.
-2. Bootstrap file descriptor validation.
-3. Bootstrap length validation (1..256 bytes).
-4. Read the bootstrap sector into ATM scratch at `#C000`.
-5. GS105a reset command `#F4`.
-6. GS105a receive command `#14` and its header.
-7. Transfer the bootstrap bytes through GSDAT.
-8. Complete the bootstrap byte transfer through GSDAT.
-9. Jump command `#13` and its target address, followed by the `J` target-byte handoff marker and `W` acknowledgement wait marker. The host then reads the single bootstrap `A1` acknowledgement. A timeout prints `!` plus the last sampled `GSSTAT`; a target-byte handoff failure prints `j` plus the sampled status.
-
-On a returned failure, the host also prints the last stage code as two hexadecimal digits. If execution stops without returning, the last progress character narrows the blocked operation. These markers are diagnostics only; they do not claim that the bootstrap or DMA transport has passed runtime validation.
+The GS105a #14/#13 exchange is the only legacy byte-channel exception. It transfers the small bootstrap image only. After A1, all resident code, BIOS, modules, control payloads and video data use Project130 DMA/IPC. No further GSDAT payload streaming is permitted.
 
 ## 2. Ownership and port boundary
 
-- ATM Turbo 2+ remains the owner of physical devices, ATM physical memory mapping and host-side DMA orchestration.
-- ATM-side code uses only the documented host-visible NeoGS command/status/data interface for the bootstrap handoff and IPC control plane.
+- ATM Turbo 2+ owns physical devices, ATM physical memory mapping and host-side DMA orchestration.
+- ATM-side code uses only the documented host-visible NeoGS command/status/data interface for stage-0 bootstrap and IPC control.
 - ATM-side code must not write NeoGS-local DMA registers as if they were ATM ports.
 - NeoGS code must not perform physical ATM I/O. Guest x86 IN/OUT is implemented by software virtual devices and host-service requests.
-- No IRQ is enabled during bootstrap or initial transport bring-up. IRQ policy is a later decision after vectors, stack, acknowledgement and ownership are specified.
+- No IRQ is enabled during bootstrap or initial transport bring-up.
 
-Project129's NeoGS port reference lists the NeoGS-local ZX DMA registers as `DMA_MOD=#1B`, `DMA_HAD=#1C`, `DMA_MAD=#1D`, `DMA_LAD=#1E`, `DMA_CST=#1F`. They are programmed by NeoGS-side code, not by direct ATM port writes.
+NeoGS-local ZX DMA registers are MOD=#1B, HAD=#1C, MAD=#1D, LAD=#1E, CST=#1F. They are programmed by NeoGS-side code, not by direct ATM port writes.
 
-## 3. DMA transfer rules
-
-The Project129 `docs/NeoGS/dma_zx_doc.txt` describes these hardware rules; the Project130 implementation must preserve them:
+## 3. DMA rules
 
 - Select ZX DMA module 1 on the NeoGS side.
-- Program the exact requested start address before enabling DMA.
-- DMA read: discard the first byte read from the ROM aperture; it is a dummy. The next byte is the requested first payload byte. Do not subtract one from the programmed address.
-- DMA write: no dummy write; the first write is payload byte zero.
-- Never interleave read and write directions. Disable DMA before changing direction and re-enable it for the next transfer.
-- DMA read requires the ATM ROM aperture at `0000–3FFF` to be enabled so the DMA read cycles are generated. DMA write can target the aperture while RAM is mapped there.
-- Keep interrupts disabled while the ROM aperture is exposed until the IM1/vector interaction is explicitly designed.
-- All polling and completion waits are bounded. Success and failure exits leave DMA disabled or in a documented idle state.
+- Program the exact requested start address.
+- DMA read: enable the ROM aperture, discard the first dummy read, then consume payload byte zero. Do not decrement the programmed address.
+- DMA write: no dummy write; first write is payload byte zero.
+- Disable DMA before changing direction.
+- Keep interrupts disabled while the ROM aperture exposes DMA data until vector handling is designed.
+- All waits are bounded; all exits leave DMA disabled or in documented idle state.
 
-These are documented device constraints, not evidence that Project130 has validated a DMA transfer.
+The approved NeoGS physical DMA staging page is #42. The ZX-visible ATM aperture 0000–3FFF is a different address space. See docs/NeoGS/MEMORY_MAP.md.
 
 ## 4. Project130 transport ABI
 
-Project130 owns its transport ABI. Project126's message format and loader are references for review, not an automatically accepted wire format.
+Project130 owns its transport ABI. Project126 framing is a reference, not an automatically accepted wire format. Before payload traffic is enabled, define magic/version, message type, sequence, payload length, CRC coverage, completion and stale-response handling, timeout/resync, DMA direction and ownership, maximum frame and fragmentation.
 
-Before enabling payload traffic, the Project130 ABI must define:
+Control plane may use documented NeoGS command/status handshakes. Application payload bytes use DMA only.
 
-- magic and ABI version;
-- message type, service and operation;
-- sequence number and payload length;
-- CRC algorithm, covered bytes and validation order;
-- request/response completion and stale-response handling;
-- timeout, cancellation and resynchronization;
-- DMA direction, buffer ownership and lifetime;
-- maximum frame, fragmentation and wrap behavior.
+## 5. BIOS load and launch contract
 
-The control plane may use the documented NeoGS command/status handshake. Application payload bytes must use DMA only.
+The selected BIOS is one of the three 8 KiB TR-DOS images documented in docs/NeoGS/BIOS_IMAGES.md.
 
-Project130 reproduces Project126's pre-`#13` `X86CORE.C` open/first-sector read and length validation, but does not transfer the core bytes through GSDAT. This preserves the host-side launch transaction only. The stage-0 implementation currently stops after `A1`; unlike Project126, it does not exchange the core length (`A3`), receive a resident image, return `A2`, validate `X86MODS.M`, or install the six overlays. These are explicit incomplete stages, not successful startup.
+1. ATM opens the selected BIOS .C file and validates type and exact size (8192 bytes / 32 TR-DOS sectors).
+2. Read the complete image into ATM staging and calculate CRC-16/CCITT-FALSE over exactly 8192 bytes.
+3. Send IMAGE_BEGIN for image kind SYSBIOS, physical page #10 and image length #2000.
+4. Send IMAGE_FRAGMENT containing all 8192 bytes.
+5. Send IMAGE_FINISH. NeoGS validates the transfer, installs the bytes in the physical SYSBIOS slot (pages #10–#1F), and performs physical readback verification.
+6. Guest memory backend maps the 8 KiB image at FE000h–FFFFFh and verifies guest-visible readback, including reset-vector bytes at FFFF0h.
+7. Only after successful verification, initialize 8086 state to CS:IP=FFFF:0000, FLAGS=0002h, and begin instruction execution.
 
-## 5. Memory-map boundary
+The physical SYSBIOS slot is 256 KiB; each initial BIOS image is 8 KiB; the guest-visible ROM window is 8 KiB. These sizes must not be conflated.
 
-The NeoGS physical map and DMA buffer addresses are a separate Project130 design artifact. They must not be inferred from the x86 guest address map or copied from Project126.
+## 6. Current implementation status
 
-The separate map specification must identify and keep distinct:
+The current Project130 tree contains the BIOS binaries in the TR-DOS image and the GS105a stage-0 bootstrap/launcher. It does not yet contain the resident DMA/IPC receiver, SYSBIOS image installer, guest-memory backend, or integrated 8086 CPU execution path. Therefore no BIOS can yet be reported as loaded or running.
 
-1. NeoGS local physical RAM capacity, page size, page selectors and reserved regions.
-2. NeoGS DMA backing range and the ZX-visible `0000–3FFF` aperture mapping.
-3. ATM host staging pages, Z80 window addresses, alignment, ownership and buffer lifetime.
-4. x86 guest physical memory (custom 1 MiB address space), which is not a DMA address space.
+Implementation order:
+1. complete and validate the A1 stage-0 handoff;
+2. implement Project130 DMA/IPC receiver and host sender using approved page #42 staging;
+3. implement SYSBIOS IMAGE_BEGIN/FRAGMENT/FINISH and physical readback;
+4. implement the adopted guest 1 MiB map and BIOS ROM window;
+5. implement reset-state initialization and release the 8086 execution loop;
+6. verify the first reset-vector instruction, then continue BIOS startup in bounded execution slices.
 
-No Project126 4 MiB / 256-page layout, page number or DMA address is accepted by this architecture decision. The actual board/emulator memory capability and mapping semantics must be established before concrete addresses are assigned.
-
-Until that separate map is approved:
-- do not hard-code DMA backing addresses or ATM staging addresses;
-- do not start resident firmware/module payload transfers;
-- do not start the x86 guest;
-- keep the transport disabled rather than substituting guessed addresses.
-
-## 6. Implementation order
-
-1. Complete and approve the separate Project130 NeoGS/ATM memory and DMA-buffer map.
-2. Add the small Project130 bootstrap image and bounded GS105a `#14/#13` launcher.
-3. Implement ROM disable and the resident-runtime handoff.
-4. Implement Project130 DMA/IPC control plane and both transfer directions using the approved map.
-5. Integrate selected TR-DOS file loading only after the transport is operational.
-6. Record build evidence separately from external emulator/runtime validation.
-
-No runtime self-tests, synthetic payloads, benchmark routines or test-only behavior are to be added to Project130.
+No GSDAT payload streaming, guessed physical addresses, synthetic self-tests, or test-only behavior may be introduced.
