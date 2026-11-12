@@ -175,10 +175,10 @@ p130_ngs_jump_tx_done:
         ; and initializing the bootstrap. Do not insert a diagnostic A0 byte:
         ; the host must consume the original Project126 handshake unchanged.
         call    p130_ngs_receive_byte
-        jr      c,p130_ngs_ack_timeout
+        jp      c,p130_ngs_ack_timeout
         ld      (p130_ngs_ack_value),a
         cp      P130_ACK_READY
-        jr      nz,p130_ngs_ack_bad
+        jp      nz,p130_ngs_ack_bad
         ld      a,'a'
         call    p130_ngs_trace
         ld      a,'1'
