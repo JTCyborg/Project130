@@ -128,7 +128,7 @@ if ($diskSize -ne 655360){throw "TR-DOS image size invalid: $diskSize"}
 # Verify the directory entries and fixed BIOS lengths before publishing output.
 [byte[]]$disk=[IO.File]::ReadAllBytes($Out)
 $entries=@(
- @{Name="BOOT    B";Length=0},@{Name="P130BOOTC";Length=0},@{Name="P126BOOTC";Length=0},
+ @{Name="boot    B";Length=0},@{Name="p130bootC";Length=0},@{Name="P126BOOTC";Length=0},
  @{Name="X86CORE C";Length=0},@{Name="X86IO   C";Length=0},@{Name="X86ALU  C";Length=0},
  @{Name="X86DEV  C";Length=0},@{Name="X86EXEC C";Length=0},@{Name="X86VGA  C";Length=0},
  @{Name="X86VID  C";Length=0},@{Name="X86MODS C";Length=55},
