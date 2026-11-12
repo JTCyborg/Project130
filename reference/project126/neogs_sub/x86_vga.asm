@@ -1,2063 +1,773 @@
-; =========================================================================
-; PROJECT126 — IBM VGA adapter overlay
-; Behavior source: Project126/PCem/vid_vga.c and vid_svga.c.
-; Dynamic module ID05 / physical page08, logical ORG 8000h.
-; VRAM backing: physical pages30h..3Fh (256 KiB), accessed later via WIN3.
-;
-; Stage 1 implements the PCem VGA/SVGA register-file and port semantics.
-; Aperture latches/planes and scanout are deliberately separate stages.
-; =========================================================================
-X86_VGA_MODULE_ID       EQU 5
-X86_VGA_PHYS_PAGE       EQU #08
-X86_VGA_VRAM_BYTES      EQU #40000
-X86_VGA_VRAM_PAGE_FIRST EQU #30
-X86_VGA_VRAM_PAGE_COUNT EQU #10
+; PROJECT 125 — resident VGA planar core.
+; Implemented: Sequencer/GC indexed registers, Attribute Controller
+; index/data flip-flop and palette-enable latch, Misc Output, Status 1,
+; aperture selection with aperture-relative offsets, four 64 KiB planes,
+; read modes 0/1, write modes 0/1, chain-2 odd/even text addressing,
+; latches, set/reset, rotate, logical ops, bit mask and Sequencer Map Mask.
+; Pending: CRTC, DAC, scanout, chain-4 and write modes 2/3.
+; Guest VRAM accesses are mapped to NeoGS pages 83..98; no NeoGS I/O ports.
 
-x86_vga_overlay_probe:
-        ld      hl,#A55A
-        ld      a,#56
-        ret
-
-; Reset the register state to the standard VGA initialization used by
-; PCem vga_init(): 256 KiB VRAM, 8bpp SVGA core, colour CRTC selected.
-x86_vga_reset_impl:
-        xor     a
-        ld      (x86_vga_miscout),a
-        ld      (x86_vga_crtcreg),a
-        ld      (x86_vga_seqaddr),a
-        ld      (x86_vga_gdcaddr),a
-        ld      (x86_vga_attraddr),a
-        ld      (x86_vga_attrff),a
-        ld      (x86_vga_attr_palette_enable),a
-        ld      (x86_vga_dac_status),a
-        ld      (x86_vga_dac_read),a
-        ld      (x86_vga_dac_write),a
-        ld      (x86_vga_dac_pos),a
-        ld      (x86_vga_cgastat),a
-        ld      (x86_vga_crtc),a
-        ld      hl,x86_vga_crtc
-        ld      de,x86_vga_crtc+1
-        ld      bc,127
-        ldir
-        ld      hl,x86_vga_gdc
-        ld      de,x86_vga_gdc+1
-        ld      bc,63
-        ld      (hl),a
-        ldir
-        ld      hl,x86_vga_attr
-        ld      de,x86_vga_attr+1
-        ld      bc,31
-        ld      (hl),a
-        ldir
-        ld      hl,x86_vga_seq
-        ld      de,x86_vga_seq+1
-        ld      bc,63
-        ld      (hl),a
-        ldir
-        ld      hl,x86_vga_dac
-        ld      de,x86_vga_dac+1
-        ld      bc,767
-        ld      (hl),a
-        ldir
-        ld      hl,x86_vga_egapal
-        ld      de,x86_vga_egapal+1
-        ld      bc,15
-        ld      (hl),a
-        ldir
-        ld      hl,x86_vga_latches
-        ld      de,x86_vga_latches+1
-        ld      bc,3
-        ld      (hl),a
-        ldir
-        ld      a,63
-        ld      (x86_vga_crtc),a
-        ld      a,#FF
-        ld      (x86_vga_crtc+6),a
-        ld      a,#FF
-        ld      (x86_vga_dac_mask),a
-        xor     a
-        ld      (x86_vga_writemask),a
-        ld      a,8
-        ld      (x86_vga_bpp),a
-        ld      a,1
-        ld      (x86_vga_miscout),a
-        xor     a
-        ld      (x86_vga_chain4),a
-        ld      (x86_vga_chain2_write),a
-        ld      (x86_vga_chain2_read),a
-        ld      (x86_vga_readmode),a
-        ld      (x86_vga_writemode),a
-        ld      (x86_vga_readplane),a
-        ld      (x86_vga_colourcompare),a
-        ld      (x86_vga_colournocare),a
-        ld      (x86_vga_plane_mask),a
-        ld      (x86_vga_dac_r),a
-        ld      (x86_vga_dac_g),a
-        ld      (x86_vga_write_value),a
-        ret
-
-; IN HL=guest I/O port. OUT A=read value, carry clear if VGA decoded it.
-; The caller dispatches unhandled ports to the remaining software devices.
 x86_vga_io_read8_impl:
-        ld      (x86_vga_port),hl
-        call    x86_vga_normalize_port
-        ret     c
-        ld      hl,(x86_vga_port)
-        ld      a,l
-        cp      #C0
-        jp      z,.read_attr_address
-        cp      #C1
-        jp      z,.read_attr_data
-        cp      #C2
-        jp      z,.read_input_status0
-        cp      #C4
-        jp      z,.read_seq_address
-        cp      #C5
-        jp      z,.read_seq_data
-        cp      #C6
-        jp      z,.read_dac_mask
-        cp      #C7
-        jp      z,.read_dac_state
-        cp      #C8
-        jp      z,.read_dac_write_index
-        cp      #C9
-        jp      z,.read_dac_data
-        cp      #CC
-        jp      z,.read_misc_output
-        cp      #CE
-        jp      z,.read_gdc_address
-        cp      #CF
-        jp      z,.read_gdc_data
-        cp      #D4
-        jp      z,.read_crtc_address
-        cp      #D5
-        jp      z,.read_crtc_data
-        cp      #DA
-        jp      z,.read_input_status1
-        ld      a,#FF
+        ld      hl,(x86_io_port)
+        ld      de,#03C4
+        or      a
+        sbc     hl,de
+        jp      z,.seq_index
+        ld      hl,(x86_io_port)
+        ld      de,#03C5
+        or      a
+        sbc     hl,de
+        jp      z,.seq_data
+        ld      hl,(x86_io_port)
+        ld      de,#03CE
+        or      a
+        sbc     hl,de
+        jp      z,.gc_index
+        ld      hl,(x86_io_port)
+        ld      de,#03CF
+        or      a
+        sbc     hl,de
+        jp      z,.gc_data
+        ld      hl,(x86_io_port)
+        ld      de,#03CC
+        or      a
+        sbc     hl,de
+        jp      z,.misc
+        ld      hl,(x86_io_port)
+        ld      de,#03C0
+        or      a
+        sbc     hl,de
+        jp      z,.attr_index_read
+        ld      hl,(x86_io_port)
+        ld      de,#03C1
+        or      a
+        sbc     hl,de
+        jp      z,.attr_data
+        ld      hl,(x86_io_port)
+        ld      de,#03DA
+        or      a
+        sbc     hl,de
+        jp      z,.status
+        scf
+        ret
+.seq_index:
+        ld      a,(x86_vga_seq_index)
         or      a
         ret
-.read_attr_address:
-        ld      a,(x86_vga_attraddr)
+.seq_data:
+        ld      a,(x86_vga_seq_index)
+        cp      5
+        jr      nc,.ff
+        ld      e,a
+        ld      d,0
+        ld      hl,x86_vga_seq_regs
+        add     hl,de
+        ld      a,(hl)
+        or      a
+        ret
+.gc_index:
+        ld      a,(x86_vga_gc_index)
+        or      a
+        ret
+.gc_data:
+        ld      a,(x86_vga_gc_index)
+        cp      9
+        jr      nc,.ff
+        ld      e,a
+        ld      d,0
+        ld      hl,x86_vga_gc_regs
+        add     hl,de
+        ld      a,(hl)
+        or      a
+        ret
+.misc:
+        ld      a,(x86_vga_misc_output)
+        or      a
+        ret
+.attr_index_read:
+        ld      a,(x86_vga_attr_index)
         ld      b,a
         ld      a,(x86_vga_attr_palette_enable)
         or      b
         or      a
         ret
-.read_attr_data:
-        ld      a,(x86_vga_attraddr)
+.attr_data:
+        ld      a,(x86_vga_attr_index)
         and     #1F
         ld      e,a
         ld      d,0
-        ld      hl,x86_vga_attr
+        ld      hl,x86_vga_attr_regs
         add     hl,de
         ld      a,(hl)
         or      a
         ret
-.read_input_status0:
-        ; PCem reports bit4 when the sum of DAC palette entry zero is dark.
-        ld      a,(x86_vga_dac)
-        ld      b,a
-        ld      a,(x86_vga_dac+1)
-        add     a,b
-        ld      b,a
-        ld      a,(x86_vga_dac+2)
-        add     a,b
-        cp      #50
-        jp      nc,.read_input_status0_bright
-        ld      a,#10
-        or      a
-        ret
-.read_input_status0_bright:
+.status:
         xor     a
+        ld      (x86_vga_attr_data_phase),a
+        ld      a,(x86_vga_status_toggle)
+        xor     #08
+        ld      (x86_vga_status_toggle),a
+        or      1
         ret
-.read_seq_address:
-        ld      a,(x86_vga_seqaddr)
-        or      a
-        ret
-.read_seq_data:
-        ld      a,(x86_vga_seqaddr)
-        and     #0F
-        ld      e,a
-        ld      d,0
-        ld      hl,x86_vga_seq
-        add     hl,de
-        ld      a,(hl)
-        or      a
-        ret
-.read_dac_mask:
-        ld      a,(x86_vga_dac_mask)
-        or      a
-        ret
-.read_dac_state:
-        ld      a,(x86_vga_dac_status)
-        or      a
-        ret
-.read_dac_write_index:
-        ld      a,(x86_vga_dac_write)
-        or      a
-        ret
-.read_dac_data:
-        call    x86_vga_dac_read_component
-        or      a
-        ret
-.read_misc_output:
-        ld      a,(x86_vga_miscout)
-        or      a
-        ret
-.read_gdc_address:
-        ld      a,(x86_vga_gdcaddr)
-        or      a
-        ret
-.read_gdc_data:
-        ld      a,(x86_vga_gdcaddr)
-        and     #0F
-        ld      e,a
-        ld      d,0
-        ld      hl,x86_vga_gdc
-        add     hl,de
-        ld      a,(hl)
-        or      a
-        ret
-.read_crtc_address:
-        ld      a,(x86_vga_crtcreg)
-        or      a
-        ret
-.read_crtc_data:
-        ld      a,(x86_vga_crtcreg)
-        bit     5,a
-        jp      nz,.read_crtc_open_bus
-        and     #7F
-        ld      e,a
-        ld      d,0
-        ld      hl,x86_vga_crtc
-        add     hl,de
-        ld      a,(hl)
-        or      a
-        ret
-.read_crtc_open_bus:
+.ff:
         ld      a,#FF
         or      a
         ret
-.read_input_status1:
-        xor     a
-        ld      (x86_vga_attrff),a
-        ; Match PCem svga_in(3DAh): when display-enable bit0 is clear,
-        ; toggle the horizontal/vertical retrace bits (5:4). When bit0 is
-        ; set, clear those bits. Do not synthesize an unrelated bit3 timer.
-        ld      a,(x86_vga_cgastat)
-        bit     0,a
-        jp      nz,.status_clear_retrace
-        xor     #30
-        ld      (x86_vga_cgastat),a
-        or      a
-        ret
-.status_clear_retrace:
-        and     #CF
-        ld      (x86_vga_cgastat),a
-        or      a
-        ret
 
-; Gate entries used by X86VID. B carries the A argument across the
-; module-ID lookup; the resident overlay gate preserves BC at module entry.
-x86_vga_io_write8_gate_impl:
-        ld      a,b
-        jp      x86_vga_io_write8_impl
-
-x86_vga_read_text_cell_gate_impl:
-        ld      a,b
-        jp      x86_vga_read_text_cell_impl
-
-; Public guest-memory write gate used by BIOS INT10 text output.
-; The caller has already calculated x86_phys_addr and supplies A=value.
-x86_vga_mem_write8_gate_impl:
-        ld      a,b
-        jp      x86_vga_mem_write8_impl
-
-; IN HL=guest I/O port, A=value. OUT carry clear if handled.
 x86_vga_io_write8_impl:
-        ld      (x86_vga_write_value),a
-        ld      (x86_vga_port),hl
-        call    x86_vga_normalize_port
-        ret     c
-        ld      hl,(x86_vga_port)
-        ld      a,l
-        cp      #C0
-        jp      z,.write_attr
-        cp      #C2
-        jp      z,.write_misc_output
-        cp      #C4
-        jp      z,.write_seq_address
-        cp      #C5
-        jp      z,.write_seq_data
-        cp      #C6
-        jp      z,.write_dac_mask
-        cp      #C7
-        jp      z,.write_dac_read_index
-        cp      #C8
-        jp      z,.write_dac_write_index
-        cp      #C9
-        jp      z,.write_dac_data
-        cp      #CE
-        jp      z,.write_gdc_address
-        cp      #CF
-        jp      z,.write_gdc_data
-        cp      #D4
-        jp      z,.write_crtc_address
-        cp      #D5
-        jp      z,.write_crtc_data
+        ld      hl,(x86_io_port)
+        ld      de,#03C4
+        or      a
+        sbc     hl,de
+        jp      z,.seq_index
+        ld      hl,(x86_io_port)
+        ld      de,#03C5
+        or      a
+        sbc     hl,de
+        jp      z,.seq_data
+        ld      hl,(x86_io_port)
+        ld      de,#03CE
+        or      a
+        sbc     hl,de
+        jp      z,.gc_index
+        ld      hl,(x86_io_port)
+        ld      de,#03CF
+        or      a
+        sbc     hl,de
+        jp      z,.gc_data
+        ld      hl,(x86_io_port)
+        ld      de,#03C2
+        or      a
+        sbc     hl,de
+        jp      z,.misc
+        ld      hl,(x86_io_port)
+        ld      de,#03C0
+        or      a
+        sbc     hl,de
+        jp      z,.attr
+        scf
+        ret
+.seq_index:
+        ld      a,(x86_io_value)
+        and     7
+        ld      (x86_vga_seq_index),a
         or      a
         ret
-
-.write_attr:
-        ld      a,(x86_vga_attrff)
+.seq_data:
+        ld      a,(x86_vga_seq_index)
+        cp      5
+        jr      nc,.done
+        ld      e,a
+        ld      d,0
+        ld      hl,x86_vga_seq_regs
+        add     hl,de
+        ld      a,(x86_io_value)
+        ld      (hl),a
         or      a
-        jp      nz,.write_attr_data
-        ld      a,(x86_vga_write_value)
+        ret
+.gc_index:
+        ld      a,(x86_io_value)
+        and     #0F
+        ld      (x86_vga_gc_index),a
+        or      a
+        ret
+.gc_data:
+        ld      a,(x86_vga_gc_index)
+        cp      9
+        jr      nc,.done
+        ld      e,a
+        ld      d,0
+        ld      hl,x86_vga_gc_regs
+        add     hl,de
+        ld      a,(x86_io_value)
+        ld      (hl),a
+        or      a
+        ret
+.misc:
+        ld      a,(x86_io_value)
+        ld      (x86_vga_misc_output),a
+        or      a
+        ret
+.attr:
+        ld      a,(x86_vga_attr_data_phase)
+        or      a
+        jr      nz,.attr_data
+        ld      a,(x86_io_value)
         and     #1F
-        ld      (x86_vga_attraddr),a
-        ld      a,(x86_vga_write_value)
+        ld      (x86_vga_attr_index),a
+        ld      a,(x86_io_value)
         and     #20
         ld      (x86_vga_attr_palette_enable),a
         ld      a,1
-        ld      (x86_vga_attrff),a
+        ld      (x86_vga_attr_data_phase),a
         or      a
         ret
-.write_attr_data:
-        ld      a,(x86_vga_attraddr)
+.attr_data:
+        ld      a,(x86_vga_attr_index)
         and     #1F
         ld      e,a
         ld      d,0
-        ld      hl,x86_vga_attr
+        ld      hl,x86_vga_attr_regs
         add     hl,de
-        ld      a,(x86_vga_write_value)
+        ld      a,(x86_io_value)
         ld      (hl),a
         xor     a
-        ld      (x86_vga_attrff),a
-        ld      a,(x86_vga_attraddr)
-        cp      #12
-        jp      nz,.write_attr_palette
-        ld      a,(x86_vga_write_value)
-        and     #0F
-        ld      (x86_vga_plane_mask),a
-.write_attr_palette:
-        ld      a,(x86_vga_attraddr)
-        cp      #10
-        jp      z,.write_attr_rebuild_palette
-        cp      #14
-        jp      z,.write_attr_rebuild_palette
-        cp      #10
-        jp      c,.write_attr_rebuild_palette
-        or      a
-        ret
-.write_attr_rebuild_palette:
-        call    x86_vga_rebuild_attr_palette
+        ld      (x86_vga_attr_data_phase),a
+.done:
         or      a
         ret
 
-.write_misc_output:
-        ld      a,(x86_vga_write_value)
-        ld      (x86_vga_miscout),a
+; Carry set: address is outside the active VGA aperture.
+x86_vga_decode_aperture:
+        ld      a,(x86_mem_addr+2)
+        cp      #0A
+        jr      z,.a000
+        cp      #0B
+        jr      nz,.no
+        ld      a,(x86_vga_gc_regs+6)
+        and     #0C
         or      a
-        ret
-.write_seq_address:
-        ld      a,(x86_vga_write_value)
-        ld      (x86_vga_seqaddr),a
-        or      a
-        ret
-.write_seq_data:
-        ld      a,(x86_vga_seqaddr)
-        cp      #10
-        jp      nc,.write_seq_ignored
-        and     #0F
-        ld      e,a
-        ld      d,0
-        ld      hl,x86_vga_seq
-        add     hl,de
-        ld      a,(x86_vga_write_value)
-        ld      (hl),a
-        ld      a,(x86_vga_seqaddr)
-        and     #0F
-        cp      2
-        jp      nz,.write_seq_not_mapmask
-        ld      a,(x86_vga_write_value)
-        and     #0F
-        ld      (x86_vga_writemask),a
-        jp      .write_seq_ignored
-.write_seq_not_mapmask:
-        cp      4
-        jp      nz,.write_seq_ignored
-        ld      a,(x86_vga_write_value)
-        bit     3,a
-        jp      z,.write_seq_no_chain4
-        ld      a,1
-        jp      .write_seq_chain4
-.write_seq_no_chain4:
-        xor     a
-.write_seq_chain4:
-        ld      (x86_vga_chain4),a
-        ld      a,(x86_vga_write_value)
-        bit     2,a
-        jp      z,.write_seq_chain2_on
-        xor     a
-        jp      .write_seq_chain2_store
-.write_seq_chain2_on:
-        ld      a,1
-.write_seq_chain2_store:
-        ld      (x86_vga_chain2_write),a
-.write_seq_ignored:
-        or      a
-        ret
-.write_dac_mask:
-        ld      a,(x86_vga_write_value)
-        ld      (x86_vga_dac_mask),a
-        or      a
-        ret
-.write_dac_read_index:
-        ld      a,(x86_vga_write_value)
-        ld      (x86_vga_dac_read),a
-        xor     a
-        ld      (x86_vga_dac_pos),a
-        or      a
-        ret
-.write_dac_write_index:
-        ld      a,(x86_vga_write_value)
-        ld      (x86_vga_dac_write),a
-        dec     a
-        ld      (x86_vga_dac_read),a
-        xor     a
-        ld      (x86_vga_dac_pos),a
-        or      a
-        ret
-.write_dac_data:
-        xor     a
-        ld      (x86_vga_dac_status),a
-        call    x86_vga_dac_write_component
-        or      a
-        ret
-.write_gdc_address:
-        ld      a,(x86_vga_write_value)
-        ld      (x86_vga_gdcaddr),a
-        or      a
-        ret
-.write_gdc_data:
-        ld      a,(x86_vga_gdcaddr)
-        and     #0F
-        ld      e,a
-        ld      d,0
-        ld      hl,x86_vga_gdc
-        add     hl,de
-        ld      a,(hl)
-        ld      (x86_vga_old_register),a
-        ld      a,(x86_vga_write_value)
-        ld      (hl),a
-        ld      a,(x86_vga_gdcaddr)
-        and     #0F
-        cp      2
-        jp      nz,.write_gdc_not_compare
-        ld      a,(x86_vga_write_value)
-        ld      (x86_vga_colourcompare),a
-        jp      .write_gdc_done
-.write_gdc_not_compare:
-        cp      4
-        jp      nz,.write_gdc_not_readplane
-        ld      a,(x86_vga_write_value)
-        and     3
-        ld      (x86_vga_readplane),a
-        jp      .write_gdc_done
-.write_gdc_not_readplane:
-        cp      5
-        jp      nz,.write_gdc_not_mode
-        ld      a,(x86_vga_write_value)
-        and     3
-        ld      (x86_vga_writemode),a
-        ld      a,(x86_vga_write_value)
-        and     8
-        ld      (x86_vga_readmode),a
-        ld      a,(x86_vga_write_value)
-        and     #10
-        ld      (x86_vga_chain2_read),a
-        jp      .write_gdc_done
-.write_gdc_not_mode:
-        cp      7
-        jp      nz,.write_gdc_done
-        ld      a,(x86_vga_write_value)
-        ld      (x86_vga_colournocare),a
-.write_gdc_done:
-        or      a
-        ret
-.write_crtc_address:
-        ld      a,(x86_vga_write_value)
-        and     #3F
-        ld      (x86_vga_crtcreg),a
-        or      a
-        ret
-.write_crtc_data:
-        ld      a,(x86_vga_crtcreg)
-        bit     5,a
-        jp      nz,.write_crtc_ignored
-        and     #7F
-        ld      (x86_vga_index_temp),a
-        cp      7
-        jp      z,.write_crtc_overflow
-        cp      7
-        jp      nc,.write_crtc_store
-        ld      a,(x86_vga_crtc+17)
+        jr      z,.offset_full
+        cp      #08
+        jr      z,.b000
+        cp      #0C
+        jr      nz,.no
+        ld      a,(x86_mem_addr+1)
         bit     7,a
-        jp      nz,.write_crtc_ignored
-        jp      .write_crtc_store
-.write_crtc_overflow:
-        ld      a,(x86_vga_crtc+17)
+        jr      z,.no
+        jr      .offset_32_b800
+.b000:
+        ; B0000h has middle byte 00h; this is already the aperture offset.
+        ld      a,(x86_mem_addr+1)
         bit     7,a
-        jp      z,.write_crtc_store
-        ld      a,(x86_vga_crtc+7)
-        and     #EF
-        ld      b,a
-        ld      a,(x86_vga_write_value)
-        and     #10
-        or      b
-        ld      (x86_vga_crtc+7),a
+        jr      nz,.no
+        ld      a,(x86_mem_addr+1)
+        jr      .store_offset_hi
+.offset_32_b800:
+        ; B8000h starts at middle byte 80h, not B8h.
+        ld      a,(x86_mem_addr+1)
+        sub     #80
+        jr      .store_offset_hi
+.a000:
+        ld      a,(x86_vga_gc_regs+6)
+        and     #0C
+        cp      #08
+        jr      z,.no
+        cp      #0C
+        jr      z,.no
+.offset_full:
+        ; The 20-bit physical address is stored as low/middle/high bytes.
+        ; A0000h has middle byte 00h, so its aperture offset high byte is
+        ; already zero-based. Do not subtract A0h here.
+        ld      a,(x86_mem_addr+1)
+.store_offset_hi:
+        ld      (x86_vga_offset+1),a
+        ld      a,(x86_mem_addr)
+        ld      (x86_vga_offset),a
         or      a
         ret
-.write_crtc_store:
-        ld      a,(x86_vga_index_temp)
-        ld      e,a
-        ld      d,0
-        ld      hl,x86_vga_crtc
-        add     hl,de
-        ld      a,(x86_vga_write_value)
-        ld      (hl),a
-.write_crtc_ignored:
-        or      a
-        ret
-
-; VGA CRTC port aliasing from PCem vga_in/vga_out. With MiscOut bit0=0,
-; 3B0..3BF aliases to 3D0..3DF; the inactive 3D0 bank is not decoded.
-x86_vga_normalize_port:
-        ld      a,h
-        cp      3
-        jp      nz,.port_bad
-        ld      a,l
-        cp      #C0
-        jp      c,.port_mono_alias
-        cp      #D0
-        jp      c,.port_good
-        cp      #E0
-        jp      nc,.port_bad
-        ld      a,(x86_vga_miscout)
-        bit     0,a
-        jp      nz,.port_good
-        ; The fixed 3D0-3DF handler remains installed; when mono is active
-        ; this colour block aliases to the inactive 3B0-3BF range and reads
-        ; as open bus / ignores writes, rather than falling through to a
-        ; second software device.
-        ld      a,l
-        xor     #60
-        ld      l,a
-        ld      (x86_vga_port),hl
-        jp      .port_good
-.port_mono_alias:
-        ld      a,l
-        cp      #A0
-        jp      c,.port_bad
-        cp      #B0
-        jp      nc,.port_mono_b_range
-        ; PCem enables the full 3A0-3BF block in monochrome mode; 3A0-3AF
-        ; are decoded as open bus by svga_in/svga_out.
-        ld      a,(x86_vga_miscout)
-        bit     0,a
-        jp      nz,.port_bad
-        jp      .port_good
-.port_mono_b_range:
-        ld      a,(x86_vga_miscout)
-        bit     0,a
-        jp      nz,.port_bad
-        ld      a,l
-        xor     #60
-        ld      l,a
-        ld      (x86_vga_port),hl
-.port_good:
-        or      a
-        ret
-.port_bad:
+.no:
         scf
         ret
 
-; Attribute palette derivation mirrors svga_out(): attr[0..15], mode
-; control register 10h and colour-select register 14h feed the EGA palette.
-x86_vga_rebuild_attr_palette:
-        ld      a,(x86_vga_attr+16)
-        bit     7,a
-        jp      z,.attr_palette_6bit
-        ld      a,(x86_vga_attr+20)
-        and     #0F
+; A=plane; page = plane_base + offset[15:14].
+x86_vga_map_plane:
+        add     a,a
+        add     a,a
+        add     a,VGA_PLANE0_FIRST_PAGE
+        ld      c,a
+        ld      a,(x86_vga_offset+1)
         rlca
         rlca
-        rlca
-        rlca
-        ld      (x86_vga_attr_palette_hi),a
-        ld      b,16
-        ld      c,0
-.attr_palette_16bit_loop:
-        ld      a,c
-        ld      e,a
-        ld      d,0
-        ld      hl,x86_vga_attr
-        add     hl,de
-        ld      a,(hl)
-        and     #0F
-        ld      (x86_vga_palette_temp),a
-        ld      a,(x86_vga_attr_palette_hi)
-        ld      e,a
-        ld      a,(x86_vga_palette_temp)
-        or      e
-        ld      (x86_vga_palette_temp),a
-        ld      a,c
-        ld      e,a
-        ld      d,0
-        ld      hl,x86_vga_egapal
-        add     hl,de
-        ld      a,(x86_vga_palette_temp)
-        ld      (hl),a
-        inc     c
-        djnz    .attr_palette_16bit_loop
-        ret
-.attr_palette_6bit:
-        ld      a,(x86_vga_attr+20)
-        and     #0C
-        rlca
-        rlca
-        rlca
-        rlca
-        ld      (x86_vga_attr_palette_hi),a
-        ld      b,16
-        ld      c,0
-.attr_palette_6bit_loop:
-        ld      a,c
-        ld      e,a
-        ld      d,0
-        ld      hl,x86_vga_attr
-        add     hl,de
-        ld      a,(hl)
+        and     3
+        add     a,c
+        rrca
+        out     (MPAGEX),a
+        ld      a,(x86_vga_offset+1)
         and     #3F
-        ld      (x86_vga_palette_temp),a
-        ld      a,(x86_vga_attr_palette_hi)
-        ld      e,a
-        ld      a,(x86_vga_palette_temp)
-        or      e
-        ld      (x86_vga_palette_temp),a
-        ld      a,c
-        ld      e,a
-        ld      d,0
-        ld      hl,x86_vga_egapal
-        add     hl,de
-        ld      a,(x86_vga_palette_temp)
-        ld      (hl),a
-        inc     c
-        djnz    .attr_palette_6bit_loop
+        or      #C0
+        ld      h,a
+        ld      a,(x86_vga_offset)
+        ld      l,a
         ret
-
-; DAC data pointer = palette index*3 + component.
-x86_vga_dac_read_component:
-        ld      a,(x86_vga_dac_read)
-        ld      e,a
-        ld      d,0
-        ld      hl,x86_vga_dac
-        add     hl,de
-        add     hl,de
-        add     hl,de
-        ld      a,(x86_vga_dac_pos)
-        ld      e,a
-        ld      d,0
-        add     hl,de
-        ld      a,(hl)
-        and     #3F
-        ld      b,a
-        ld      a,(x86_vga_dac_pos)
-        inc     a
-        cp      3
-        jp      c,.dac_read_next
-        xor     a
-        ld      (x86_vga_dac_pos),a
-        ld      hl,x86_vga_dac_read
-        inc     (hl)
-        jp      .dac_read_return
-.dac_read_next:
-        ld      (x86_vga_dac_pos),a
-.dac_read_return:
-        ld      a,3
-        ld      (x86_vga_dac_status),a
-        ld      a,b
-        ret
-
-x86_vga_dac_write_component:
-        ld      a,(x86_vga_dac_pos)
-        cp      0
-        jp      nz,.dac_write_green
-        ld      a,(x86_vga_write_value)
-        and     #3F
-        ld      (x86_vga_dac_r),a
-        ld      a,1
-        ld      (x86_vga_dac_pos),a
-        ret
-.dac_write_green:
-        cp      1
-        jp      nz,.dac_write_blue
-        ld      a,(x86_vga_write_value)
-        and     #3F
-        ld      (x86_vga_dac_g),a
-        ld      a,2
-        ld      (x86_vga_dac_pos),a
-        ret
-.dac_write_blue:
-        ld      a,(x86_vga_dac_write)
-        ld      e,a
-        ld      d,0
-        ld      hl,x86_vga_dac
-        add     hl,de
-        add     hl,de
-        add     hl,de
-        ld      a,(x86_vga_dac_r)
-        ld      (hl),a
-        inc     hl
-        ld      a,(x86_vga_dac_g)
-        ld      (hl),a
-        inc     hl
-        ld      a,(x86_vga_write_value)
-        and     #3F
-        ld      (hl),a
-        xor     a
-        ld      (x86_vga_dac_pos),a
-        ld      hl,x86_vga_dac_write
-        inc     (hl)
-        ret
-
-; -------------------------------------------------------------------------
-; VGA aperture memory backend — PCem svga_read/svga_write model.
-; IN: x86_phys_addr is the guest physical address; write takes A=value.
-; VRAM is the separate 256 KiB physical allocation pages30h..3Fh.
-; Every physical byte is accessed through WIN3/MPAGEX, never as a flat
-; 128 KiB aperture mirror. The four VGA planes are interleaved in VRAM.
-; -------------------------------------------------------------------------
 
 x86_vga_mem_read8_impl:
-        call    x86_vga_aperture_offset
-        jp      nc,.mem_read_mapped
-        ld      a,#FF
-        or      a
-        ret
-.mem_read_mapped:
-        ld      (x86_vga_guest_offset),hl
-        ld      a,(x86_vga_chain4)
-        or      a
-        jp      nz,.mem_read_chain4
-        ld      a,(x86_vga_chain2_read)
-        or      a
-        jp      nz,.mem_read_chain2
-
-        ; Planar read: latch all four planes, then return selected plane or
-        ; the colour-compare result according to GDC[5].3.
-        call    x86_vga_make_planar_offset
-        call    x86_vga_save_vram_base
-        call    x86_vga_load_latches
-        call    x86_vga_restore_vram_base
-        ld      a,(x86_vga_readmode)
-        or      a
-        jp      nz,.mem_read_compare
-        ld      a,(x86_vga_readplane)
-        and     3
-        call    x86_vga_add_plane_offset
-        call    x86_vga_vram_read_at_offset
-        or      a
-        ret
-.mem_read_compare:
-        call    x86_vga_compare_latches
-        or      a
-        ret
-
-.mem_read_chain2:
-        ; Odd/even addressing converts CPU byte addresses to word addresses:
-        ; plane offset = (guest byte address >> 1) * 4. Preserve the low
-        ; address bit first because it selects plane 0/1 (or 2/3).
-        ld      hl,(x86_vga_guest_offset)
-        ld      a,l
+        call    x86_vga_decode_aperture
+        ret     c
+        ; Load VGA latches from the unmodified aperture address, as PCem does.
+        ; In chain-2 mode CPU A0 selects the plane; the plane offset is
+        ; aperture_offset >> 1 (CPU A0 is removed from the address).
+        ld      a,(x86_vga_gc_regs+5)
+        and     #10
+        jr      z,.read_plane_normal
+        ld      a,(x86_vga_offset)
         and     1
         ld      b,a
-        ld      a,(x86_vga_readplane)
+        ld      a,(x86_vga_gc_regs+4)
         and     2
         or      b
-        ld      (x86_vga_selected_plane),a
-        ld      hl,(x86_vga_guest_offset)
-        ld      a,l
-        and     #FE
-        ld      l,a
-        srl     h
-        rr      l
-        ld      (x86_vga_guest_offset),hl
-        call    x86_vga_make_planar_offset
-        call    x86_vga_save_vram_base
-        call    x86_vga_load_latches
-        ld      a,(x86_vga_selected_plane)
-        call    x86_vga_add_plane_offset
-        call    x86_vga_vram_read_at_offset
+        ld      (x86_vga_read_plane),a
+        ; Normalize the plane offset before loading any of the four latches.
+        call    x86_vga_offset_even
+        jr      .read_latches
+.read_plane_normal:
+        ld      a,(x86_vga_gc_regs+4)
+        and     3
+        ld      (x86_vga_read_plane),a
+.read_latches:
+        xor     a
+        call    x86_vga_map_plane
+        ld      a,(hl)
+        ld      (x86_vga_latches),a
+        ld      a,1
+        call    x86_vga_map_plane
+        ld      a,(hl)
+        ld      (x86_vga_latches+1),a
+        ld      a,2
+        call    x86_vga_map_plane
+        ld      a,(hl)
+        ld      (x86_vga_latches+2),a
+        ld      a,3
+        call    x86_vga_map_plane
+        ld      a,(hl)
+        ld      (x86_vga_latches+3),a
+        ld      a,(x86_vga_gc_regs+5)
+        and     #08
+        jr      nz,.read_mode1
+        ; Chain-2 mode-0 reads use the selected plane at aperture_offset >> 1.
+        ld      a,(x86_vga_gc_regs+5)
+        and     #10
+        jr      z,.read_mode0_latch
+        ; x86_vga_offset was normalized before the latch fetch above.
+        ld      a,(x86_vga_read_plane)
+        call    x86_vga_map_plane
+        ld      a,(hl)
         or      a
         ret
-.mem_read_chain4:
-        ; Chain-4 reads return the packed byte directly, but still refresh
-        ; the four latches from its aligned four-byte group.
-        ld      hl,(x86_vga_guest_offset)
-        ld      (x86_vga_guest_offset_saved),hl
-        ld      a,l
-        and     #FC
-        ld      l,a
-        ld      (x86_vga_guest_offset),hl
-        call    x86_vga_make_direct_offset
-        call    x86_vga_save_vram_base
-        call    x86_vga_load_latches
-        ld      hl,(x86_vga_guest_offset_saved)
-        ld      (x86_vga_guest_offset),hl
-        call    x86_vga_make_direct_offset
-        call    x86_vga_vram_read_at_offset
+.read_mode0_latch:
+        ld      a,(x86_vga_read_plane)
+        ld      e,a
+        ld      d,0
+        ld      hl,x86_vga_latches
+        add     hl,de
+        ld      a,(hl)
         or      a
+        ret
+.read_mode1:
+        xor     a
+        ld      (x86_vga_compare_result),a
+        xor     a
+        call    x86_vga_compare_one
+        ld      a,1
+        call    x86_vga_compare_one
+        ld      a,2
+        call    x86_vga_compare_one
+        ld      a,3
+        call    x86_vga_compare_one
+        ld      a,(x86_vga_compare_result)
+        cpl
+        ret
+
+; A=plane; OR its mismatch byte into the accumulated comparator result.
+x86_vga_compare_one:
+        ld      (x86_vga_plane),a
+        ld      e,a
+        ld      d,0
+        ld      hl,x86_vga_latches
+        add     hl,de
+        ld      b,(hl)
+        ld      a,(x86_vga_bit_table)
+        ld      c,a
+        ld      a,(x86_vga_plane)
+        ld      e,a
+        ld      d,0
+        ld      hl,x86_vga_bit_table
+        add     hl,de
+        ld      a,(hl)
+        ld      c,a
+        ld      a,(x86_vga_gc_regs+7)
+        and     c
+        ret     z
+        ld      a,(x86_vga_gc_regs+2)
+        and     c
+        jr      z,.zero
+        ld      a,b
+        cpl
+        jr      .acc
+.zero:
+        ld      a,b
+.acc:
+        ld      b,a
+        ld      a,(x86_vga_compare_result)
+        or      b
+        ld      (x86_vga_compare_result),a
         ret
 
 x86_vga_mem_write8_impl:
-        ld      (x86_vga_write_value),a
-        call    x86_vga_aperture_offset
-        jp      nc,.mem_write_mapped
-        ; An address outside the currently selected VGA aperture is not a
-        ; successful no-op. Propagate the mapping failure to the BIOS caller;
-        ; otherwise INT10 reports a successful write while VRAM stays blank.
-        scf
-        ret
-.mem_write_mapped:
-        ld      (x86_vga_guest_offset),hl
-        ld      a,(x86_vga_chain4)
-        or      a
-        jp      nz,.mem_write_chain4
-        ld      a,(x86_vga_chain2_write)
-        or      a
-        jp      nz,.mem_write_chain2
-
-        ; Normal planar write uses Sequencer Map Mask.
-        ld      a,(x86_vga_writemask)
-        ld      (x86_vga_write_plane_mask),a
-        call    x86_vga_make_planar_offset
-        jp      .mem_write_base_ready
-
-.mem_write_chain4:
-        ; Chain-4 selects exactly one plane from address bits 1:0.
-        ld      hl,(x86_vga_guest_offset)
-        ld      a,l
-        and     3
-        ld      e,a
-        ld      d,0
-        ld      hl,x86_vga_plane_bits
-        add     hl,de
-        ld      a,(hl)
-        ld      (x86_vga_write_plane_mask),a
-        ld      hl,(x86_vga_guest_offset)
-        ld      a,l
-        and     #FC
-        ld      l,a
-        ld      (x86_vga_guest_offset),hl
-        call    x86_vga_make_direct_offset
-        jp      .mem_write_base_ready
-
-.mem_write_chain2:
-        ; Chain-2 enables planes 0/2 for even CPU addresses and 1/3 for odd.
-        ; The planar word address is the aligned CPU byte address divided by
-        ; two; omitting this shift makes writes disagree with text capture.
-        ld      a,(x86_vga_writemask)
-        and     #05
-        ld      hl,(x86_vga_guest_offset)
-        bit     0,l
-        jp      z,.mem_write_chain2_mask_ready
-        add     a,a
-.mem_write_chain2_mask_ready:
-        ld      (x86_vga_write_plane_mask),a
-        ld      hl,(x86_vga_guest_offset)
-        ld      a,l
-        and     #FE
-        ld      l,a
-        srl     h
-        rr      l
-        ld      (x86_vga_guest_offset),hl
-        call    x86_vga_make_planar_offset
-.mem_write_base_ready:
-        call    x86_vga_save_vram_base
-        call    x86_vga_rotate_cpu_value
-        ld      a,(x86_vga_gdc+8)
-        ld      (x86_vga_effective_mask),a
-        ld      a,(x86_vga_writemode)
-        cp      3
-        jp      nz,.mem_write_mask_ready
-        ld      a,(x86_vga_effective_mask)
-        ld      b,a
-        ld      a,(x86_vga_rotated_value)
-        and     b
-        ld      (x86_vga_effective_mask),a
-.mem_write_mask_ready:
-        xor     a
-        ld      (x86_vga_plane_index),a
-.mem_write_plane_loop:
-        ld      a,(x86_vga_plane_index)
-        ld      e,a
-        ld      d,0
-        ld      hl,x86_vga_plane_bits
-        add     hl,de
-        ld      a,(hl)
-        ld      b,a
-        ld      a,(x86_vga_write_plane_mask)
-        and     b
-        jp      z,.mem_write_plane_skip
-        call    x86_vga_calc_source
-        ld      (x86_vga_source_value),a
-        call    x86_vga_calc_write_plane_value
-        ld      (x86_vga_vram_data),a
-        call    x86_vga_restore_vram_base
-        ld      a,(x86_vga_plane_index)
-        call    x86_vga_add_plane_offset
-        call    x86_vga_vram_write_at_offset
-.mem_write_plane_skip:
-        ld      a,(x86_vga_plane_index)
-        inc     a
-        ld      (x86_vga_plane_index),a
-        cp      4
-        jp      c,.mem_write_plane_loop
-        or      a
-        ret
-
-; GDC[6] selects the actual VGA memory window, as in PCem svga_out().
-; Returns HL=window-relative address and carry clear, or carry set if this
-; physical address is outside the currently selected aperture.
-x86_vga_aperture_offset:
-        ld      a,(x86_vga_gdc+6)
-        and     #0C
-        cp      0
-        jp      z,.aperture_128k
-        cp      4
-        jp      z,.aperture_64k
-        cp      8
-        jp      z,.aperture_b0000
-        jp      .aperture_b8000
-.aperture_128k:
-        ld      a,(x86_phys_addr+2)
-        cp      #0A
-        jp      z,.aperture_base_a
-        cp      #0B
-        jp      nz,.aperture_bad
-        jp      .aperture_base_a
-.aperture_64k:
-        ld      a,(x86_phys_addr+2)
-        cp      #0A
-        jp      nz,.aperture_bad
-.aperture_base_a:
-        ld      a,(x86_phys_addr+1)
-        ld      h,a
-        ld      a,(x86_phys_addr)
-        ld      l,a
-        or      a
-        ret
-.aperture_b0000:
-        ld      a,(x86_phys_addr+2)
-        cp      #0B
-        jp      nz,.aperture_bad
-        ld      a,(x86_phys_addr+1)
-        cp      #80
-        jp      nc,.aperture_bad
-        ld      h,a
-        ld      a,(x86_phys_addr)
-        ld      l,a
-        or      a
-        ret
-.aperture_b8000:
-        ld      a,(x86_phys_addr+2)
-        cp      #0B
-        jp      nz,.aperture_bad
-        ld      a,(x86_phys_addr+1)
-        cp      #80
-        jp      c,.aperture_bad
-        sub     #80
-        ld      h,a
-        ld      a,(x86_phys_addr)
-        ld      l,a
-        or      a
-        ret
-.aperture_bad:
-        scf
-        ret
-
-; Convert the 16-bit window-relative guest byte address to interleaved
-; planar VRAM offset = guest_address * 4 (18-bit result).
-x86_vga_make_planar_offset:
-        ld      hl,(x86_vga_guest_offset)
-        ld      a,l
-        add     a,a
-        add     a,a
-        ld      (x86_vga_vram_offset),a
-        ld      a,l
-        srl     a
-        srl     a
-        srl     a
-        srl     a
-        srl     a
-        srl     a
-        ld      b,a
-        ld      a,h
-        add     a,a
-        add     a,a
-        or      b
-        ld      (x86_vga_vram_offset+1),a
-        ld      a,h
-        srl     a
-        srl     a
-        srl     a
-        srl     a
-        srl     a
-        srl     a
-        ld      (x86_vga_vram_offset+2),a
-        ret
-
-; Convert the guest address directly to packed/chain-4 VRAM byte offset.
-x86_vga_make_direct_offset:
-        ld      hl,(x86_vga_guest_offset)
-        ld      (x86_vga_vram_offset),hl
-        xor     a
-        ld      (x86_vga_vram_offset+2),a
-        ret
-
-x86_vga_save_vram_base:
-        ld      hl,(x86_vga_vram_offset)
-        ld      (x86_vga_vram_base),hl
-        ld      a,(x86_vga_vram_offset+2)
-        ld      (x86_vga_vram_base+2),a
-        ret
-
-x86_vga_restore_vram_base:
-        ld      hl,(x86_vga_vram_base)
-        ld      (x86_vga_vram_offset),hl
-        ld      a,(x86_vga_vram_base+2)
-        ld      (x86_vga_vram_offset+2),a
-        ret
-
-x86_vga_add_plane_offset:
-        ld      e,a
-        ld      d,0
-        ld      hl,(x86_vga_vram_offset)
-        add     hl,de
-        ld      (x86_vga_vram_offset),hl
-        ret
-
-x86_vga_load_latches:
-        call    x86_vga_vram_read_at_offset
-        ld      (x86_vga_latches),a
-        call    x86_vga_increment_vram_offset
-        call    x86_vga_vram_read_at_offset
-        ld      (x86_vga_latches+1),a
-        call    x86_vga_increment_vram_offset
-        call    x86_vga_vram_read_at_offset
-        ld      (x86_vga_latches+2),a
-        call    x86_vga_increment_vram_offset
-        call    x86_vga_vram_read_at_offset
-        ld      (x86_vga_latches+3),a
-        ret
-
-x86_vga_increment_vram_offset:
-        ld      hl,(x86_vga_vram_offset)
-        inc     hl
-        ld      (x86_vga_vram_offset),hl
-        ld      a,h
-        or      l
-        ret     nz
-        ld      hl,x86_vga_vram_offset+2
-        inc     (hl)
-        ret
-
-; Read/write one byte at x86_vga_vram_offset through physical pages30h..3Fh.
-x86_vga_vram_read_at_offset:
-        ld      a,(x86_vga_vram_offset+2)
-        add     a,a
-        add     a,a
-        ld      b,a
-        ld      a,(x86_vga_vram_offset+1)
-        srl     a
-        srl     a
-        srl     a
-        srl     a
-        srl     a
-        srl     a
-        and     3
-        add     a,b
-        add     a,#30
-        rrca
-        out     (P126_NGS_BANK_WINDOW_PORT),a
-        ld      a,(x86_vga_vram_offset+1)
-        and     #3F
-        or      #C0
-        ld      h,a
-        ld      a,(x86_vga_vram_offset)
-        ld      l,a
-        ld      a,(hl)
-        ret
-
-x86_vga_vram_write_at_offset:
-        ld      a,(x86_vga_vram_offset+2)
-        add     a,a
-        add     a,a
-        ld      b,a
-        ld      a,(x86_vga_vram_offset+1)
-        srl     a
-        srl     a
-        srl     a
-        srl     a
-        srl     a
-        srl     a
-        and     3
-        add     a,b
-        add     a,#30
-        rrca
-        out     (P126_NGS_BANK_WINDOW_PORT),a
-        ld      a,(x86_vga_vram_offset+1)
-        and     #3F
-        or      #C0
-        ld      h,a
-        ld      a,(x86_vga_vram_offset)
-        ld      l,a
-        ld      a,(x86_vga_vram_data)
-        ld      (hl),a
-        ret
-
-x86_vga_compare_latches:
-        xor     a
-        ld      (x86_vga_compare_accum),a
-        ld      a,(x86_vga_colournocare)
-        bit     0,a
-        jp      z,.compare_plane1
-        ld      a,(x86_vga_latches)
-        ld      b,a
-        ld      a,(x86_vga_colourcompare)
-        bit     0,a
-        jp      z,.compare_plane0_care
-        ld      a,b
-        cpl
-        ld      b,a
-.compare_plane0_care:
-        ld      a,(x86_vga_compare_accum)
-        or      b
-        ld      (x86_vga_compare_accum),a
-.compare_plane1:
-        ld      a,(x86_vga_colournocare)
-        bit     1,a
-        jp      z,.compare_plane2
-        ld      a,(x86_vga_latches+1)
-        ld      b,a
-        ld      a,(x86_vga_colourcompare)
-        bit     1,a
-        jp      z,.compare_plane1_care
-        ld      a,b
-        cpl
-        ld      b,a
-.compare_plane1_care:
-        ld      a,(x86_vga_compare_accum)
-        or      b
-        ld      (x86_vga_compare_accum),a
-.compare_plane2:
-        ld      a,(x86_vga_colournocare)
+        call    x86_vga_decode_aperture
+        ret     c
+        ; Chain-2 writes use A0 to choose plane pair member and address>>1.
+        ld      a,(x86_vga_seq_regs+4)
         bit     2,a
-        jp      z,.compare_plane3
-        ld      a,(x86_vga_latches+2)
+        jr      nz,.write_planar
+        ld      a,(x86_vga_offset)
+        and     1
         ld      b,a
-        ld      a,(x86_vga_colourcompare)
-        bit     2,a
-        jp      z,.compare_plane2_care
+        call    x86_vga_offset_even
+        ; In odd/even text mode CPU A0 selects exactly one plane:
+        ; even addresses use Sequencer Map Mask bit 0 (plane 0),
+        ; odd addresses use bit 1 (plane 1). Do not let the other enabled
+        ; map-mask bit leak into the write; that corrupts both text planes.
+        ld      a,(x86_vga_seq_regs+2)
+        and     1
+        ld      c,a
         ld      a,b
-        cpl
+        or      a
+        jr      z,.odd_even_even
+        ld      a,(x86_vga_seq_regs+2)
+        and     2
+        jr      .odd_even_mask_ready
+.odd_even_even:
+        ld      a,c
+.odd_even_mask_ready:
+        ld      (x86_vga_effective_mask),a
+        jr      .write_mode_decode
+.write_planar:
+        ld      a,(x86_vga_seq_regs+2)
+        ld      (x86_vga_effective_mask),a
+.write_mode_decode:
+        ld      a,(x86_vga_gc_regs+5)
+        and     3
+        cp      1
+        jp      z,.mode1
+        or      a
+        jp      nz,.unsupported
+        ld      a,(x86_mem_value)
         ld      b,a
-.compare_plane2_care:
-        ld      a,(x86_vga_compare_accum)
-        or      b
-        ld      (x86_vga_compare_accum),a
-.compare_plane3:
-        ld      a,(x86_vga_colournocare)
-        bit     3,a
-        jp      z,.compare_done
-        ld      a,(x86_vga_latches+3)
-        ld      b,a
-        ld      a,(x86_vga_colourcompare)
-        bit     3,a
-        jp      z,.compare_plane3_care
-        ld      a,b
-        cpl
-        ld      b,a
-.compare_plane3_care:
-        ld      a,(x86_vga_compare_accum)
-        or      b
-        ld      (x86_vga_compare_accum),a
-.compare_done:
-        ld      a,(x86_vga_compare_accum)
-        cpl
-        ret
-
-; Rotate the CPU write byte right by GDC[3].2:0, matching svga_rotate[].
-x86_vga_rotate_cpu_value:
-        ld      a,(x86_vga_write_value)
-        ld      (x86_vga_rotated_value),a
-        ld      a,(x86_vga_gdc+3)
+        ld      a,(x86_vga_gc_regs+3)
         and     7
-        ld      b,a
-.rotate_cpu_loop:
-        ld      a,b
+        ld      c,a
+.rotate:
+        ld      a,c
         or      a
-        ret     z
-        ld      a,(x86_vga_rotated_value)
+        jr      z,.rotated
+        ld      a,b
         rrca
-        ld      (x86_vga_rotated_value),a
-        djnz    .rotate_cpu_loop
-        ret
-
-; Return the source byte for the current plane according to write mode 0..3.
-x86_vga_calc_source:
-        ld      a,(x86_vga_plane_index)
+        ld      b,a
+        dec     c
+        jr      .rotate
+.rotated:
+        ld      a,b
+        ld      (x86_vga_rotated),a
+        xor     a
+        ld      (x86_vga_plane),a
+.plane_loop:
+        ld      a,(x86_vga_plane)
         ld      e,a
         ld      d,0
-        ld      hl,x86_vga_plane_bits
+        ld      hl,x86_vga_bit_table
+        add     hl,de
+        ld      a,(hl)
+        ld      b,a
+        ld      a,(x86_vga_effective_mask)
+        and     b
+        jr      z,.next_plane
+        ; GC1 selects set/reset on this plane; otherwise use rotated CPU data.
+        ld      a,(x86_vga_plane)
+        ld      e,a
+        ld      d,0
+        ld      hl,x86_vga_bit_table
         add     hl,de
         ld      b,(hl)
-        ld      a,(x86_vga_writemode)
-        cp      1
-        jp      z,.source_latch
-        cp      2
-        jp      z,.source_mode2
-        cp      3
-        jp      z,.source_set_reset
-        ; Mode 0: use Set/Reset only when the corresponding enable bit is set.
-        ld      a,(x86_vga_gdc+1)
+        ld      a,(x86_vga_gc_regs+1)
         and     b
-        jp      z,.source_rotated
-.source_set_reset:
-        ld      a,(x86_vga_gdc)
+        jr      z,.cpu_source
+        ld      a,(x86_vga_gc_regs)
         and     b
-        jp      z,.source_zero
-        ld      a,#FF
-        ret
-.source_zero:
-        xor     a
-        ret
-.source_rotated:
-        ld      a,(x86_vga_rotated_value)
-        ret
-.source_mode2:
-        ld      a,(x86_vga_write_value)
-        and     b
-        jp      z,.source_zero
-        ld      a,#FF
-        ret
-.source_latch:
-        ld      a,(x86_vga_plane_index)
-        ld      e,a
-        ld      d,0
-        ld      hl,x86_vga_latches
-        add     hl,de
-        ld      a,(hl)
-        ret
-
-; Apply GDC[3] logical operation and GDC[8] bit mask to one plane.
-; Mode 1 writes the latch directly and bypasses the bit mask.
-x86_vga_calc_write_plane_value:
-        ld      a,(x86_vga_writemode)
-        cp      1
-        jp      nz,.write_plane_logic
-        ld      a,(x86_vga_plane_index)
-        ld      e,a
-        ld      d,0
-        ld      hl,x86_vga_latches
-        add     hl,de
-        ld      a,(hl)
-        ret
-.write_plane_logic:
-        ld      a,(x86_vga_source_value)
-        ld      (x86_vga_logical_result),a
-        ld      a,(x86_vga_plane_index)
-        ld      e,a
-        ld      d,0
-        ld      hl,x86_vga_latches
-        add     hl,de
-        ld      a,(hl)
-        ld      (x86_vga_latch_temp),a
-        ld      a,(x86_vga_gdc+3)
-        and     #18
-        cp      8
-        jp      z,.write_plane_and
-        cp      #10
-        jp      z,.write_plane_or
-        cp      #18
-        jp      z,.write_plane_xor
-        jp      .write_plane_mask
-.write_plane_and:
-        ld      a,(x86_vga_logical_result)
+        ld      b,0
+        jr      z,.source_ready
+        dec     b
+        jr      .source_ready
+.cpu_source:
+        ld      a,(x86_vga_rotated)
         ld      b,a
-        ld      a,(x86_vga_latch_temp)
-        and     b
-        ld      (x86_vga_logical_result),a
-        jp      .write_plane_mask
-.write_plane_or:
-        ld      a,(x86_vga_logical_result)
-        ld      b,a
-        ld      a,(x86_vga_latch_temp)
-        or      b
-        ld      (x86_vga_logical_result),a
-        jp      .write_plane_mask
-.write_plane_xor:
-        ld      a,(x86_vga_logical_result)
-        ld      b,a
-        ld      a,(x86_vga_latch_temp)
-        xor     b
-        ld      (x86_vga_logical_result),a
-.write_plane_mask:
-        ld      a,(x86_vga_effective_mask)
-        ld      b,a
-        ld      a,(x86_vga_logical_result)
-        and     b
+.source_ready:
+        ld      a,(x86_vga_plane)
+        call    x86_vga_get_latch
         ld      c,a
-        ld      a,(x86_vga_effective_mask)
-        cpl
+        ld      a,(x86_vga_gc_regs+3)
+        and     #18
+        call    x86_vga_logic
         ld      b,a
-        ld      a,(x86_vga_latch_temp)
-        and     b
-        or      c
-        ret
-
-; Text-mode snapshot and cell API used by the ATM frame converter.
-; Snapshot OUT: A=text aperture middle byte (00h mono / 80h colour),
-; HL=start byte address, DE=row stride in bytes; carry set if not text aperture.
-x86_vga_get_text_snapshot_impl:
-        ld      a,(x86_vga_gdc+6)
-        bit     0,a
-        jp      nz,.text_snapshot_bad
-        ld      a,(x86_vga_attr+#10)
-        bit     0,a
-        jp      nz,.text_snapshot_bad
-        ld      a,(x86_vga_gdc+6)
-        and     #0C
-        cp      0
-        jp      z,.text_snapshot_colour
-        cp      8
-        jp      z,.text_snapshot_mono
-        cp      #0C
-        jp      z,.text_snapshot_colour
-        scf
-        ret
-.text_snapshot_colour:
-        ld      a,#80
-        jp      .text_snapshot_base
-.text_snapshot_mono:
-        xor     a
-.text_snapshot_base:
-        ld      (x86_vga_text_base_mid),a
-        ld      a,(x86_vga_chain4)
-        or      a
-        jp      nz,.text_snapshot_bad
-        ; VGA text memory must use odd/even addressing on both the host
-        ; write path (Sequencer Memory Mode) and the host read path
-        ; (Graphics Controller Mode). Do not reinterpret a planar/linear
-        ; graphics aperture as character/attribute pairs.
-        ld      a,(x86_vga_chain2_write)
-        or      a
-        jp      z,.text_snapshot_bad
-        ld      a,(x86_vga_chain2_read)
-        or      a
-        jp      z,.text_snapshot_bad
-        ld      a,(x86_vga_gdc+5)
-        and     #6B
-        jp      nz,.text_snapshot_bad
-        ; PCem selects the 40-column text renderer from Sequencer Clocking
-        ; Mode bit3. This ATM text descriptor is 80 columns.
-        ld      a,(x86_vga_seq+1)
-        bit     3,a
-        jp      nz,.text_snapshot_bad
-
-        ; Match PCem svga_poll()/svga_render_text_80():
-        ; ma_latch = CRTC[0Ch:0Dh] + ((CRTC[08h]&60h)>>5)
-        ; frame MA adds ((CRTC[05h]&60h)>>5), then renderer scales MA<<2.
-        ; The CPU text aperture byte address is frame_MA<<1;
-        ; row stride is CRTC[13h]<<2 bytes.
-        ld      a,(x86_vga_crtc+12)
-        ld      h,a
-        ld      a,(x86_vga_crtc+13)
-        ld      l,a
-        ld      a,(x86_vga_crtc+8)
-        and     #60
-        srl     a
-        srl     a
-        srl     a
-        srl     a
-        srl     a
-        ld      e,a
-        ld      d,0
-        add     hl,de
-        ; Horizontal blank end contributes the second MA start adjustment.
-        ld      a,(x86_vga_crtc+5)
-        and     #60
-        srl     a
-        srl     a
-        srl     a
-        srl     a
-        srl     a
-        ld      e,a
-        ld      d,0
-        add     hl,de
-        add     hl,hl
-        ld      (x86_vga_text_start),hl
-        ; PCem advances ma by rowoffset<<3; convert ma units to CPU bytes.
-        ld      a,(x86_vga_crtc+19)
-        ld      l,a
-        ld      h,0
-        add     hl,hl
-        add     hl,hl
-        ex      de,hl
-        ld      hl,(x86_vga_text_start)
-        ld      a,(x86_vga_text_base_mid)
-        or      a
-        ret
-.text_snapshot_bad:
-        scf
-        ret
-
-; IN: A=aperture middle byte (00h B0000 / 80h B8000), HL=CPU aperture byte offset.
-; OUT: A=character, D=attribute.
-; Project125-compatible raw plane capture: text cell N is stored at planar
-; byte offset N*4, with character plane 0 at +0 and attribute plane 1 at +1.
-; Read the backing planes directly, independent of CRTC/Sequencer/GDC mode
-; validation. This is intentional: BIOS POST writes B8000 before VGA setup.
-x86_vga_read_text_cell_impl:
-        ld      (x86_vga_text_base_mid),a
-        ld      (x86_vga_text_offset),hl
-
-        ; Preserve the VGA backing-store cursor used by normal guest accesses.
-        ld      hl,(x86_vga_vram_offset)
-        ld      (x86_vga_text_saved_vram_offset),hl
-        ld      a,(x86_vga_vram_offset+2)
-        ld      (x86_vga_text_saved_vram_offset+2),a
-
-        ; The converter supplies CPU byte offsets 0,2,4... (one word/cell).
-        ; Odd/even VGA writes map CPU offset 2*N to planar backing offset 4*N:
-        ; x86_vga_mem_write8 aligns the byte address, divides by two, then
-        ; expands the planar word address by four. Therefore capture uses *2.
-        ld      hl,(x86_vga_text_offset)
-        add     hl,hl
-        ld      (x86_vga_vram_offset),hl
-        xor     a
-        ld      (x86_vga_vram_offset+2),a
-        call    x86_vga_vram_read_at_offset
-        ld      (x86_vga_text_char),a
-
-        ; Plane 1 is the next interleaved byte in the same VGA word.
-        call    x86_vga_increment_vram_offset
-        call    x86_vga_vram_read_at_offset
-        ld      (x86_vga_text_attr),a
-
-        ; Restore the backing-store cursor before returning to the guest.
-        ld      hl,(x86_vga_text_saved_vram_offset)
-        ld      (x86_vga_vram_offset),hl
-        ld      a,(x86_vga_text_saved_vram_offset+2)
-        ld      (x86_vga_vram_offset+2),a
-        ld      a,(x86_vga_text_attr)
+        ld      a,(x86_vga_gc_regs+8)
         ld      d,a
-        ld      a,(x86_vga_text_char)
-        or      a
-        ret
-
-; Bulk equivalent of Project125 command_video_pull plane gathering.
-; One overlay call captures 2000 chars, then 2000 attributes into the
-; existing P126 framed-DMA producer page. VGA backing is interleaved:
-; cell N = planar offset N*4, plane0 at +0, plane1 at +1.
-; No guest mode validation: BIOS POST text at B8000 is visible immediately.
-x86_vga_capture_text_frame_gate_impl:
-        jp      x86_vga_capture_text_frame_impl
-
-x86_vga_capture_text_frame_impl:
-        xor     a
-        ld      (x86_vga_capture_plane),a
-        ld      hl,0
-        ld      (x86_vga_capture_index),hl
-        ld      hl,P126_IPC_HEADER_SIZE
-        ld      (x86_vga_capture_dst),hl
-.capture_plane_loop:
-        ld      hl,0
-        ld      (x86_vga_capture_index),hl
-.capture_cell_loop:
-        ; Read the character/attribute pair from the VGA backing planes.
-        ; The generic guest-aperture read depends on the current GDC odd/even
-        ; read state and can return plane 0 for both byte positions during
-        ; BIOS POST. The text-cell helper selects plane 0/1 explicitly.
-        ld      hl,(x86_vga_capture_index)
-        add     hl,hl
-        ld      a,#80
-        call    x86_vga_read_text_cell_impl
-        ld      a,(x86_vga_capture_plane)
-        or      a
-        jr      z,.capture_char_ready
+        and     b
+        ld      e,a
         ld      a,d
-.capture_char_ready:
-        ld      (x86_vga_capture_data),a
-
-        ; Write sequentially into the P126 video frame payload:
-        ; first all 2000 character bytes, then all 2000 attributes.
-        ld      a,P126_NGS_DMA_PROD_PAGE
-        rrca
-        out     (P126_NGS_BANK_WINDOW_PORT),a
-        ld      hl,(x86_vga_capture_dst)
-        ld      a,h
-        and     #3F
-        or      #C0
-        ld      h,a
-        ld      a,(x86_vga_capture_data)
+        cpl
+        and     c
+        or      e
+        ld      (x86_vga_write_byte),a
+        ld      a,(x86_vga_plane)
+        call    x86_vga_map_plane
+        ld      a,(x86_vga_write_byte)
         ld      (hl),a
-        ld      hl,(x86_vga_capture_dst)
-        inc     hl
-        ld      (x86_vga_capture_dst),hl
-
-        ld      hl,(x86_vga_capture_index)
-        inc     hl
-        ld      (x86_vga_capture_index),hl
-        ld      de,P126_VIDEO_TEXT80_CELLS
-        or      a
-        sbc     hl,de
-        jr      nz,.capture_cell_loop
-
-        ld      a,(x86_vga_capture_plane)
+.next_plane:
+        ld      a,(x86_vga_plane)
         inc     a
-        ld      (x86_vga_capture_plane),a
-        cp      2
-        jr      nz,.capture_plane_loop
-        ; Do not consume the one-shot dump on the initial blank frame.
-        ; Wait until the captured character plane contains actual text.
-        ld      a,(x86_vga_capture_dumped)
+        ld      (x86_vga_plane),a
+        cp      4
+        jr      c,.plane_loop
         or      a
-        jp      nz,.capture_dump_done
-        call    x86_vga_frame_has_text
-        or      a
-        jp      z,.capture_dump_done
-        ld      a,1
-        ld      (x86_vga_capture_dumped),a
-        call    x86_vga_dump_dma_frame
-.capture_dump_done:
+        ret
+.mode1:
         xor     a
+        ld      (x86_vga_plane),a
+.mode1_loop:
+        ld      a,(x86_vga_plane)
+        ld      e,a
+        ld      d,0
+        ld      hl,x86_vga_bit_table
+        add     hl,de
+        ld      a,(hl)
+        ld      b,a
+        ld      a,(x86_vga_effective_mask)
+        and     b
+        jr      z,.mode1_next
+        ld      a,(x86_vga_plane)
+        call    x86_vga_get_latch
+        ld      (x86_vga_write_byte),a
+        ld      a,(x86_vga_plane)
+        call    x86_vga_map_plane
+        ld      a,(x86_vga_write_byte)
+        ld      (hl),a
+.mode1_next:
+        ld      a,(x86_vga_plane)
+        inc     a
+        ld      (x86_vga_plane),a
+        cp      4
+        jr      c,.mode1_loop
+        or      a
+        ret
+.unsupported:
+        or      a
         ret
 
-x86_vga_capture_plane: db 0
-x86_vga_capture_index: dw 0
-x86_vga_capture_dst:   dw 0
-x86_vga_capture_data:  db 0
-x86_vga_capture_dumped: db 0
+x86_vga_offset_even:
+        ; Chain-2/odd-even: CPU A0 selects plane 0/1. The remaining
+        ; aperture address bits are shifted right once to form the plane
+        ; byte offset, exactly as the 8086 VGA odd/even address decoder.
+        ld      hl,(x86_vga_offset)
+        srl     h
+        rr      l
+        ld      (x86_vga_offset),hl
+        ret
 
-; Return A=1 once at least one character byte in the captured frame is nonzero.
-; Initial POST clear frames are skipped so they cannot consume the dump.
-x86_vga_frame_has_text:
-        push    bc
-        push    hl
-        ld      a,P126_NGS_DMA_PROD_PAGE
-        rrca
-        out     (P126_NGS_BANK_WINDOW_PORT),a
-        ld      hl,P126_IPC_HEADER_SIZE
-        ld      bc,P126_VIDEO_TEXT80_CELLS
-.frame_scan:
-        ld      a,h
-        and     #3F
-        or      #C0
-        ld      h,a
+x86_vga_get_latch:
+        ld      e,a
+        ld      d,0
+        ld      hl,x86_vga_latches
+        add     hl,de
         ld      a,(hl)
-        or      a
-        jr      nz,.frame_found
-        inc     hl
-        dec     bc
+        ret
+
+; A=GC3 function, B=source, C=latch.
+x86_vga_logic:
+        cp      #08
+        jr      z,.and_op
+        cp      #10
+        jr      z,.or_op
+        cp      #18
+        jr      z,.xor_op
+        ld      a,b
+        ret
+.and_op:
+        ld      a,b
+        and     c
+        ret
+.or_op:
         ld      a,b
         or      c
-        jr      nz,.frame_scan
-        xor     a
-        jr      .frame_scan_done
-.frame_found:
-        ld      a,1
-.frame_scan_done:
-        pop     hl
-        pop     bc
+        ret
+.xor_op:
+        ld      a,b
+        xor     c
         ret
 
-; One-shot diagnostic: dump all 4000 bytes of the captured 80x25 text frame.
-; Payload layout is 2000 character bytes followed by 2000 attribute bytes.
-; Output format: 16 blocks x 256 bytes, 16 bytes per line, hexadecimal.
-x86_vga_dump_dma_frame:
+x86_vga_seq_index:       db 0
+x86_vga_gc_index:        db 0
+x86_vga_attr_index:      db 0
+x86_vga_attr_palette_enable: db 0
+x86_vga_attr_data_phase: db 0
+x86_vga_misc_output:     db 1
+x86_vga_status_toggle:   db 0
+x86_vga_seq_regs:        db 3,0,#0F,0,6
+x86_vga_gc_regs:         db 0,0,0,0,0,0,0,0,#FF
+x86_vga_attr_regs:       defs 32,0
+x86_vga_bit_table:       db 1,2,4,8
+x86_vga_offset:          dw 0
+x86_vga_plane:           db 0
+x86_vga_read_plane:       db 0
+x86_vga_effective_mask:   db #0F
+x86_vga_latches:         db 0,0,0,0
+x86_vga_compare_result:  db 0
+x86_vga_write_byte:      db 0
+x86_vga_rotated:         db 0
+
+; Project130 overlay ABI adapter: reset the Project125 VGA core.
+x86_vga_reset_impl:
+        xor     a
+        ld      (x86_vga_seq_index),a
+        ld      (x86_vga_gc_index),a
+        ld      (x86_vga_attr_index),a
+        ld      (x86_vga_attr_palette_enable),a
+        ld      (x86_vga_attr_data_phase),a
+        ld      (x86_vga_status_toggle),a
+        ld      (x86_vga_misc_output),a
+        ld      a,3
+        ld      (x86_vga_seq_regs),a
+        xor     a
+        ld      (x86_vga_seq_regs+1),a
+        ld      a,#0F
+        ld      (x86_vga_seq_regs+2),a
+        xor     a
+        ld      (x86_vga_seq_regs+3),a
+        ld      a,6
+        ld      (x86_vga_seq_regs+4),a
+        ld      hl,x86_vga_gc_regs
+        ld      b,8
+.reset_gc:
+        xor     a
+        ld      (hl),a
+        inc     hl
+        djnz    .reset_gc
+        ld      a,#FF
+        ld      (x86_vga_gc_regs+8),a
+        ld      hl,x86_vga_attr_regs
+        ld      b,32
+.reset_attr:
+        xor     a
+        ld      (hl),a
+        inc     hl
+        djnz    .reset_attr
+        ld      hl,x86_vga_latches
+        ld      b,4
+.reset_latches:
+        xor     a
+        ld      (hl),a
+        inc     hl
+        djnz    .reset_latches
+        or      a
+        ret
+
+; The P125 plane implementation stores the text page as plane 0/1.
+; This compatibility reader is used by the P130 frame converter.
+x86_vga_read_text_cell_impl:
+        ; IN HL=cell index, A=B800 aperture selector; OUT A=character,D=attribute.
+        push    bc
+        push    de
+        push    hl
+        add     hl,hl
+        ld      (x86_vga_offset),hl
+        xor     a
+        ld      (x86_mem_addr),a
+        ld      a,l
+        ld      (x86_mem_addr),a
+        ld      a,h
+        ld      (x86_mem_addr+1),a
+        ld      a,#0B
+        ld      (x86_mem_addr+2),a
+        call    x86_vga_decode_aperture
+        jr      c,.read_cell_fail
+        call    x86_vga_offset_even
+        xor     a
+        call    x86_vga_map_plane
+        ld      a,(hl)
+        ld      (x86_vga_text_char),a
+        ld      a,1
+        call    x86_vga_map_plane
+        ld      a,(hl)
+        ld      d,a
+        ld      a,(x86_vga_text_char)
+        pop     hl
+        pop     de
+        pop     bc
+        or      a
+        ret
+.read_cell_fail:
+        pop     hl
+        pop     de
+        pop     bc
+        scf
+        ret
+
+x86_vga_text_char: db 0
+
+; Capture 2000 text cells as contiguous chars then attrs in the P130 DMA page.
+x86_vga_capture_text_frame_gate_impl:
         push    af
         push    bc
         push    de
         push    hl
-        ld      a,P126_NGS_DMA_PROD_PAGE
+        ld      hl,0
+        ld      (x86_vga_capture_index),hl
+        ld      a,P126_NGS_DMA_PAGE
         rrca
         out     (P126_NGS_BANK_WINDOW_PORT),a
-        ld      hl,P126_IPC_HEADER_SIZE
-        ld      (x86_vga_dump_offset),hl
-        xor     a
-        ld      (x86_vga_dump_block),a
-        ld      a,16
-        ld      (x86_vga_dump_blocks_left),a
-.dump_block:
-        ld      a,'V'
-        call    x86_vga_dump_char
-        ld      a,'B'
-        call    x86_vga_dump_char
-        ld      a,'U'
-        call    x86_vga_dump_char
-        ld      a,'F'
-        call    x86_vga_dump_char
-        ld      a,' '
-        call    x86_vga_dump_char
-        ld      a,(x86_vga_dump_block)
-        call    x86_vga_dump_hex8
-        ld      a,' '
-        call    x86_vga_dump_char
-        ld      hl,(x86_vga_dump_offset)
-        ld      a,h
-        call    x86_vga_dump_hex8
-        ld      a,l
-        call    x86_vga_dump_hex8
-        ld      a,13
-        call    x86_vga_dump_char
-        ld      a,10
-        call    x86_vga_dump_char
-        ld      a,(x86_vga_dump_block)
-        cp      15
-        ld      a,16
-        jr      nz,.dump_block_line_count_ready
-        ; 4000-byte payload = 15 full 256-byte blocks + final 160 bytes.
-        ld      a,10
-.dump_block_line_count_ready:
-        ld      (x86_vga_dump_lines_left),a
-.dump_line:
-        ld      a,16
-        ld      (x86_vga_dump_bytes_left),a
-.dump_byte:
-        ld      hl,(x86_vga_dump_offset)
-        ld      a,h
-        and     #3F
-        or      #C0
-        ld      h,a
-        ld      a,(hl)
-        call    x86_vga_dump_hex8
-        ld      a,' '
-        call    x86_vga_dump_char
-        ld      hl,(x86_vga_dump_offset)
+        ld      de,#C000+P126_IPC_HEADER_SIZE
+        ld      bc,2000
+.capture_chars:
+        push    bc
+        ld      hl,(x86_vga_capture_index)
+        ld      a,#80
+        call    x86_vga_read_text_cell_impl
+        jr      c,.capture_fail
+        ld      (de),a
+        inc     de
+        ld      hl,(x86_vga_capture_index)
         inc     hl
-        ld      (x86_vga_dump_offset),hl
-        ld      a,(x86_vga_dump_bytes_left)
-        dec     a
-        ld      (x86_vga_dump_bytes_left),a
-        jp      nz,.dump_byte
-        ld      a,13
-        call    x86_vga_dump_char
-        ld      a,10
-        call    x86_vga_dump_char
-        ld      a,(x86_vga_dump_lines_left)
-        dec     a
-        ld      (x86_vga_dump_lines_left),a
-        jp      nz,.dump_line
-        ld      a,(x86_vga_dump_block)
-        inc     a
-        ld      (x86_vga_dump_block),a
-        ld      a,(x86_vga_dump_blocks_left)
-        dec     a
-        ld      (x86_vga_dump_blocks_left),a
-        jp      nz,.dump_block
+        ld      (x86_vga_capture_index),hl
+        pop     bc
+        dec     bc
+        ld      a,b
+        or      c
+        jr      nz,.capture_chars
+        ld      hl,0
+        ld      (x86_vga_capture_index),hl
+        ld      a,P126_NGS_DMA_PAGE
+        rrca
+        out     (P126_NGS_BANK_WINDOW_PORT),a
+        ld      de,#C000+P126_IPC_HEADER_SIZE+2000
+        ld      bc,2000
+.capture_attrs:
+        push    bc
+        ld      hl,(x86_vga_capture_index)
+        ld      a,#80
+        call    x86_vga_read_text_cell_impl
+        jr      c,.capture_fail
+        ld      (de),d
+        inc     de
+        ld      hl,(x86_vga_capture_index)
+        inc     hl
+        ld      (x86_vga_capture_index),hl
+        pop     bc
+        dec     bc
+        ld      a,b
+        or      c
+        jr      nz,.capture_attrs
         pop     hl
         pop     de
         pop     bc
         pop     af
+        ld      hl,4000
+        or      a
         ret
-
-x86_vga_dump_hex8:
-        push    af
-        rrca
-        rrca
-        rrca
-        rrca
-        call    x86_vga_dump_nibble
-        pop     af
-        and     #0F
-        jp      x86_vga_dump_nibble
-
-x86_vga_dump_nibble:
-        and     #0F
-        add     a,'0'
-        cp      '9'+1
-        jr      c,.dump_digit
-        add     a,7
-.dump_digit:
-        jp      x86_vga_dump_char
-
-x86_vga_dump_char:
-        push    bc
-        out     (#EF),a
+.capture_fail:
         pop     bc
-        ret
-
-x86_vga_dump_offset: dw 0
-x86_vga_dump_block: db 0
-x86_vga_dump_blocks_left: db 0
-x86_vga_dump_lines_left: db 0
-x86_vga_dump_bytes_left: db 0
-
-x86_vga_set_text_phys_addr:
-        ld      hl,(x86_vga_text_offset)
-        ld      a,(x86_vga_text_base_mid)
-        add     a,h
-        ld      (x86_phys_addr+1),a
-        ld      a,#0B
-        adc     a,0
-        ld      (x86_phys_addr+2),a
-        ld      a,l
-        ld      (x86_phys_addr),a
-        ret
-
-; Save/restore-safe aperture regression. It tests planar writes to all four
-; interleaved planes, selected-plane reads, then chain-4 packed access at the
-; final 64 KiB aperture byte (AFFFFh -> packed VRAM offset 0FFFFh; planar path reaches 3FFFCh).
-x86_vga_aperture_selftest_impl:
-        ld      hl,(x86_phys_addr)
-        ld      (x86_vga_test_saved_phys),hl
-        ld      a,(x86_phys_addr+2)
-        ld      (x86_vga_test_saved_phys+2),a
-
-        ld      hl,#FFFC
-        ld      (x86_vga_vram_offset),hl
-        ld      a,3
-        ld      (x86_vga_vram_offset+2),a
-        call    x86_vga_vram_read_at_offset
-        ld      (x86_vga_test_saved_vram),a
-        call    x86_vga_increment_vram_offset
-        call    x86_vga_vram_read_at_offset
-        ld      (x86_vga_test_saved_vram+1),a
-        call    x86_vga_increment_vram_offset
-        call    x86_vga_vram_read_at_offset
-        ld      (x86_vga_test_saved_vram+2),a
-        call    x86_vga_increment_vram_offset
-        call    x86_vga_vram_read_at_offset
-        ld      (x86_vga_test_saved_vram+3),a
-        ; Chain-4 addresses the packed byte offset directly (FFFFh), so
-        ; preserve that byte separately from the planar 3FFFCh..3FFFFh group.
-        ld      hl,#FFFF
-        ld      (x86_vga_vram_offset),hl
-        xor     a
-        ld      (x86_vga_vram_offset+2),a
-        call    x86_vga_vram_read_at_offset
-        ld      (x86_vga_test_saved_vram+4),a
-
-        ; Select guest AFFFFh and standard planar write mode 0.
-        ld      hl,#FFFF
-        ld      (x86_phys_addr),hl
-        ld      a,#0A
-        ld      (x86_phys_addr+2),a
-        ld      a,4
-        ld      (x86_vga_gdc+6),a
-        xor     a
-        ld      (x86_vga_chain4),a
-        ld      (x86_vga_chain2_write),a
-        ld      (x86_vga_chain2_read),a
-        ld      (x86_vga_writemode),a
-        ld      (x86_vga_readmode),a
-        ld      (x86_vga_gdc+3),a
-        ld      (x86_vga_gdc+1),a
-        ld      (x86_vga_gdc),a
-        ld      (x86_vga_readplane),a
-        ld      a,#0F
-        ld      (x86_vga_writemask),a
-        ld      a,#FF
-        ld      (x86_vga_gdc+8),a
-
-        ld      a,#5A
-        call    x86_vga_mem_write8_impl
-        ld      a,0
-        ld      (x86_vga_readplane),a
-        call    x86_vga_mem_read8_impl
-        cp      #5A
-        jp      nz,.aperture_test_failed
-        ld      a,1
-        ld      (x86_vga_readplane),a
-        call    x86_vga_mem_read8_impl
-        cp      #5A
-        jp      nz,.aperture_test_failed
-        ld      a,2
-        ld      (x86_vga_readplane),a
-        call    x86_vga_mem_read8_impl
-        cp      #5A
-        jp      nz,.aperture_test_failed
-        ld      a,3
-        ld      (x86_vga_readplane),a
-        call    x86_vga_mem_read8_impl
-        cp      #5A
-        jp      nz,.aperture_test_failed
-
-        ; Chain-4 uses the same aperture address as a packed byte offset.
-        ld      a,1
-        ld      (x86_vga_chain4),a
-        ld      a,#A5
-        call    x86_vga_mem_write8_impl
-        call    x86_vga_mem_read8_impl
-        cp      #A5
-        jp      nz,.aperture_test_failed
-
-        xor     a
-        ld      (x86_vga_test_failed),a
-        jp      .aperture_test_restore
-.aperture_test_failed:
-        ld      a,1
-        ld      (x86_vga_test_failed),a
-.aperture_test_restore:
-        ; Restore all four bytes of physical VRAM at 3FFFCh..3FFFFh.
-        ld      hl,#FFFC
-        ld      (x86_vga_vram_offset),hl
-        ld      a,3
-        ld      (x86_vga_vram_offset+2),a
-        ld      a,(x86_vga_test_saved_vram)
-        ld      (x86_vga_vram_data),a
-        call    x86_vga_vram_write_at_offset
-        call    x86_vga_increment_vram_offset
-        ld      a,(x86_vga_test_saved_vram+1)
-        ld      (x86_vga_vram_data),a
-        call    x86_vga_vram_write_at_offset
-        call    x86_vga_increment_vram_offset
-        ld      a,(x86_vga_test_saved_vram+2)
-        ld      (x86_vga_vram_data),a
-        call    x86_vga_vram_write_at_offset
-        call    x86_vga_increment_vram_offset
-        ld      a,(x86_vga_test_saved_vram+3)
-        ld      (x86_vga_vram_data),a
-        call    x86_vga_vram_write_at_offset
-        ld      hl,#FFFF
-        ld      (x86_vga_vram_offset),hl
-        xor     a
-        ld      (x86_vga_vram_offset+2),a
-        ld      a,(x86_vga_test_saved_vram+4)
-        ld      (x86_vga_vram_data),a
-        call    x86_vga_vram_write_at_offset
-
-        ld      hl,(x86_vga_test_saved_phys)
-        ld      (x86_phys_addr),hl
-        ld      a,(x86_vga_test_saved_phys+2)
-        ld      (x86_phys_addr+2),a
-        call    x86_vga_reset_impl
-        ld      a,(x86_vga_test_failed)
-        or      a
-        jp      nz,.aperture_test_bad
-        ld      hl,#A55A
-        ld      a,#5A
-        or      a
-        ret
-.aperture_test_bad:
-        ld      a,#FF
-        scf
-        ret
-
-; Register-file regression against the PCem-visible port protocol.
-; OUT A=5Ah, HL=A55Ah on pass; carry set on failure. Restores reset state.
-x86_vga_register_selftest_impl:
-        ; Sequencer index/data round-trip.
-        ld      hl,#03C4
-        ld      a,2
-        call    x86_vga_io_write8_impl
-        jp      c,.vga_test_fail
-        ld      hl,#03C5
-        ld      a,#0F
-        call    x86_vga_io_write8_impl
-        jp      c,.vga_test_fail
-        ld      hl,#03C5
-        call    x86_vga_io_read8_impl
-        cp      #0F
-        jp      nz,.vga_test_fail
-
-        ; PCem status-port phase: with bit0 clear, bits5:4 toggle on
-        ; successive reads; the same read also resets the AC flip-flop.
-        xor     a
-        ld      (x86_vga_cgastat),a
-        ld      hl,#03DA
-        call    x86_vga_io_read8_impl
-        cp      #30
-        jp      nz,.vga_test_fail
-        ld      hl,#03DA
-        call    x86_vga_io_read8_impl
-        or      a
-        jp      nz,.vga_test_fail
-        ld      hl,#03C0
-        ld      a,#12
-        call    x86_vga_io_write8_impl
-        jp      c,.vga_test_fail
-        ld      hl,#03C0
-        ld      a,#05
-        call    x86_vga_io_write8_impl
-        jp      c,.vga_test_fail
-        ld      hl,#03C1
-        call    x86_vga_io_read8_impl
-        cp      #05
-        jp      nz,.vga_test_fail
-
-        ; Graphics Controller read-plane register round-trip.
-        ld      hl,#03CE
-        ld      a,4
-        call    x86_vga_io_write8_impl
-        jp      c,.vga_test_fail
-        ld      hl,#03CF
-        ld      a,3
-        call    x86_vga_io_write8_impl
-        jp      c,.vga_test_fail
-        ld      hl,#03CF
-        call    x86_vga_io_read8_impl
-        cp      3
-        jp      nz,.vga_test_fail
-
-        ; CRTC index/data and the mono/colour alias switch from MiscOut.
-        ld      hl,#03D4
-        ld      a,#0C
-        call    x86_vga_io_write8_impl
-        jp      c,.vga_test_fail
-        ld      hl,#03D5
-        ld      a,#44
-        call    x86_vga_io_write8_impl
-        jp      c,.vga_test_fail
-        ld      hl,#03D5
-        call    x86_vga_io_read8_impl
-        cp      #44
-        jp      nz,.vga_test_fail
-        ld      hl,#03C2
-        xor     a
-        call    x86_vga_io_write8_impl
-        jp      c,.vga_test_fail
-        ld      hl,#03B4
-        ld      a,#0C
-        call    x86_vga_io_write8_impl
-        jp      c,.vga_test_fail
-        ld      hl,#03B5
-        ld      a,#33
-        call    x86_vga_io_write8_impl
-        jp      c,.vga_test_fail
-        ld      hl,#03B5
-        call    x86_vga_io_read8_impl
-        cp      #33
-        jp      nz,.vga_test_fail
-        ; The inactive colour block remains claimed by VGA and reads open bus.
-        ld      hl,#03D5
-        call    x86_vga_io_read8_impl
-        cp      #FF
-        jp      nz,.vga_test_fail
-
-        ; DAC RGB write/read sequencing (standard six-bit DAC components).
-        ld      hl,#03C8
-        ld      a,2
-        call    x86_vga_io_write8_impl
-        jp      c,.vga_test_fail
-        ld      hl,#03C9
-        ld      a,#12
-        call    x86_vga_io_write8_impl
-        jp      c,.vga_test_fail
-        ld      hl,#03C9
-        ld      a,#23
-        call    x86_vga_io_write8_impl
-        jp      c,.vga_test_fail
-        ld      hl,#03C9
-        ld      a,#34
-        call    x86_vga_io_write8_impl
-        jp      c,.vga_test_fail
-        ld      hl,#03C7
-        ld      a,2
-        call    x86_vga_io_write8_impl
-        jp      c,.vga_test_fail
-        ld      hl,#03C9
-        call    x86_vga_io_read8_impl
-        cp      #12
-        jp      nz,.vga_test_fail
-
-        call    x86_vga_aperture_selftest_impl
-        jp      c,.vga_test_fail
-
-        call    x86_vga_reset_impl
-        ld      hl,#A55A
-        ld      a,#5A
-        or      a
-        ret
-.vga_test_fail:
-        push    af
-        call    x86_vga_reset_impl
+        pop     hl
+        pop     de
+        pop     bc
         pop     af
         scf
         ret
-
-; VGA state. The 256 KiB VRAM is physically allocated separately and is not
-; duplicated in this module's 16 KiB overlay page.
-x86_vga_port:                  dw 0
-x86_vga_write_value:           db 0
-x86_vga_miscout:               db 1
-x86_vga_crtcreg:               db 0
-x86_vga_seqaddr:               db 0
-x86_vga_gdcaddr:               db 0
-x86_vga_attraddr:              db 0
-x86_vga_attrff:                db 0
-x86_vga_attr_palette_enable:   db 0
-x86_vga_dac_mask:              db #FF
-x86_vga_dac_status:            db 0
-x86_vga_dac_read:              db 0
-x86_vga_dac_write:             db 0
-x86_vga_dac_pos:               db 0
-x86_vga_dac_r:                 db 0
-x86_vga_dac_g:                 db 0
-x86_vga_bpp:                   db 8
-x86_vga_cgastat:               db 0
-x86_vga_writemask:             db #0F
-x86_vga_chain4:                db 0
-x86_vga_chain2_write:          db 0
-x86_vga_chain2_read:           db 0
-x86_vga_readmode:              db 0
-x86_vga_writemode:             db 0
-x86_vga_readplane:             db 0
-x86_vga_colourcompare:         db 0
-x86_vga_colournocare:          db 0
-x86_vga_plane_mask:            db 0
-x86_vga_old_register:          db 0
-x86_vga_index_temp:            db 0
-x86_vga_attr_palette_hi:       db 0
-x86_vga_palette_temp:          db 0
-x86_vga_crtc:                  defs 128,0
-x86_vga_gdc:                   defs 64,0
-x86_vga_attr:                  defs 32,0
-x86_vga_seq:                   defs 64,0
-x86_vga_dac:                   defs 768,0
-x86_vga_egapal:                defs 16,0
-x86_vga_guest_offset:          dw 0
-x86_vga_guest_offset_saved:    dw 0
-x86_vga_vram_offset:           defs 3,0
-x86_vga_vram_base:             defs 3,0
-x86_vga_vram_data:             db 0
-x86_vga_latches:               defs 4,0
-x86_vga_write_plane_mask:      db 0
-x86_vga_selected_plane:        db 0
-x86_vga_plane_index:           db 0
-x86_vga_effective_mask:        db 0
-x86_vga_source_value:          db 0
-x86_vga_logical_result:        db 0
-x86_vga_latch_temp:            db 0
-x86_vga_compare_accum:         db 0
-x86_vga_rotated_value:         db 0
-x86_vga_plane_bits:            db 1,2,4,8
-x86_vga_text_base_mid:         db 0
-x86_vga_text_start:            dw 0
-x86_vga_text_offset:           dw 0
-x86_vga_text_saved_vram_offset: defs 3,0
-x86_vga_text_saved_phys:       defs 3,0
-x86_vga_text_saved_chain2:     db 0
-x86_vga_text_saved_readplane:  db 0
-x86_vga_text_saved_latches:    defs 4,0
-x86_vga_text_char:             db 0
-x86_vga_text_attr:             db 0
-x86_vga_test_saved_phys:       defs 3,0
-x86_vga_test_saved_vram:       defs 5,0
-x86_vga_test_failed:           db 0
-
-        ASSERT X86_VGA_VRAM_BYTES = #40000
-        ASSERT X86_VGA_VRAM_PAGE_COUNT*#4000 = X86_VGA_VRAM_BYTES
+x86_vga_capture_index: dw 0
