@@ -63,12 +63,27 @@ x86_video_convert_impl:
         pop     hl
         pop     bc
         pop     af
+        jr      c,.video_capture_failed
+
+        ; Dump the first eight bytes from the actual DMA producer page.
+        ; This verifies that VGA capture populated the frame before IPC.
+        call    x86_video_trace_dump_payload
+        ld      hl,x86_video_trace_capture_ok
+        call    x86_video_trace_string
         ld      hl,P126_VIDEO_TEXT80_FRAME_SIZE
         ld      (x86_video_frame_size),hl
         ld      a,1
         ld      (x86_video_frame_ready),a
         ld      hl,P126_VIDEO_TEXT80_FRAME_SIZE
         xor     a
+        ret
+
+.video_capture_failed:
+        push    af
+        ld      hl,x86_video_trace_capture_failed
+        call    x86_video_trace_string
+        pop     af
+        scf
         ret
 
 .video_convert_no_mode:
@@ -111,6 +126,75 @@ x86_video_frame_size:    dw 0
 x86_video_frame_data:    db 0
 x86_video_frame_ready:   db 0
 x86_video_trace_capture_msg: db "[TRACE] VGA CAPTURE RETURNED",13,10,0
+x86_video_trace_capture_ok: db "[VGA DBG] CAPTURE STATUS OK",13,10,0
+x86_video_trace_capture_failed: db "[VGA DBG] CAPTURE FAILED",13,10,0
+x86_video_trace_chars: db "[VGA DBG] FRAME CHARS[0..7]=",0
+x86_video_trace_attrs: db "[VGA DBG] FRAME ATTRS[0..7]=",0
+
+; Dump frame bytes from page42h staging area to NeoGS #EF.
+x86_video_trace_dump_payload:
+        push    af
+        push    bc
+        push    hl
+        ld      hl,x86_video_trace_chars
+        call    x86_video_trace_string
+        ld      a,P126_NGS_DMA_PROD_PAGE
+        rrca
+        out     (P126_NGS_BANK_WINDOW_PORT),a
+        ld      hl,#C000+P126_IPC_HEADER_SIZE
+        ld      b,8
+.x86_video_trace_char_loop:
+        ld      a,(hl)
+        inc     hl
+        call    x86_video_trace_hex8
+        djnz    .x86_video_trace_char_loop
+        ld      hl,x86_video_trace_attrs
+        call    x86_video_trace_string
+        ld      a,P126_NGS_DMA_PROD_PAGE
+        rrca
+        out     (P126_NGS_BANK_WINDOW_PORT),a
+        ld      hl,#C000+P126_IPC_HEADER_SIZE+P126_VIDEO_TEXT80_CELLS
+        ld      b,8
+.x86_video_trace_attr_loop:
+        ld      a,(hl)
+        inc     hl
+        call    x86_video_trace_hex8
+        djnz    .x86_video_trace_attr_loop
+        ld      a,13
+        out     (#EF),a
+        ld      a,10
+        out     (#EF),a
+        pop     hl
+        pop     bc
+        pop     af
+        ret
+
+; IN A=value; preserve AF/BC.
+x86_video_trace_hex8:
+        push    af
+        push    bc
+        ld      b,a
+        rrca
+        rrca
+        rrca
+        rrca
+        and     #0F
+        call    x86_video_trace_hex_nibble
+        ld      a,b
+        and     #0F
+        call    x86_video_trace_hex_nibble
+        pop     bc
+        pop     af
+        ret
+
+x86_video_trace_hex_nibble:
+        add     a,'0'
+        cp      '9'+1
+        jr      c,.x86_video_trace_hex_emit
+        add     a,7
+.x86_video_trace_hex_emit:
+        out     (#EF),a
+        ret
 
 ; Emit a fixed trace marker on NeoGS #EF without changing the caller's regs.
 x86_video_trace_string:
