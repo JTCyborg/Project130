@@ -119,6 +119,7 @@ p130_trdos_restore:
 p130_trdos_rom_call:
         ; Shadow-off transition changes BC; restore the sector-read ABI
         ; registers afterwards, immediately before entering the ROM.
+        push    af
         push    bc
         push    de
         push    hl
@@ -131,6 +132,7 @@ p130_trdos_rom_call:
         pop     hl
         pop     de
         pop     bc
+        pop     af
 
         ld      hl,p130_trdos_rom_return
         push    hl
