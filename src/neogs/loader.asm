@@ -146,16 +146,18 @@ p130_ngs_core_size_low:
         ld      (_p130_neogs_stage),a
         ld      a,'9'
         call    p130_ngs_trace
-        ; GS105a #13 takes its one-byte jump target as a command argument:
-        ; preload #40 in GSDAT BEFORE writing #13 to GSCOM. Command arguments
-        ; do not use DBIT handshaking; the ROM consumes the byte as it starts
-        ; the command. Sending #40 after #13 incorrectly jumps to address 0000.
-        ld      a,040h
+        ; Match the working Project126/125 #13 16-bit address transaction:
+        ; preload the LOW byte #00 before dispatch, then send HIGH byte #40
+        ; through DBIT after command completion. #40 is NOT the first argument.
+        xor     a
         call    p130_ngs_send_argument
         jp      c,p130_ngs_fail
         ld      a,P130_CMD_JUMP
         call    p130_ngs_send_command
         jp      c,p130_ngs_fail
+        ld      a,040h
+        call    p130_ngs_send_byte
+        jp      c,p130_ngs_jump_tx_fail
         ld      a,9
         ld      (_p130_neogs_stage),a
         ld      a,'9'
