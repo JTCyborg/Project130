@@ -3,6 +3,26 @@
 ; Full 8086 instruction dispatcher; resident APIs remain callable by absolute address.
 
 x86_cpu_step_impl:
+        ; Emit a one-time identity from the actual X86EXEC overlay in WIN2.
+        ; This distinguishes the loaded image from an older TR-DOS disk.
+        ld      a,(x86_exec_build_id_emitted)
+        or      a
+        jr      nz,.build_id_done
+        ld      a,1
+        ld      (x86_exec_build_id_emitted),a
+        push    af
+        push    bc
+        push    de
+        push    hl
+        push    ix
+        ld      hl,x86_exec_build_id_text
+        call    p126_ngs_resident_log
+        pop     ix
+        pop     hl
+        pop     de
+        pop     bc
+        pop     af
+.build_id_done:
         ; PCem checks the saved TF state first, then NMI, then maskable IRQ.
         ; The noint shadow suppresses TF but deliberately does not mask NMI.
         ld      a,(x86_irq_inhibit)
@@ -4812,4 +4832,5 @@ x86_exec_overlay_probe:
 x86_exec_far_jmp_target_ip: dw 0
 x86_exec_far_jmp_target_cs: dw 0
 x86_exec_far_jmp_target_valid: db 0
-
+x86_exec_build_id_emitted: db 0
+x86_exec_build_id_text: db "[P130 X86EXEC BUILD=FEDEC-20261112-A]",13,10,0
