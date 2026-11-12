@@ -280,11 +280,18 @@ p130_ngs_stream_done:
         ; invoking the UI renderer during the DBIT handoff.
         ld      a,'J'
         call    p130_ngs_trace
+        ; Keep the two DBIT phases separate. A timeout BEFORE the #40
+        ; write is a transmit failure, not a reason to read stale GSDAT data.
+        ; Only a timeout AFTER the write may mean that GS105a has started
+        ; replying while the host-side sender is still observing DBIT.
         ld      a,040h
-        call    p130_ngs_send_byte
+        ld      (p130_ngs_tx),a
+        call    p130_ngs_wait_dbit_clear
+        jp      c,p130_ngs_jump_tx_fail
+        ld      a,(p130_ngs_tx)
+        out     (P130_GSDAT),a
+        call    p130_ngs_wait_dbit_clear
         jr      nc,p130_ngs_jump_tx_done
-        ; The #13 target byte may still be pending while the ROM switches
-        ; to the bootstrap receiver. Preserve the Project126 fallback.
         in      a,(P130_GSSTAT)
         ld      (p130_ngs_last_status),a
         bit     7,a
