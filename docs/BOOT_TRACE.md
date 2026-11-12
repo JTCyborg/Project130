@@ -52,3 +52,12 @@ This trace can validate the host entry, GS105a #14/#13 transaction and A1 acknow
 Project130 previously called `p130_neogs_startup()` before `p130_trdos_preload()`. This is the reverse of the working Project126 host sequence: Project126 preloads the TR-DOS directory before opening the bootstrap and resident files through the TR-DOS ROM API. Project130 now preloads the directory first, then launches GS105a. Build ID: `P130-0.6.0-P126-TRDOS-PRELOAD-FIRST`.
 
 This is a startup-order correction only. It does not claim that the resident core, X86MODS manifest, overlays, or DMA/IPC endpoint are implemented in Project130. Target build and Unreal Speccy runtime verification are still required.
+
+
+## 2026-11-12 — TR-DOS ROM-call trampoline
+
+Build `P130-0.6.1-P127-TRDOS-ROM-TRAMPOLINE` fixes the catalogue read path. A direct `CALL #3D13` did not follow the working Project127 TR-DOS return contract. Sector reads now use the Project127 shadow-off transition, install the return trampoline through system variable 23613, enter `#3D13` by JP, restore shadow/video through `#3D2F`, then restore the Project130 host W2/W3 pages. The sector-read ABI registers are restored after the paging writes.
+
+Startup diagnostics now use actual CR/LF escapes rather than printing the literal characters `\\r\\n`.
+
+Target-side build and runtime verification are pending. The expected next marker after `[TR-DOS] CATALOGUE PRELOAD BEGIN` is `r0`; then `r1` through `r7`. A failure or stop before `r0` still needs a fresh runtime trace.
