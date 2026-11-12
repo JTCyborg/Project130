@@ -1441,8 +1441,11 @@ x86_vga_read_text_cell_impl:
         ld      (x86_vga_text_saved_vram_offset+2),a
 
         ; The converter supplies CPU byte offsets 0,2,4... (one word/cell).
-        ; Convert that to planar storage N*4: (CPU offset / 2) * 4.
+        ; Text memory is stored as interleaved VGA planes: cell N occupies
+        ; planar offsets N*4 (character plane 0 at +0, attribute plane 1 at +1).
+        ; Convert the CPU word offset (2*N) to the backing-store offset (4*N).
         ld      hl,(x86_vga_text_offset)
+        add     hl,hl
         add     hl,hl
         ld      (x86_vga_vram_offset),hl
         xor     a
