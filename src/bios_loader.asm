@@ -525,7 +525,13 @@ p130_bios_enter_trdos_mode:
 ; across the video restoration. This wrapper is used for C=0Ah, C=08h and
 ; each C=05h sector read, matching NedoOS' per-call SHADOFF discipline.
 p130_bios_trdos_call:
-        call    p130_trdos_rom_call
+        ; Exact Project126 ROM-call boundary. Do not route this BIOS-file
+        ; operation through p130_trdos_rom_call: that Project127 trampoline
+        ; restores video by writing A/BC and therefore destroys the TR-DOS
+        ; result registers (notably C from the C=0Ah open call).
+        ;
+        ; Preserve every primary and alternate register while switching to
+        ; the documented BASIC-48 ROM page and closing ATM shadow ports.
         push    af
         push    bc
         push    de
@@ -540,7 +546,50 @@ p130_bios_trdos_call:
         ex      af,af'
         push    af
         ex      af,af'
+
+        ld      a,083h
+        ld      bc,03FF7h
+        out     (c),a
+        ld      a,0C6h
+        ld      bc,0FF77h
+        out     (c),a
+
+        ex      af,af'
+        pop     af
+        ex      af,af'
+        exx
+        pop     hl
+        pop     de
+        pop     bc
+        exx
+        pop     iy
+        pop     ix
+        pop     hl
+        pop     de
+        pop     bc
+        pop     af
+
+        ; Execute the same TR-DOS ROM entry as Project126.
+        call    03D13h
+
+        ; Preserve the complete ROM result while restoring the ATM display.
+        push    af
+        push    bc
+        push    de
+        push    hl
+        push    ix
+        push    iy
+        exx
+        push    bc
+        push    de
+        push    hl
+        exx
+        ex      af,af'
+        push    af
+        ex      af,af'
+
         call    0A00Ch
+
         ex      af,af'
         pop     af
         ex      af,af'
