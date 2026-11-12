@@ -172,7 +172,7 @@ void p130_c_entry(void)
     p130_debug_puts("\r\n[P130] C IMAGE EXECUTED\r\n");
     p130_debug_puts("[P130] Z88DK C ENTRY\r\n");
     p130_debug_puts("[P130] BUILD: " P130_BUILD_ID "\r\n");
-    p130_debug_puts("[P130] ATM 80X25 CONSOLE READY\r\n");
+    p130_debug_puts("[P130] ATM 80X25 CONSOLE IMAGE LINKED\r\n");
     p130_debug_puts("[P130] DEBUG PORT EF READY\r\n");
     p130_debug_puts("[P130] ATM HOST BOOTSTRAP READY\r\n");
 
@@ -201,6 +201,7 @@ void p130_c_entry(void)
     __asm
         call 0A000h
     __endasm;
+    p130_debug_puts("[ATM] VIDEO/UI INIT DONE\r\n");
 
     /* RTC uses the shadow-port/video configuration established by the UI. */
     p130_rtc_start();

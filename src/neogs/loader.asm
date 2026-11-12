@@ -234,8 +234,8 @@ p130_ngs_finish:
         ld      h,0
         ret
 
-; Project126 TR-DOS file-open ABI, with Project130's required ATM
-; shadow/video banking around each ROM call. IN HL=8-char name; OUT C=0,
+; Project126 TR-DOS file-open ABI using direct #3D13 calls before video init.
+; IN HL=8-char name; OUT C=0,
 ; first sector at C000h and exact file length in p130_ngs_length.
 p130_ngs_open_file:
         ld      (p130_ngs_name_ptr),hl
