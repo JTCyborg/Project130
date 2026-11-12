@@ -6,7 +6,7 @@
 #define P130_CATALOGUE_ADDR 0xC800u
 #define P130_CATALOGUE_SIZE 2048u
 
-#define P130_BUILD_ID "P130-0.6.9-P126-RESIDENT-HANDOFF"
+#define P130_BUILD_ID "P130-0.7.0-P126-FULL-LOADER"
 
 static void p130_report_memory(void)
 {
@@ -34,6 +34,7 @@ extern volatile uint8_t p130_trdos_result;
 extern uint16_t p130_trdos_preload(void);
 extern uint8_t p130_neogs_startup(void);
 extern volatile uint8_t p130_neogs_stage;
+extern uint8_t p130_neogs_send_video_mode(void);
 extern void p130_catalog_init(void);
 extern void p130_catalog_poll(void);
 extern void p130_hdd_probe(void);
@@ -168,6 +169,7 @@ static void p130_rtc_start(void)
 
 void p130_c_entry(void)
 {
+    uint8_t neogs_ready = 0u;
     p130_debug_puts("\r\n[P130] C IMAGE EXECUTED\r\n");
     p130_debug_puts("[P130] Z88DK C ENTRY\r\n");
     p130_debug_puts("[P130] BUILD: " P130_BUILD_ID "\r\n");
@@ -188,11 +190,11 @@ void p130_c_entry(void)
 
     p130_debug_puts("[NEOGS] GS105a BOOTSTRAP LAUNCH BEGIN; TRACE=");
     if (p130_neogs_startup() == 0u) {
-        p130_debug_puts("[NEOGS] STAGE0 A1 ACK RECEIVED; BOOTSTRAP IDLE\r\n");
-        p130_debug_puts("[NEOGS] DMA/IPC NOT STARTED; RESIDENT HANDOFF PENDING\r\n");
+        neogs_ready = 1u;
+        p130_debug_puts("[NEOGS] P126 RESIDENT + SIX OVERLAYS INSTALLED\r\n");
     } else {
         p130_debug_puts("\r\n[NEOGS] BOOTSTRAP LAUNCH FAILED; STAGE=");
-        p130_debug_hex8(p130_neogs_stage);
+        p130_debug_putc(p130_neogs_stage);
         p130_debug_puts("\r\n");
     }
 
@@ -201,6 +203,13 @@ void p130_c_entry(void)
         call 0A00Ch
     __endasm;
     p130_debug_puts("[ATM] VIDEO MODE INIT DONE\r\n");
+    if (neogs_ready != 0u) {
+        if (p130_neogs_send_video_mode() == 0u) {
+            p130_debug_puts("[NEOGS] VIDEO MODE SENT OVER DMA\r\n");
+        } else {
+            p130_debug_puts("[NEOGS] VIDEO MODE DMA FAILED\r\n");
+        }
+    }
 
     p130_rtc_start();
 
@@ -215,7 +224,7 @@ void p130_c_entry(void)
     p130_storage_start();
     p130_catalog_init();
     p130_debug_puts("[MAP] PHYSICAL W3 MAPPER NOT INITIALIZED\r\n");
-    p130_debug_puts("[NEOGS] DMA/IPC NOT INITIALIZED; PHYSICAL MAP PENDING\r\n");
+    p130_debug_puts("[NEOGS] P126 IMAGE DMA TRANSPORT INITIALIZED\r\n");
 
     {
         volatile uint16_t rtc_poll_divider = 0u;

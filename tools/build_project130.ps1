@@ -39,7 +39,7 @@ if ([System.IO.Path]::GetFileName($Out) -ne "disk_A.trd") {
 
 Remove-Item -Force -ErrorAction SilentlyContinue $Resident, $MapFile, $UiImage, $NeoGsBootstrap, (Join-Path $BuildDir "P130BOOT.sym"), $Out
 
-Write-Host "[P130 BUILD] VERSION=P130-0.6.9-P126-RESIDENT-HANDOFF"
+Write-Host "[P130 BUILD] VERSION=P130-0.7.0-P126-FULL-LOADER"
 foreach ($Source in @("src/main.c", "src/diag.c", "src/diag.h", "src/memory.c", "src/memory.h", "src/rtc.h", "src/rtc.asm", "src/trdos.asm", "src/hdd.asm", "src/hdd_fat16.asm", "src/catalog.asm", "src/neogs/loader.asm", "src/neogs/bootstrap.asm", "src/neogs/bootstrap_assemble.asm", "reference/project126/neogs_sub/x86_cpu_state_assemble.asm", "reference/project126/neogs_sub/p126_ipc.asm", "reference/project126/shared/p126_ipc_protocol.inc", "src/entry.asm", "src/ui.asm", "src/boot/main.asm")) {
     $Hash = (Get-FileHash $Source -Algorithm SHA256).Hash.Substring(0, 8)
     Write-Host "[P130 BUILD] $Source=$Hash"
@@ -134,11 +134,60 @@ Remove-Item -Force -ErrorAction SilentlyContinue $CoreListing, $CoreSymbols, (Jo
 & $SjAsmPlus --msg=all "--lst=build/P130_X86CORE.lst" --lstlab=sort "--sym=build/P130_X86CORE.map" "reference/project126/neogs_sub/x86_cpu_state_assemble.asm"
 if ($LASTEXITCODE -ne 0) { throw "Project126-compatible resident preflight image assembly failed: $LASTEXITCODE" }
 $CoreImage = Join-Path $BuildDir "X86CORE.C"
+foreach ($Overlay in @("X86IO.C","X86ALU.C","X86DEV.C","X86EXEC.C","X86VGA.C","X86VID.C","X86MODS.MF")) { Remove-Item -Force -ErrorAction SilentlyContinue (Join-Path $BuildDir $Overlay) }
 if (-not (Test-Path $CoreImage)) { throw "Resident preflight image was not produced: build/X86CORE.C" }
 $CoreSize = (Get-Item $CoreImage).Length
 if ($CoreSize -le 0 -or $CoreSize -gt 0x4000) {
     throw "X86CORE.C preflight image must fit 1..16384 bytes; actual size: $CoreSize"
 }
+
+# Exact Project126 split overlay directory consumed by the imported host loader.
+$OverlayProfiles = @(
+    @{ Id = 1; Page = 4; File = "X86IO.C"; Max = 0x1000 },
+    @{ Id = 2; Page = 5; File = "X86ALU.C"; Max = 0x1000 },
+    @{ Id = 3; Page = 6; File = "X86DEV.C"; Max = 0x1000 },
+    @{ Id = 4; Page = 7; File = "X86EXEC.C"; Max = 0x4000 },
+    @{ Id = 5; Page = 8; File = "X86VGA.C"; Max = 0x4000 },
+    @{ Id = 6; Page = 9; File = "X86VID.C"; Max = 0x4000 }
+)
+function Get-P130Crc16([byte[]]$Bytes) {
+    [int]$Crc = 0xFFFF
+    foreach ($Value in $Bytes) {
+        $Crc = $Crc -bxor ([int]$Value -shl 8)
+        for ($Bit = 0; $Bit -lt 8; $Bit++) {
+            if (($Crc -band 0x8000) -ne 0) {
+                $Crc = (($Crc -shl 1) -band 0xFFFF) -bxor 0x1021
+            } else {
+                $Crc = ($Crc -shl 1) -band 0xFFFF
+            }
+        }
+    }
+    return [uint16]$Crc
+}
+[System.Collections.Generic.List[byte]]$Manifest = [System.Collections.Generic.List[byte]]::new()
+$Manifest.AddRange([byte[]](0x50,0x31,0x32,0x36,1,6,8))
+foreach ($Profile in $OverlayProfiles) {
+    $Path = Join-Path $BuildDir $Profile.File
+    if (-not (Test-Path $Path)) { throw "Required Project126 overlay missing: $Path" }
+    [byte[]]$Bytes = [System.IO.File]::ReadAllBytes($Path)
+    if ($Bytes.Length -lt 1 -or $Bytes.Length -gt $Profile.Max) {
+        throw "$($Profile.File) size $($Bytes.Length) exceeds its Project126 page limit."
+    }
+    [uint16]$Crc = Get-P130Crc16 $Bytes
+    $Manifest.Add([byte]$Profile.Id)
+    $Manifest.Add([byte]$Profile.Page)
+    $Manifest.Add([byte]1)
+    $Manifest.Add([byte]0)
+    $Manifest.Add([byte]($Bytes.Length -band 0xFF))
+    $Manifest.Add([byte](($Bytes.Length -shr 8) -band 0xFF))
+    $Manifest.Add([byte]($Crc -band 0xFF))
+    $Manifest.Add([byte](($Crc -shr 8) -band 0xFF))
+    Write-Host ("[P130 BUILD] MODULE={0} PAGE={1:X2} SIZE={2} CRC16={3:X4}" -f $Profile.File,$Profile.Page,$Bytes.Length,$Crc)
+}
+if ($Manifest.Count -ne 55) { throw "X86MODS.MF must be exactly 55 bytes; got $($Manifest.Count)" }
+[System.IO.File]::WriteAllBytes((Join-Path $BuildDir "X86MODS.MF"),$Manifest.ToArray())
+Write-Host "[P130 BUILD] X86MODS.MF SIZE=55 RECORDS=6"
+
 Write-Host "[P130 BUILD] X86CORE_PREFLIGHT_SIZE=$CoreSize (opened/read before GS105a #13; payload remains DMA/IPC)"
 
 # The three BIOS files are independent 8 KiB ROM images. bios.asm/bios.txt
@@ -157,5 +206,5 @@ if (-not (Test-Path $Out)) { throw "SjASMPlus returned success but disk image is
 $DiskSize = (Get-Item $Out).Length
 if ($DiskSize -ne 655360) { throw "TR-DOS image must be 655360 bytes; actual size: $DiskSize" }
 Write-Host "[P130 BUILD] DISK=$Out SIZE=$DiskSize"
-Write-Host "[P130 BUILD] TR-DOS FILES=boot.B,p130boot.C,NEOBOOT.C,X86CORE.C,BIOS1.C,BIOS2.C,BIOS3.C"
+Write-Host "[P130 BUILD] TR-DOS FILES=boot.B,p130boot.C,NEOBOOT.C,X86CORE.C,X86IO.C,X86ALU.C,X86DEV.C,X86EXEC.C,X86VGA.C,X86VID.C,X86MODS.C,BIOS1.C,BIOS2.C,BIOS3.C"
 Write-Host "[P130 BUILD] BUILD COMPLETE (runtime test required)"

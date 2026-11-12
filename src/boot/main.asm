@@ -117,3 +117,53 @@ p130_bios_compaq:
 p130_bios_compaq_end:
         ASSERT  p130_bios_compaq_end-p130_bios_compaq = 8192
         SAVETRD "disk_A.trd","BIOS3.C",p130_bios_compaq,p130_bios_compaq_end-p130_bios_compaq
+
+; Project126-compatible split CPU/device overlays and their manifest.
+        ORG     #0000
+p130_x86io_file:
+        INCBIN  "build/X86IO.C"
+p130_x86io_file_end:
+        ASSERT  p130_x86io_file_end > p130_x86io_file
+        ASSERT  p130_x86io_file_end-p130_x86io_file <= #1000
+        SAVETRD "disk_A.trd","X86IO.C",p130_x86io_file,p130_x86io_file_end-p130_x86io_file
+        ORG     #0000
+p130_x86alu_file:
+        INCBIN  "build/X86ALU.C"
+p130_x86alu_file_end:
+        ASSERT  p130_x86alu_file_end > p130_x86alu_file
+        ASSERT  p130_x86alu_file_end-p130_x86alu_file <= #1000
+        SAVETRD "disk_A.trd","X86ALU.C",p130_x86alu_file,p130_x86alu_file_end-p130_x86alu_file
+        ORG     #0000
+p130_x86dev_file:
+        INCBIN  "build/X86DEV.C"
+p130_x86dev_file_end:
+        ASSERT  p130_x86dev_file_end > p130_x86dev_file
+        ASSERT  p130_x86dev_file_end-p130_x86dev_file <= #1000
+        SAVETRD "disk_A.trd","X86DEV.C",p130_x86dev_file,p130_x86dev_file_end-p130_x86dev_file
+        ORG     #0000
+p130_x86exec_file:
+        INCBIN  "build/X86EXEC.C"
+p130_x86exec_file_end:
+        ASSERT  p130_x86exec_file_end > p130_x86exec_file
+        ASSERT  p130_x86exec_file_end-p130_x86exec_file <= #4000
+        SAVETRD "disk_A.trd","X86EXEC.C",p130_x86exec_file,p130_x86exec_file_end-p130_x86exec_file
+        ORG     #0000
+p130_x86vga_file:
+        INCBIN  "build/X86VGA.C"
+p130_x86vga_file_end:
+        ASSERT  p130_x86vga_file_end > p130_x86vga_file
+        ASSERT  p130_x86vga_file_end-p130_x86vga_file <= #4000
+        SAVETRD "disk_A.trd","X86VGA.C",p130_x86vga_file,p130_x86vga_file_end-p130_x86vga_file
+        ORG     #0000
+p130_x86vid_file:
+        INCBIN  "build/X86VID.C"
+p130_x86vid_file_end:
+        ASSERT  p130_x86vid_file_end > p130_x86vid_file
+        ASSERT  p130_x86vid_file_end-p130_x86vid_file <= #4000
+        SAVETRD "disk_A.trd","X86VID.C",p130_x86vid_file,p130_x86vid_file_end-p130_x86vid_file
+        ORG     #0000
+p130_x86mods_manifest:
+        INCBIN  "build/X86MODS.MF"
+p130_x86mods_manifest_end:
+        ASSERT  p130_x86mods_manifest_end-p130_x86mods_manifest = 55
+        SAVETRD "disk_A.trd","X86MODS.C",p130_x86mods_manifest,p130_x86mods_manifest_end-p130_x86mods_manifest
