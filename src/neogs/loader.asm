@@ -1876,6 +1876,7 @@ PUBLIC p126_bios_send_frame
 PUBLIC p126_bios_frame_flags
 PUBLIC p126_ipc_debug_hex_byte
 PUBLIC p126_ipc_crc16_update
+PUBLIC p126_ipc_crc16_update
 PUBLIC p126_host_log_prefix
 p126_bios_send_frame:
         ld      (p126_bios_operation),a

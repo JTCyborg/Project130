@@ -11,6 +11,7 @@ PUBLIC _p130_catalog_load_request
 PUBLIC _p130_catalog_selected_index
 PUBLIC _p130_catalog_selected_entry
 PUBLIC p130_cat_find_index
+PUBLIC p130_cat_selected
 PUBLIC p130_cat_debug_string
 EXTERN p130_bios_load_selected
 
