@@ -204,14 +204,4 @@ Write-Host "[P130 BUILD] FILE MANIFEST=build/P130_BUILD_FILES.log"
 Write-Host "[P130 BUILD] DISK=$Out SIZE=$diskSize"
 Write-Host "[P130 BUILD] ACTIVE HOST=PROJECT126 EXACT"
 Write-Host "[P130 BUILD] BIOS FLOW=CATALOGUE ENTER -> 32 SECTORS -> DMA/IPC ABI 1.1 -> SYSBIOS PAGE10"
-Write-Host "[P130 BUILD] BUILD COMPLETE (runtime test required)"){
-  $text=[IO.File]::ReadAllText($full)
-  foreach($m in [regex]::Matches($text,'(?im)^\\s*(INCLUDE|INCBIN)\\s+"([^"]+)"')){
-   $dep=$m.Groups[2].Value
-   Add-BuildFile $dep ("DEP-"+$m.Groups[1].Value.ToUpperInvariant()) $true
-  }
- }
-}
-function Add-BuildOutput([string]$Path,[string]$Role){
- Add-BuildFile $Path $Role $false
-}
+Write-Host "[P130 BUILD] BUILD COMPLETE (runtime test required)"
