@@ -426,6 +426,7 @@ p130_ngs_trdos_call:
         ld      (23801),a
         ld      (23823),a
         ld      (23824),a
+        ld      a,(p130_ngs_trdos_in_a)
         jp      03D13h
 p130_ngs_trdos_return:
         ld      (p130_ngs_trdos_a),a
