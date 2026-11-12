@@ -272,7 +272,9 @@ p130_ngs_open_file:
         ld      de,0C010h
         or      a
         sbc     hl,de
-        jr      nc,p130_ngs_trdos_open_error
+        jr      c,p130_ngs_file_length_ok
+        jp      nz,p130_ngs_trdos_open_error
+p130_ngs_file_length_ok:
         ld      hl,(p130_ngs_length)
         ld      de,255
         add     hl,de
