@@ -4533,26 +4533,42 @@ x86_exec_io_instruction:
         ld      a,(x86_exec_io_opcode)
         and     1
         jr      nz,.io_output_word
+        ; PCem OUT preserves the complete guest AX register. Protect it
+        ; across the X86IO overlay call and the optional trace gate.
+        push    hl
+        ld      hl,(x86_reg_ax)
+        ld      (x86_exec_io_saved_ax),hl
+        pop     hl
         ld      a,(x86_reg_ax)
         ld      (x86_io_log_value),a
         call    x86_io_write8
+        ld      hl,(x86_exec_io_saved_ax)
+        ld      (x86_reg_ax),hl
         ld      a,1
         ld      (x86_io_log_direction),a
         xor     a
         ld      (x86_io_log_width),a
         call    x86_io_log_access
+        ld      hl,(x86_exec_io_saved_ax)
+        ld      (x86_reg_ax),hl
         or      a
         ret
 .io_output_word:
         ; DE carries the port across the overlay gate; HL carries AX.
+        ; PCem OUT DX,AX leaves the guest accumulator unchanged.
         ex      de,hl
         ld      hl,(x86_reg_ax)
+        ld      (x86_exec_io_saved_ax),hl
         ld      (x86_io_log_value),hl
         call    x86_io_write16
+        ld      hl,(x86_exec_io_saved_ax)
+        ld      (x86_reg_ax),hl
         ld      a,1
         ld      (x86_io_log_direction),a
         ld      (x86_io_log_width),a
         call    x86_io_log_access
+        ld      hl,(x86_exec_io_saved_ax)
+        ld      (x86_reg_ax),hl
         or      a
         ret
 
@@ -4635,3 +4651,6 @@ x86_exec_overlay_probe:
 x86_exec_far_jmp_target_ip: dw 0
 x86_exec_far_jmp_target_cs: dw 0
 x86_exec_far_jmp_target_valid: db 0
+
+; Guest AX must survive virtual OUT calls exactly as in PCem/808x.c.
+x86_exec_io_saved_ax: dw 0
