@@ -35,58 +35,114 @@ _p130_neogs_startup:
         xor     a
         ld      (p130_ngs_result),a
 
-        ; Save and install the TR-DOS #3D13 error/stack context.
-        ld      hl,(05C3Dh)
-        ld      (p130_ngs_old_errsp),hl
-        ld      hl,(05D03h)
-        ld      (p130_ngs_old_hook_addr),hl
-        ld      a,(05D02h)
-        ld      (p130_ngs_old_hook_op),a
+        ; Preserve TR-DOS caller state. Use the same C=0A/C=08/C=05
+        ; file-open + sector-read ABI proven in Project126.
         ld      a,(05D06h)
         ld      (p130_ngs_old_name_len),a
         ld      a,(05CF9h)
         ld      (p130_ngs_old_drive),a
+        ld      a,(05CE5h)
+        ld      (p130_ngs_old_ext),a
         ld      a,(05D10h)
         ld      (p130_ngs_old_status),a
 
+        ; TR-DOS filename is exactly eight name bytes plus extension.
         ld      hl,p130_ngs_boot_name
         ld      de,05CDDh
-        ld      bc,9
+        ld      bc,8
         ldir
+        ld      a,'C'
+        ld      (05CE5h),a
         ld      a,9
         ld      (05D06h),a
         xor     a
         ld      (05CF9h),a
         ld      (05D0Fh),a
         ld      (05D10h),a
-        ld      hl,0B7F0h
-        ld      (05C3Dh),hl
-        ld      a,0C3h
-        ld      (05D02h),a
-        ld      hl,p130_ngs_rom_error
-        ld      (05D03h),hl
 
         ld      a,1
         ld      (_p130_neogs_stage),a
         ld      a,'1'
         call    p130_ngs_trace
-        ; #3D13 file-load ABI: A=type, HL=destination, DE=length,
-        ; BC=14. For type 1, DE=0 selects the catalogue file length.
-        ; The 9-byte filename is already installed at #5CDD.
-        di
+        ; C=0A searches the 8-character name + extension.
         ld      bc,00EFh
         ld      a,'R'
         out     (c),a
-        ld      a,1
-        ld      hl,0C000h
-        ld      de,0
-        ld      bc,14
+        ld      c,10
         call    03D13h
-        push    bc
+        push    af
         ld      bc,00EFh
         ld      a,'r'
         out     (c),a
-        pop     bc
+        pop     af
+        cp      0FFh
+        jp      z,p130_ngs_fail
+
+        ; C=08 fetches the selected file descriptor at #5CE8..#5CEC.
+        push    af
+        xor     a
+        ld      (05D0Fh),a
+        ld      (05D10h),a
+        pop     af
+        ld      bc,00EFh
+        ld      a,'S'
+        out     (c),a
+        ld      c,8
+        call    03D13h
+        push    af
+        ld      bc,00EFh
+        ld      a,'s'
+        out     (c),a
+        pop     af
+        ld      a,(05D0Fh)
+        ld      b,a
+        ld      a,(05D10h)
+        or      b
+        jp      nz,p130_ngs_fail
+
+        ; Stage-0 must fit one ROM receive block (1..256 bytes).
+        ld      hl,(05CE8h)
+        ld      a,h
+        or      l
+        jp      z,p130_ngs_fail
+        ld      a,h
+        or      a
+        jr      z,p130_ngs_len_ok
+        cp      1
+        jp      nz,p130_ngs_fail
+        ld      a,l
+        or      a
+        jp      nz,p130_ngs_fail
+p130_ngs_len_ok:
+        ld      hl,(05CE8h)
+        ld      (p130_ngs_length),hl
+        ld      a,(05CEBh)
+        cp      16
+        jp      nc,p130_ngs_fail
+        ld      (p130_ngs_sector),a
+        ld      a,(05CECh)
+        ld      (p130_ngs_track),a
+
+        ; C=05 reads the first file sector into #C000.
+        ld      bc,00EFh
+        ld      a,'T'
+        out     (c),a
+        ld      a,(p130_ngs_track)
+        ld      d,a
+        ld      a,(p130_ngs_sector)
+        ld      e,a
+        ld      hl,0C000h
+        ld      b,1
+        ld      c,5
+        xor     a
+        ld      (05D0Fh),a
+        ld      (05D10h),a
+        call    03D13h
+        push    af
+        ld      bc,00EFh
+        ld      a,'t'
+        out     (c),a
+        pop     af
         ld      a,(05D0Fh)
         ld      b,a
         ld      a,(05D10h)
@@ -206,16 +262,12 @@ p130_ngs_fail:
 
 p130_ngs_finish:
         ld      (p130_ngs_result),a
-        ld      a,(p130_ngs_old_hook_op)
-        ld      (05D02h),a
-        ld      hl,(p130_ngs_old_hook_addr)
-        ld      (05D03h),hl
-        ld      hl,(p130_ngs_old_errsp)
-        ld      (05C3Dh),hl
         ld      a,(p130_ngs_old_name_len)
         ld      (05D06h),a
         ld      a,(p130_ngs_old_drive)
         ld      (05CF9h),a
+        ld      a,(p130_ngs_old_ext)
+        ld      (05CE5h),a
         ld      a,(p130_ngs_old_status)
         ld      (05D10h),a
         ld      sp,(p130_ngs_saved_sp)
@@ -353,9 +405,9 @@ p130_ngs_length:    dw 0
 p130_ngs_tx:        db 0
 p130_ngs_saved_sp:  dw 0
 p130_ngs_result:    db 0
-p130_ngs_old_errsp: dw 0
-p130_ngs_old_hook_addr: dw 0
-p130_ngs_old_hook_op: db 0
 p130_ngs_old_name_len: db 0
 p130_ngs_old_drive: db 0
+p130_ngs_old_ext: db 0
 p130_ngs_old_status: db 0
+p130_ngs_sector: db 0
+p130_ngs_track: db 0
