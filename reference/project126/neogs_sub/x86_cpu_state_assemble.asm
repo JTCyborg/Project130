@@ -8,8 +8,8 @@
         ORG     0
 
 ; Physical NeoGS and guest x86 memory allocation contracts.
-        INCLUDE "shared/p126_x86_machine_map.inc"
-        INCLUDE "shared/p126_neogs_memory_map.inc"
+        INCLUDE "reference/project126/shared/p126_x86_machine_map.inc"
+        INCLUDE "reference/project126/shared/p126_neogs_memory_map.inc"
 
         DISPLAY "P126_X86_RAM_BYTES=", /H, P126_X86_RAM_BACKING_SIZE
         DISPLAY "P126_X86_VGA_APERTURE=", /H, P126_X86_VGA_APERTURE_BASE
@@ -191,22 +191,22 @@ p126_ngs_resident_frame_bad: db "[P130 NGS] RX BAD",13,10,0
 p126_ngs_resident_tx: db 0
 
 x86_cpu_state_module_start:
-        INCLUDE "neogs_sub/x86_cpu_state.asm"
+        INCLUDE "reference/project126/neogs_sub/x86_cpu_state.asm"
 x86_cpu_state_module_end:
 
 ; Resident fetch API, dispatcher gate and trace-visible execution state.
-        INCLUDE "neogs_sub/x86_exec_resident.asm"
+        INCLUDE "reference/project126/neogs_sub/x86_exec_resident.asm"
 
 x86_modrm_module_start:
-        INCLUDE "neogs_sub/x86_modrm.asm"
+        INCLUDE "reference/project126/neogs_sub/x86_modrm.asm"
 x86_modrm_module_end:
 
 ; Link the ABI 1.0 DMA receiver/dispatcher into the fixed resident image.
 p126_ngs_ipc_module_start:
-        INCLUDE "neogs_sub/p126_ipc.asm"
+        INCLUDE "reference/project126/neogs_sub/p126_ipc.asm"
 
 ; Resident bank-call gate and compatibility entry points for X86IO and X86ALU.
-        INCLUDE "neogs_sub/p126_overlay_gate.asm"
+        INCLUDE "reference/project126/neogs_sub/p126_overlay_gate.asm"
 p126_ngs_ipc_module_end:
 
 ; Fixed-origin overlays share logical origin 8000h but are loaded into
@@ -216,25 +216,25 @@ p126_ngs_ipc_module_end:
 ; 8086 instruction dispatcher, moved out of the resident image.
         ORG     #8000
 x86_cpu_exec_module_start:
-        INCLUDE "neogs_sub/x86_exec.asm"
+        INCLUDE "reference/project126/neogs_sub/x86_exec.asm"
 x86_cpu_exec_module_end:
         SAVEBIN "build/X86EXEC.C",x86_cpu_exec_module_start,x86_cpu_exec_module_end-x86_cpu_exec_module_start
 
         ORG     #8000
 x86_io_module_start:
-        INCLUDE "neogs_sub/x86_io.asm"
+        INCLUDE "reference/project126/neogs_sub/x86_io.asm"
 x86_io_module_end:
         SAVEBIN "build/X86IO.C",x86_io_module_start,x86_io_module_end-x86_io_module_start
 
         ORG     #8000
 x86_alu_module_start:
-        INCLUDE "neogs_sub/x86_alu.asm"
+        INCLUDE "reference/project126/neogs_sub/x86_alu.asm"
 x86_alu_module_end:
         SAVEBIN "build/X86ALU.C",x86_alu_module_start,x86_alu_module_end-x86_alu_module_start
 
         ORG     #8000
 x86_dev_module_start:
-        INCLUDE "neogs_sub/x86_devices.asm"
+        INCLUDE "reference/project126/neogs_sub/x86_devices.asm"
 x86_dev_module_end:
         SAVEBIN "build/X86DEV.C",x86_dev_module_start,x86_dev_module_end-x86_dev_module_start
 
@@ -242,14 +242,14 @@ x86_dev_module_end:
 ; separate from X86DEV so the 4 KiB device overlay limit remains intact.
         ORG     #8000
 x86_vga_module_start:
-        INCLUDE "neogs_sub/x86_vga.asm"
+        INCLUDE "reference/project126/neogs_sub/x86_vga.asm"
 x86_vga_module_end:
         SAVEBIN "build/X86VGA.C",x86_vga_module_start,x86_vga_module_end-x86_vga_module_start
 
 ; ATM-native frame conversion is a separate dynamic overlay, ID06/page09.
         ORG     #8000
 x86_video_module_start:
-        INCLUDE "neogs_sub/x86_video_convert.asm"
+        INCLUDE "reference/project126/neogs_sub/x86_video_convert.asm"
 x86_video_module_end:
         SAVEBIN "build/X86VID.C",x86_video_module_start,x86_video_module_end-x86_video_module_start
 

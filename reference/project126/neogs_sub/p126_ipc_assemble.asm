@@ -5,10 +5,10 @@
 
         ORG 0
 
-        INCLUDE "shared/p126_neogs_memory_map.inc"
+        INCLUDE "reference/project126/shared/p126_neogs_memory_map.inc"
 
 p126_ngs_ipc_module_start:
-        INCLUDE "neogs_sub/p126_ipc.asm"
+        INCLUDE "reference/project126/neogs_sub/p126_ipc.asm"
 p126_ngs_ipc_module_end:
 
 ; Standalone IPC audit unit: the production image links these symbols from

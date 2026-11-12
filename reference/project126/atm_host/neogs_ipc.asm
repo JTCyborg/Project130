@@ -10,7 +10,7 @@
 ; and does not program DMA_MOD/HAD/MAD/LAD/CST from the ATM side.
 ; =========================================================================
 
-        INCLUDE "atm_host/neogs_ipc.inc"
+        INCLUDE "reference/project126/atm_host/neogs_ipc.inc"
 
 ; -------------------------------------------------------------------------
 ; Read the current hardware handshake state.
