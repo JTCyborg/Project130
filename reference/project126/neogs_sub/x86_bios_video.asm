@@ -36,7 +36,12 @@ bios_int10_dispatch_impl:
 bios_int10_set_mode:
         ld      a,l
         cp      BIOS_VIDEO_MODE
-        ret     nz
+        jr      z,.supported_mode
+        ; Project125 treats unsupported mode requests as successful no-ops;
+        ; never leak CP's carry flag into the x86 execution fault path.
+        or      a
+        ret
+.supported_mode:
         call    bios_video_set_vga_text_state
         ret     c
         ld      hl,#0449
