@@ -70,13 +70,16 @@ _p130_neogs_startup:
         ld      (_p130_neogs_stage),a
         ld      a,'1'
         call    p130_ngs_trace
-        ; A=1: destination DE, length from catalogue; BC=14 loads the file.
+        ; #3D13 file-load ABI: A=type, HL=destination, DE=length,
+        ; BC=14. For type 1, DE=0 selects the catalogue file length.
+        ; The 9-byte filename is already installed at #5CDD.
+        di
         ld      bc,00EFh
         ld      a,'R'
         out     (c),a
         ld      a,1
-        ld      hl,05CDDh
-        ld      de,0C000h
+        ld      hl,0C000h
+        ld      de,0
         ld      bc,14
         call    03D13h
         push    bc
