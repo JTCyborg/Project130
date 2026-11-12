@@ -209,6 +209,7 @@ x86_bios_startup_trace:
         xor     a
         ld      (x86_bios_trace_first_slice_once),a
         ld      (x86_bios_rep_stosw_active),a
+        ld      a,1
         ld      (x86_bios_trace_active),a
 .run_slice:
         ; 256 instructions per pass; service IPC between bounded slices.
