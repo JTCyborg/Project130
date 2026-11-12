@@ -83,6 +83,11 @@ x86_video_convert_impl:
         ld      hl,x86_video_trace_capture_failed
         call    x86_video_trace_string
         pop     af
+        call    x86_video_trace_hex8
+        ld      a,13
+        out     (#EF),a
+        ld      a,10
+        out     (#EF),a
         scf
         ret
 
@@ -127,7 +132,7 @@ x86_video_frame_data:    db 0
 x86_video_frame_ready:   db 0
 x86_video_trace_capture_msg: db "[TRACE] VGA CAPTURE RETURNED",13,10,0
 x86_video_trace_capture_ok: db "[VGA DBG] CAPTURE STATUS OK",13,10,0
-x86_video_trace_capture_failed: db "[VGA DBG] CAPTURE FAILED",13,10,0
+x86_video_trace_capture_failed: db "[VGA DBG] CAPTURE FAILED CODE=",0
 x86_video_trace_chars: db "[VGA DBG] FRAME CHARS[0..7]=",0
 x86_video_trace_attrs: db "[VGA DBG] FRAME ATTRS[0..7]=",0
 
