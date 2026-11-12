@@ -4533,41 +4533,45 @@ x86_exec_io_instruction:
         ld      a,(x86_exec_io_opcode)
         and     1
         jr      nz,.io_output_word
-        ; PCem OUT preserves the complete guest AX register. Protect it
-        ; across the X86IO overlay call and the optional trace gate.
-        push    hl
+        ; The X86IO gate may replace its overlay window. Keep guest AX on
+        ; the Z80 stack: a scratch word in this overlay is not persistent.
+        push    hl                      ; preserve the decoded guest port
         ld      hl,(x86_reg_ax)
-        ld      (x86_exec_io_saved_ax),hl
-        pop     hl
+        push    hl                      ; guest AX survives overlay mapping
         ld      a,(x86_reg_ax)
         ld      (x86_io_log_value),a
         call    x86_io_write8
-        ld      hl,(x86_exec_io_saved_ax)
+        pop     hl
         ld      (x86_reg_ax),hl
+        ld      hl,(x86_reg_ax)
+        push    hl
         ld      a,1
         ld      (x86_io_log_direction),a
         xor     a
         ld      (x86_io_log_width),a
         call    x86_io_log_access
-        ld      hl,(x86_exec_io_saved_ax)
+        pop     hl
         ld      (x86_reg_ax),hl
+        pop     hl                      ; restore decoded guest port
         or      a
         ret
 .io_output_word:
-        ; DE carries the port across the overlay gate; HL carries AX.
-        ; PCem OUT DX,AX leaves the guest accumulator unchanged.
+        ; DE carries the port and HL the value for the X86IO gate.
+        ; Keep guest AX on the Z80 stack across both overlay calls.
         ex      de,hl
         ld      hl,(x86_reg_ax)
-        ld      (x86_exec_io_saved_ax),hl
+        push    hl
         ld      (x86_io_log_value),hl
         call    x86_io_write16
-        ld      hl,(x86_exec_io_saved_ax)
+        pop     hl
         ld      (x86_reg_ax),hl
+        ld      hl,(x86_reg_ax)
+        push    hl
         ld      a,1
         ld      (x86_io_log_direction),a
         ld      (x86_io_log_width),a
         call    x86_io_log_access
-        ld      hl,(x86_exec_io_saved_ax)
+        pop     hl
         ld      (x86_reg_ax),hl
         or      a
         ret
@@ -4652,5 +4656,3 @@ x86_exec_far_jmp_target_ip: dw 0
 x86_exec_far_jmp_target_cs: dw 0
 x86_exec_far_jmp_target_valid: db 0
 
-; Guest AX must survive virtual OUT calls exactly as in PCem/808x.c.
-x86_exec_io_saved_ax: dw 0
