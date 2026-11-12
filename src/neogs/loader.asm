@@ -47,6 +47,7 @@ P130_NGS_TIMEOUT EQU 0FFFFh
 p130_neogs_startup_impl:
         ld      a,'1'
         ld      (p130_neogs_startup_stage),a
+        call    p130_neogs_trace_start
         ld      hl,p130_neogs_boot_name
         call    p130_neogs_open_file
         ret     c
@@ -783,7 +784,11 @@ p130_neogs_overlay_read_sector__overlay_sector_available:
         xor     a
         ld      (05D0Fh),a
         ld      (05D10h),a
+        ld      a,'r'
+        call    p130_neogs_trace_char
         call 03D13h
+        ld      a,'R'
+        call    p130_neogs_trace_char
         ld      a,(05D0Fh)
         ld      b,a
         ld      a,(05D10h)
@@ -845,7 +850,11 @@ p130_neogs_open_file:
         ld      a,9
         ld      (05D06h),a
         ld      c,10
+        ld      a,'o'
+        call    p130_neogs_trace_char
         call 03D13h
+        ld      a,'O'
+        call    p130_neogs_trace_char
         ld      a,c
         cp      0FFh
         jp      z,p130_neogs_open_file__p130_neogs_file_not_found
@@ -857,7 +866,11 @@ p130_neogs_open_file:
         ld      (05D10h),a
         pop     af
         ld      c,8
+        ld      a,'d'
+        call    p130_neogs_trace_char
         call 03D13h
+        ld      a,'D'
+        call    p130_neogs_trace_char
         ld      a,(05D0Fh)
         ld      b,a
         ld      a,(05D10h)
@@ -894,6 +907,8 @@ p130_neogs_open_file__p130_neogs_file_length_ok:
 
         ; Acquire only the first sector now; subsequent sectors are read
         ; on demand after the current 256-byte buffer has been consumed.
+        ld      a,'s'
+        call    p130_neogs_trace_char
         call    p130_neogs_read_next_sector
         ret     c
         ld      hl,0C000h
@@ -1237,6 +1252,20 @@ p130_neogs_send_video_mode_impl:
         pop     hl
         pop     de
         pop     bc
+        ret
+
+
+; Runtime trace for the first TR-DOS transaction. This writes single markers
+; to the independent ATM debug port and preserves caller registers/flags.
+p130_neogs_trace_start:
+        ld      a,'1'
+p130_neogs_trace_char:
+        push    af
+        push    bc
+        ld      bc,00EFh
+        out     (c),a
+        pop     bc
+        pop     af
         ret
 
 p130_neogs_boot_name: db "NEOBOOT "
