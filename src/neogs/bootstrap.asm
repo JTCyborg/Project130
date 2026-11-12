@@ -96,4 +96,6 @@ p130_ngs_send_done:
 
 p130_ngs_tx: db 0
 p130_ngs_boot_end:
+        ASSERT  p130_ngs_boot_start = #4000
+        ASSERT  p130_ngs_boot_end <= #4100
         ASSERT  p130_ngs_boot_end-p130_ngs_boot_start <= 256
