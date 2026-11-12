@@ -1,7 +1,8 @@
 ; Project130 ATM-side GS105a bootstrap launcher.
 ; Legacy GSDAT is restricted to transferring NEOBOOT.C (<=256 bytes).
-; After #13, only the bootstrap-ready A1 acknowledgement is accepted.
-; No resident core or application payload is sent over GSDAT.
+; After #13, the Project126-compatible A1 bootstrap-ready acknowledgement
+; is accepted. Project130 then switches to its own DMA/IPC initialization;
+; no resident core or application payload is sent over GSDAT.
 
 SECTION CODE
 PUBLIC _p130_neogs_startup
@@ -255,8 +256,8 @@ p130_ngs_stream_done:
         ld      (_p130_neogs_stage),a
         ld      a,'8'
         call    p130_ngs_trace
-        ; #13 transfers control to #4000. Bootstrap disables NOROM and
-        ; publishes A1 through its own ZX data endpoint.
+        ; #13 transfers control to #4000. Bootstrap follows the Project126
+        ; stack/DMA/GSCFG0/temporary-window sequence, then publishes A1.
         xor     a
         call    p130_ngs_send_argument
         jp      c,p130_ngs_fail
@@ -270,28 +271,15 @@ p130_ngs_stream_done:
         ld      (_p130_neogs_stage),a
         ld      a,'9'
         call    p130_ngs_trace
-        ; First acknowledgement proves execution reached #4000.
-        call    p130_ngs_wait_dbit_set
+        ; One A1 acknowledgement, matching Project126. It is emitted only
+        ; after DMA stop, NOROM/EXPAG and temporary memory-window setup.
+        call    p130_ngs_receive_byte
         jp      c,p130_ngs_fail
-        in      a,(P130_GSDAT)
-        ; Preserve the actual first ACK too; otherwise a bad E0 is
-        ; incorrectly reported as the zero-initialized second-ACK value.
-        ld      (p130_ngs_ack_value),a
-        cp      0E0h
-        jr      nz,p130_ngs_ack_bad
-        ld      a,'e'
-        call    p130_ngs_trace
-
-        ; Second acknowledgement proves bootstrap completed ROM/DMA setup.
-        call    p130_ngs_wait_dbit_set
-        jp      c,p130_ngs_fail
-        ld      a,'a'
-        call    p130_ngs_trace
-        in      a,(P130_GSDAT)
-        ld      (p130_ngs_ack_value),a
         cp      P130_ACK_READY
         jr      nz,p130_ngs_ack_bad
-        ld      a,'b'
+        ld      a,'a'
+        call    p130_ngs_trace
+        ld      a,'1'
         call    p130_ngs_trace
         xor     a
         jp      p130_ngs_finish
