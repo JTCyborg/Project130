@@ -23,6 +23,10 @@ _p130_neogs_startup:
         ld      (05CE5h),a
         ld      a,9
         ld      (05D06h),a
+        ld      a,1
+        ld      (p130_neogs_stage),a
+        ld      a,'1'
+        call    p130_ngs_trace
         ld      c,10
         call    03D13h
         ld      a,c
@@ -34,6 +38,10 @@ _p130_neogs_startup:
         ld      (05D0Fh),a
         ld      (05D10h),a
         pop     af
+        ld      a,2
+        ld      (p130_neogs_stage),a
+        ld      a,'2'
+        call    p130_ngs_trace
         ld      c,8
         call    03D13h
         ld      a,(05D0Fh)
@@ -42,6 +50,10 @@ _p130_neogs_startup:
         or      b
         jp      nz,p130_ngs_fail
 
+        ld      a,3
+        ld      (p130_neogs_stage),a
+        ld      a,'3'
+        call    p130_ngs_trace
         ; Stage-0 must fit one ROM receive block (1..256 bytes).
         ld      hl,(05CE8h)
         ld      a,h
@@ -59,6 +71,10 @@ p130_ngs_len_ok:
         ld      hl,(05CE8h)
         ld      (p130_ngs_length),hl
 
+        ld      a,4
+        ld      (p130_neogs_stage),a
+        ld      a,'4'
+        call    p130_ngs_trace
         ; Read the first and only sector into ATM W3 scratch at #C000.
         ld      a,(05CEBh)
         ld      e,a
@@ -77,11 +93,19 @@ p130_ngs_len_ok:
         or      b
         jp      nz,p130_ngs_fail
 
+        ld      a,5
+        ld      (p130_neogs_stage),a
+        ld      a,'5'
+        call    p130_ngs_trace
         ; Restart the stock ROM into its known command receive state.
         ld      a,P130_CMD_RESET
         call    p130_ngs_send_command_long
         jp      c,p130_ngs_fail
 
+        ld      a,6
+        ld      (p130_neogs_stage),a
+        ld      a,'6'
+        call    p130_ngs_trace
         ; #14: low length argument, then high length, address low/high.
         ld      hl,(p130_ngs_length)
         ld      a,l
@@ -101,6 +125,10 @@ p130_ngs_len_ok:
         call    p130_ngs_send_byte
         jp      c,p130_ngs_fail
 
+        ld      a,7
+        ld      (p130_neogs_stage),a
+        ld      a,'7'
+        call    p130_ngs_trace
         ; The only GSDAT payload is the small bootstrap image.
         ld      hl,0C000h
         ld      de,(p130_ngs_length)
@@ -115,6 +143,10 @@ p130_ngs_stream:
         dec     de
         jr      p130_ngs_stream
 p130_ngs_stream_done:
+        ld      a,8
+        ld      (p130_neogs_stage),a
+        ld      a,'8'
+        call    p130_ngs_trace
         ; #13 transfers control to #4000. Bootstrap disables NOROM and
         ; publishes A1 through its own ZX data endpoint.
         xor     a
@@ -126,16 +158,31 @@ p130_ngs_stream_done:
         ld      a,040h
         call    p130_ngs_send_byte
         jp      c,p130_ngs_fail
+        ld      a,9
+        ld      (p130_neogs_stage),a
+        ld      a,'9'
+        call    p130_ngs_trace
         call    p130_ngs_wait_dbit_set
         jp      c,p130_ngs_fail
         in      a,(P130_GSDAT)
         cp      P130_ACK_READY
         jp      nz,p130_ngs_fail
+        xor     a
+        ld      (p130_neogs_stage),a
         ld      hl,0
         ret
 
 p130_ngs_fail:
         ld      hl,1
+        ret
+
+; Emit a one-character progress marker on the existing #EF debug channel.
+p130_ngs_trace:
+        push    bc
+        ld      bc,00EFh
+        out     (c),a
+        call    0A003h
+        pop     bc
         ret
 
 ; Long bounded CBIT wait for the GS105a cold-reset command.
@@ -230,6 +277,9 @@ p130_ngs_dbit_set_loop:
 p130_ngs_ok:
         or      a
         ret
+
+PUBLIC _p130_neogs_stage
+_p130_neogs_stage: db 0
 
 p130_ngs_boot_name: db "NEOBOOT "
 p130_ngs_length:    dw 0
