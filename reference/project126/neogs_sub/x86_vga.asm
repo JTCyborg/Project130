@@ -688,10 +688,13 @@ x86_vga_read_text_cell_impl:
         ld      a,1
         call    x86_vga_map_plane
         ld      a,(hl)
-        ld      d,a
+        ld      (x86_vga_text_attr),a
         ld      a,(x86_vga_text_char)
         pop     hl
         pop     de
+        ld      a,(x86_vga_text_attr)
+        ld      d,a
+        ld      a,(x86_vga_text_char)
         pop     bc
         or      a
         ret
@@ -703,6 +706,7 @@ x86_vga_read_text_cell_impl:
         ret
 
 x86_vga_text_char: db 0
+x86_vga_text_attr: db 0
 
 ; Capture 2000 text cells as contiguous chars then attrs in the P130 DMA page.
 x86_vga_capture_text_frame_gate_impl:
