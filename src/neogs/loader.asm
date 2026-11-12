@@ -86,8 +86,10 @@ p130_ngs_scan_found:
         ld      a,'r'
         out     (c),a
 
-        ; TR-DOS descriptor: length +11/+12, sector count +13,
-        ; first sector +14, track +15.
+        ; TR-DOS descriptor (Project127 TRDOSFCB/findfile ABI):
+        ; length +11/+12, sector count +12, first sector +13,
+        ; logical track +14. The sector count overlaps neither length nor
+        ; the first-sector byte: descriptor layout is fixed at 16 bytes.
         ld      a,(ix+11)
         ld      l,a
         ld      a,(ix+12)
@@ -105,11 +107,11 @@ p130_ngs_scan_found:
         jp      nz,p130_ngs_fail
 p130_ngs_len_ok:
         ld      (p130_ngs_length),hl
-        ld      a,(ix+14)
+        ld      a,(ix+13)
         cp      16
         jp      nc,p130_ngs_fail
         ld      (p130_ngs_sector),a
-        ld      a,(ix+15)
+        ld      a,(ix+14)
         ld      (p130_ngs_track),a
 
         ; C=05, B=1, HL=#C000, DE=track:sector.
