@@ -6,7 +6,7 @@
 #define P130_CATALOGUE_ADDR 0xC800u
 #define P130_CATALOGUE_SIZE 2048u
 
-#define P130_BUILD_ID "BOOTSTRAP-0.4.4-P127-STARTUP-ORDER-ACK-DIAG"
+#define P130_BUILD_ID "BOOTSTRAP-0.4.5-P127-BOOT-CHAIN"
 
 static void p130_report_memory(void)
 {
@@ -166,19 +166,11 @@ static void p130_rtc_start(void)
     }
 }
 
-static void p130_ui_init(void)
-{
-    __asm
-        call 0A000h
-    __endasm;
-}
-
 void p130_c_entry(void)
 {
     p130_debug_puts("\r\n[P130] C IMAGE EXECUTED\r\n");
     p130_debug_puts("[P130] Z88DK C ENTRY\r\n");
     p130_debug_puts("[P130] BUILD: " P130_BUILD_ID "\r\n");
-    p130_ui_init();
     p130_debug_puts("[P130] ATM 80X25 CONSOLE READY\r\n");
     p130_debug_puts("[P130] DEBUG PORT EF READY\r\n");
     p130_debug_puts("[P130] ATM HOST BOOTSTRAP READY\r\n");
