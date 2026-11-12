@@ -162,16 +162,9 @@ p130_ngs_trdos_return:
         out     (c),a
         pop     af
 
-        ; Restore Project130 host mapping and re-enable the same shadow
-        ; ports/video mode using the #3D2F sequence from ui.asm.
+        ; Re-enable shadow ports/video first, exactly as ui.asm does,
+        ; then restore the host's W2/W3 pages.
         di
-        ld      a,P130_HOST_PAGE5
-        ld      bc,07FF7h
-        out     (c),a
-        ld      a,P130_HOST_PAGE0
-        ld      bc,0FFF7h
-        out     (c),a
-        ei
         ld      bc,p130_ngs_trdos_video_restored
         push    bc
         ld      bc,02A53h
@@ -181,6 +174,13 @@ p130_ngs_trdos_return:
         jp      03D2Fh
 
 p130_ngs_trdos_video_restored:
+        ld      a,P130_HOST_PAGE5
+        ld      bc,07FF7h
+        out     (c),a
+        ld      a,P130_HOST_PAGE0
+        ld      bc,0FFF7h
+        out     (c),a
+        ei
         ld      a,(05D0Fh)
         ld      b,a
         ld      a,(05D10h)
