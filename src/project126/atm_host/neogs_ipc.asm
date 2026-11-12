@@ -957,15 +957,28 @@ p126_ipc_dma_receive_video_frame::
         ld      hl,p126_ipc_video_frame_rx_ok
         call    p126_ipc_debug_string
 
-        ; Dump the actual payload at the ATM receiver, not just its CRC.
-        ld      hl,p126_ipc_dbg_payload_char
+        ; Dump the first eight character and attribute bytes at the ATM
+        ; receiver. This distinguishes an empty/wrong capture from a renderer
+        ; or paging failure even when the frame CRC is valid.
+        ld      hl,p126_ipc_dbg_payload_chars
         call    p126_ipc_debug_string
-        ld      a,(P126_IPC_DMA_RX_BUFFER+P126_IPC_HEADER_SIZE)
+        ld      hl,P126_IPC_DMA_RX_BUFFER+P126_IPC_HEADER_SIZE
+        ld      b,8
+.video_dbg_chars:
+        ld      a,(hl)
+        inc     hl
         call    p126_ipc_debug_hex_byte
-        ld      hl,p126_ipc_dbg_payload_attr
+        djnz    .video_dbg_chars
+        call    p126_ipc_debug_crlf
+        ld      hl,p126_ipc_dbg_payload_attrs
         call    p126_ipc_debug_string
-        ld      a,(P126_IPC_DMA_RX_BUFFER+P126_IPC_HEADER_SIZE+P126_VIDEO_TEXT80_CELLS)
+        ld      hl,P126_IPC_DMA_RX_BUFFER+P126_IPC_HEADER_SIZE+P126_VIDEO_TEXT80_CELLS
+        ld      b,8
+.video_dbg_attrs:
+        ld      a,(hl)
+        inc     hl
         call    p126_ipc_debug_hex_byte
+        djnz    .video_dbg_attrs
         call    p126_ipc_debug_crlf
 
         ld      hl,p126_ipc_dbg_apply_enter
@@ -1114,8 +1127,8 @@ p126_ipc_debug_event_missing: db "[X86] BIOS TRACE EVENT INVALID; FRAME=",0
 p126_ipc_debug_dma_failed: db "[X86] DIAGNOSTIC DMA FAILED",13,10,0
 p126_ipc_video_frame_rx_ok: db "[TRACE] ATM FRAME RX / CRC OK",13,10,0
 p126_ipc_video_frame_applied: db "[VIDEO] RG6 FRAME APPLIED",13,10,0
-p126_ipc_dbg_payload_char: db "[VIDEO DBG] RX CHAR[0]=",0
-p126_ipc_dbg_payload_attr: db " ATTR[0]=",0
+p126_ipc_dbg_payload_chars: db "[VIDEO DBG] RX CHARS[0..7]=",0
+p126_ipc_dbg_payload_attrs: db "[VIDEO DBG] RX ATTRS[0..7]=",0
 p126_ipc_dbg_apply_enter: db "[VIDEO DBG] APPLY ENTER",13,10,0
 p126_ipc_dbg_apply_return: db "[VIDEO DBG] APPLY RETURN A=",0
 p126_ipc_dbg_apply_ok: db "[VIDEO DBG] APPLY OK",13,10,0
