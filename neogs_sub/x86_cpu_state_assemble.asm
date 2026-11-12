@@ -178,7 +178,7 @@ p126_ngs_resident_send_boot_ack:
         or      a
         ret
 
-p126_ngs_resident_banner: db "[P130 NGS] P126 RESIDENT v0.1.0",13,10,0
+p126_ngs_resident_banner: db "[P130 NGS] RESIDENT v0.1.0",13,10,0
 p126_ngs_resident_crc_ok: db "[P130 NGS] ABI CRC16 PASS",13,10,0
 p126_ngs_resident_allocator_ok: db "[P130 NGS] OVERLAY ALLOCATOR PASS",13,10,0
 p126_ngs_resident_allocator_bad: db "[P130 NGS] OVERLAY ALLOCATOR FAIL",13,10,0
