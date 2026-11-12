@@ -825,7 +825,10 @@ x86_vga_mem_write8_impl:
         ld      (x86_vga_write_value),a
         call    x86_vga_aperture_offset
         jp      nc,.mem_write_mapped
-        or      a
+        ; An address outside the currently selected VGA aperture is not a
+        ; successful no-op. Propagate the mapping failure to the BIOS caller;
+        ; otherwise INT10 reports a successful write while VRAM stays blank.
+        scf
         ret
 .mem_write_mapped:
         ld      (x86_vga_guest_offset),hl
