@@ -38,6 +38,10 @@ _p130_entry:
         ; Read track 0 sectors 1..8 into the host W3 buffer at #C800.
         call    _p130_trdos_preload
 
+        ; Project127 startup contract: initialize the ATM/W3 console before
+        ; entering the resident application services.
+        call    0A000h
+
         call    _p130_c_entry
 
 ; C entry is expected to remain resident forever.
