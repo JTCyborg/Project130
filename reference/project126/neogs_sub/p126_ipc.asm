@@ -736,6 +736,8 @@ p126_ngs_ipc_dispatch_once::
         ld      (p126_ngs_video_error_code),a
         jp      p126_ngs_ipc_dma_send_video_error_frame
 .video_dispatch_success:
+        ld      hl,p126_ngs_ipc_log_video_convert_ok
+        call    p126_ngs_ipc_log
         jp      p126_ngs_ipc_dma_send_video_frame
 
 .p126_ngs_dispatch_ngs_frame:
@@ -1752,6 +1754,7 @@ p126_ngs_ipc_log_dma_rx_end:     db "[P130 NGS] DMA RX END",13,10,0
 p126_ngs_ipc_log_dma_rx_addr:    db "[P130 NGS] RX ADDR=",0
 p126_ngs_ipc_log_dma_rx_timeout: db "[P130 NGS] DMA RX TIMEOUT",13,10,0
 p126_ngs_ipc_log_dma_rx_length_bad: db "[P130 NGS] RX LEN BAD",13,10,0
+p126_ngs_ipc_log_video_convert_ok: db "[TRACE] NGS VIDEO CONVERT OK / TX",13,10,0
 
 ; Emit CR/LF on NeoGS's independent #EF diagnostic channel.
 p126_ngs_ipc_log_crlf:

@@ -604,6 +604,21 @@ bios_video_write_cell:
         ld      (bios_video_guest_value),a
         call    bios_video_write_guest_byte
 .write_done:
+        jr      c,.write_return
+        ld      a,(bios_video_trace_vga_write_once)
+        or      a
+        jr      nz,.write_return
+        inc     a
+        ld      (bios_video_trace_vga_write_once),a
+        push    af
+        push    bc
+        push    hl
+        ld      hl,bios_video_trace_vga_write_msg
+        call    bios_video_trace_string
+        pop     hl
+        pop     bc
+        pop     af
+.write_return:
         pop     hl
         pop     de
         pop     bc
@@ -753,6 +768,8 @@ bios_video_trace_nibble:
 bios_video_trace_prefix:
         db "[BIOS INT10] AX BX CX DX CS:IP=",0
 bios_video_trace_count: db 0
+bios_video_trace_vga_write_once: db 0
+bios_video_trace_vga_write_msg: db "[TRACE] BIOS VGA WRITE OK",13,10,0
 
 bios_video_row:           db 0
 bios_video_col:           db 0

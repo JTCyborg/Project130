@@ -33,6 +33,8 @@ p126_atm_video_enabled: db 0
 p126_screen_frame_char: db 0
 p126_screen_frame_char_ptr: dw 0
 p126_screen_frame_attr_ptr: dw 0
+p126_screen_trace_screen_write_once: db 0
+p126_screen_trace_screen_write_msg: db "[TRACE] ATM SCREEN CELL WRITE CALLED",13,10,0
 p126_screen_frame_row:      db 0
 p126_screen_frame_col:      db 0
 
@@ -646,6 +648,16 @@ p126_screen_apply_text_frame::
         ld      e,a
         ld      a,(p126_screen_frame_char)
         call    p126_screen_write_guest_cell
+        ld      a,(p126_screen_trace_screen_write_once)
+        or      a
+        jr      nz,.screen_write_trace_done
+        inc     a
+        ld      (p126_screen_trace_screen_write_once),a
+        push    hl
+        ld      hl,p126_screen_trace_screen_write_msg
+        call    p126_ipc_debug_string
+        pop     hl
+.screen_write_trace_done:
         ld      a,(p126_screen_frame_col)
         inc     a
         ld      (p126_screen_frame_col),a

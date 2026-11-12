@@ -55,6 +55,14 @@ x86_video_convert_impl:
         ; into contiguous char[2000] + attr[2000] arrays before presenting.
         ; The VGA overlay owns the physical 256 KiB backing-store mapping.
         call    x86_video_vga_capture_text_frame
+        push    af
+        push    bc
+        push    hl
+        ld      hl,x86_video_trace_capture_msg
+        call    x86_video_trace_string
+        pop     hl
+        pop     bc
+        pop     af
         ld      hl,P126_VIDEO_TEXT80_FRAME_SIZE
         ld      (x86_video_frame_size),hl
         ld      a,1
@@ -102,6 +110,27 @@ x86_video_frame_offset:  dw 0
 x86_video_frame_size:    dw 0
 x86_video_frame_data:    db 0
 x86_video_frame_ready:   db 0
+x86_video_trace_capture_msg: db "[TRACE] VGA CAPTURE RETURNED",13,10,0
+
+; Emit a fixed trace marker on NeoGS #EF without changing the caller's regs.
+x86_video_trace_string:
+        push    af
+        push    bc
+        push    hl
+        ld      bc,#00EF
+.x86_video_trace_loop:
+        ld      a,(hl)
+        inc     hl
+        or      a
+        jr      z,.x86_video_trace_done
+        out     (c),a
+        jr      .x86_video_trace_loop
+.x86_video_trace_done:
+        pop     hl
+        pop     bc
+        pop     af
+        ret
+
 x86_video_row:           db 0
 x86_video_col:           db 0
 x86_video_char:          db 0
