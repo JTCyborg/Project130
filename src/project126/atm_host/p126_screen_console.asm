@@ -648,6 +648,8 @@ p126_screen_write_guest_cell:
         ld      a,(p126_screen_trace_first_cell)
         cp      1
         jr      nz,.screen_trace_offset_done
+        ld      a,2
+        ld      (p126_screen_trace_first_cell),a
         push    af
         push    bc
         push    de
@@ -698,8 +700,10 @@ p126_screen_write_guest_cell:
         ; Read back the first character and attribute while video pages
         ; are still mapped. This separates wrong addressing from bad source.
         ld      a,(p126_screen_trace_first_cell)
-        cp      1
+        cp      2
         jr      nz,.screen_trace_readback_done
+        ld      a,3
+        ld      (p126_screen_trace_first_cell),a
         push    af
         push    bc
         push    de
