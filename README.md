@@ -25,4 +25,4 @@ powershell -ExecutionPolicy Bypass -File tools/build_project130.ps1
 
 The build creates `build/P130BOOT.bin` and packages `disk_A.trd`. The first milestone is only a resident C/ASM entry and #EF diagnostics; it does not yet initialize NeoGS or implement DMA.
 
-See [docs/IMPLEMENTATION_PLAN.md](docs/IMPLEMENTATION_PLAN.md) for milestones and acceptance criteria.
+Only the `src/` tree is the active Project130 implementation. Project126 reference sources are isolated under `reference/project126/` and are not runtime build inputs. The standalone `PCem/` tree is a read-only CPU/VGA reference.\n\nSee [docs/IMPLEMENTATION_PLAN.md](docs/IMPLEMENTATION_PLAN.md) for milestones and acceptance criteria, and [docs/PROJECT126_IMPORT.md](docs/PROJECT126_IMPORT.md) for the reference boundary.
