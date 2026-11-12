@@ -162,21 +162,11 @@ p130_ngs_core_size_low:
         ld      (_p130_neogs_stage),a
         ld      a,'9'
         call    p130_ngs_trace
-        ; A0 is emitted as the first instruction-level entry probe at #4000,
-        ; before the bootstrap uses a stack or changes the memory map.
+        ; Project126 publishes A1 as the FIRST byte after entering
+        ; and initializing the bootstrap. Do not insert a diagnostic A0 byte:
+        ; the host must consume the original Project126 handshake unchanged.
         call    p130_ngs_receive_byte
         jr      c,p130_ngs_ack_timeout
-        ld      (p130_ngs_ack_value),a
-        cp      0A0h
-        jr      nz,p130_ngs_ack_bad
-        ld      a,'b'
-        call    p130_ngs_trace
-        ld      a,'0'
-        call    p130_ngs_trace
-        ; A1 is sent only after DMA stop, NOROM/EXPAG and temporary mapping.
-        call    p130_ngs_receive_byte
-        jr      c,p130_ngs_ack_timeout
-p130_ngs_ack_check:
         ld      (p130_ngs_ack_value),a
         cp      P130_ACK_READY
         jr      nz,p130_ngs_ack_bad
