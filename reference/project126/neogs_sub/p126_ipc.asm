@@ -3,7 +3,7 @@
 ; This module implements the ABI 1.0 frame codec and the NeoGS DMA receive endpoint.
 ; =========================================================================
 
-        INCLUDE "shared/p126_ipc_protocol.inc"
+        INCLUDE "reference/project126/shared/p126_ipc_protocol.inc"
 
 ; CRC-16/CCITT-FALSE byte update.
 ; IN : HL=current CRC, A=next byte.
