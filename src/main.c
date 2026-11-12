@@ -178,26 +178,26 @@ void p130_c_entry(void)
     p130_debug_puts("[P130] ATM HOST BOOTSTRAP READY\r\n");
 
     /*
-     * Project126 host order:
-     *   1) preload the TR-DOS directory;
-     *   2) open/read NEOBOOT and X86CORE through the established TR-DOS API;
-     *   3) reset GS105a, transfer stage-0, enter it and receive A1;
-     *   4) initialize ATM video, RTC, then visible console.
-     * Do not launch GS105a before the directory/ROM-call environment is ready.
+     * Match the proven Project126 host order exactly:
+     *   1) start GS105a and load NEOBOOT, X86CORE and all six overlays;
+     *   2) read the TR-DOS directory only after all loader file operations;
+     *   3) initialize ATM video, RTC, then the visible console.
+     * The NeoGS loader uses direct TR-DOS ROM calls and does not require the
+     * catalogue mirror. Preloading it first changes the known-good startup
+     * environment and is deliberately not allowed here.
      */
-    p130_debug_puts("[TR-DOS] CATALOGUE PRELOAD BEGIN\r\n");
-    (void)p130_trdos_preload();
-
     p130_debug_puts("[NEOGS] GS105a BOOTSTRAP LAUNCH BEGIN; TRACE=");
     if (p130_neogs_startup() == 0u) {
         neogs_ready = 1u;
-        p130_debug_puts("[NEOGS] P126 RESIDENT + SIX OVERLAYS INSTALLED\r\n");
+        p130_debug_puts("[NEOGS] P126 RESIDENT + SIX OVERLAYS INSTALLED\\r\\n");
     } else {
-        p130_debug_puts("\r\n[NEOGS] BOOTSTRAP LAUNCH FAILED; STAGE=");
+        p130_debug_puts("\\r\\n[NEOGS] BOOTSTRAP LAUNCH FAILED; STAGE=");
         p130_debug_putc(p130_neogs_stage);
-        p130_debug_puts("\r\n");
+        p130_debug_puts("\\r\\n");
     }
 
+    p130_debug_puts("[TR-DOS] CATALOGUE PRELOAD BEGIN\\r\\n");
+    (void)p130_trdos_preload();
     /* Project126 order: ATM video mode first, then RTC, then console. */
     __asm
         call 0A00Ch
