@@ -258,6 +258,16 @@ x86_vga_io_read8_impl:
         or      a
         ret
 
+; Gate entries used by X86VID. B carries the A argument across the
+; module-ID lookup; the resident overlay gate preserves BC at module entry.
+x86_vga_io_write8_gate_impl:
+        ld      a,b
+        jp      x86_vga_io_write8_impl
+
+x86_vga_read_text_cell_gate_impl:
+        ld      a,b
+        jp      x86_vga_read_text_cell_impl
+
 ; IN HL=guest I/O port, A=value. OUT carry clear if handled.
 x86_vga_io_write8_impl:
         ld      (x86_vga_write_value),a
