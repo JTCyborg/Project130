@@ -6,7 +6,7 @@
 #define P130_CATALOGUE_ADDR 0xC800u
 #define P130_CATALOGUE_SIZE 2048u
 
-#define P130_BUILD_ID "BOOTSTRAP-0.4.2-TRDOS-LOAD-ABI-FIX"
+#define P130_BUILD_ID "BOOTSTRAP-0.4.3-P127-STARTUP-ORDER"
 
 static void p130_report_memory(void)
 {
@@ -182,8 +182,15 @@ void p130_c_entry(void)
     p130_debug_puts("[P130] ATM 80X25 CONSOLE READY\r\n");
     p130_debug_puts("[P130] DEBUG PORT EF READY\r\n");
     p130_debug_puts("[P130] ATM HOST BOOTSTRAP READY\r\n");
-    p130_report_memory();
+
+    /*
+     * Keep the Project127 startup order:
+     *   entry.asm: DI, stack, ATM paging, TR-DOS catalogue preload
+     *   here:      UI/W3, RTC, memory manager, TR-DOS report, HDD
+     * NeoGS is started only after the host-side storage stages.
+     */
     p130_rtc_start();
+    p130_report_memory();
     p130_storage_start();
     p130_debug_puts("[NEOGS] GS105a BOOTSTRAP LAUNCH BEGIN; TRACE=");
     if (p130_neogs_startup() == 0u) {
