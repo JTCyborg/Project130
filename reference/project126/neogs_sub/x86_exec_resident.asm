@@ -15,6 +15,9 @@
 ; Guest memory is accessed only through x86_guest_mem_read8 and the Project126
 ; physical-address mapper. No physical device I/O is issued by this CPU core.
 
+; Set to 0 to disable the narrowly scoped BIOS fetch diagnostic.
+X86_FETCH_TRACE_ENABLE EQU 1
+
 x86_cpu_fetch8:
         push    bc
         ld      hl,(x86_reg_cs)
@@ -22,6 +25,9 @@ x86_cpu_fetch8:
         call    x86_cpu_calc_phys
         call    x86_guest_mem_read8
         jr      c,.fetch_fault
+IF X86_FETCH_TRACE_ENABLE
+        call    x86_cpu_fetch_trace_bios_window
+ENDIF
         ld      (x86_exec_fetch_byte),a
         ld      hl,(x86_reg_ip)
         inc     hl
@@ -34,6 +40,101 @@ x86_cpu_fetch8:
         pop     bc
         scf
         ret
+
+; Trace only F000:E0C0..E0C3, the BIOS instruction bytes implicated by
+; spectrum_out.txt. Log the architectural address, calculated physical
+; address, actual byte returned by the memory backend, and WIN3 slot/page.
+x86_cpu_fetch_trace_bios_window:
+        push    af
+        push    bc
+        push    de
+        push    hl
+        ld      hl,(x86_reg_cs)
+        ld      de,#F000
+        or      a
+        sbc     hl,de
+        jr      nz,.trace_done
+        ld      hl,(x86_reg_ip)
+        ld      de,#E0C0
+        or      a
+        sbc     hl,de
+        jr      c,.trace_done
+        ld      hl,(x86_reg_ip)
+        ld      de,#E0C4
+        or      a
+        sbc     hl,de
+        jr      nc,.trace_done
+
+        ld      (x86_fetch_trace_byte),a
+        ld      hl,x86_fetch_trace_prefix
+        call    p126_ngs_resident_log
+        ld      hl,(x86_reg_cs)
+        call    x86_bios_trace_emit_hex16
+        ld      a,':'
+        call    x86_bios_trace_emit_char
+        ld      hl,(x86_reg_ip)
+        call    x86_bios_trace_emit_hex16
+        ld      hl,x86_fetch_trace_phys_text
+        call    p126_ngs_resident_log
+        ld      a,(x86_phys_addr+2)
+        call    x86_bios_trace_emit_hex8
+        ld      a,(x86_phys_addr+1)
+        call    x86_bios_trace_emit_hex8
+        ld      a,(x86_phys_addr)
+        call    x86_bios_trace_emit_hex8
+        ld      hl,x86_fetch_trace_byte_text
+        call    p126_ngs_resident_log
+        ld      a,(x86_fetch_trace_byte)
+        call    x86_bios_trace_emit_hex8
+
+        ; Reproduce the SYSBIOS page formula used by
+        ; x86_guest_mem_select_page: high*4 + middle[7:6] + bias.
+        ld      a,(x86_phys_addr+2)
+        add     a,a
+        add     a,a
+        add     a,P126_NGS_GUEST_SYSBIOS_PAGE_BIAS
+        ld      b,a
+        ld      a,(x86_phys_addr+1)
+        srl     a
+        srl     a
+        srl     a
+        srl     a
+        srl     a
+        srl     a
+        and     #03
+        add     a,b
+        ld      (x86_fetch_trace_page),a
+        ld      hl,x86_fetch_trace_page_text
+        call    p126_ngs_resident_log
+        ld      a,(x86_fetch_trace_page)
+        call    x86_bios_trace_emit_hex8
+        ld      hl,x86_fetch_trace_hl_text
+        call    p126_ngs_resident_log
+        ld      a,(x86_phys_addr+1)
+        and     #3F
+        or      #C0
+        sub     #20
+        call    x86_bios_trace_emit_hex8
+        ld      a,(x86_phys_addr)
+        call    x86_bios_trace_emit_hex8
+        ld      a,13
+        call    x86_bios_trace_emit_char
+        ld      a,10
+        call    x86_bios_trace_emit_char
+.trace_done:
+        pop     hl
+        pop     de
+        pop     bc
+        pop     af
+        ret
+
+x86_fetch_trace_prefix:   db "[X86 FETCH] CS:IP=",0
+x86_fetch_trace_phys_text: db " P=",0
+x86_fetch_trace_byte_text: db " BYTE=",0
+x86_fetch_trace_page_text: db " PAGE=",0
+x86_fetch_trace_hl_text:   db " WIN3=",0
+x86_fetch_trace_byte:      db 0
+x86_fetch_trace_page:      db 0
 
 x86_cpu_fetch16:
         call    x86_cpu_fetch8
