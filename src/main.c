@@ -6,7 +6,7 @@
 #define P130_CATALOGUE_ADDR 0xC800u
 #define P130_CATALOGUE_SIZE 2048u
 
-#define P130_BUILD_ID "BOOTSTRAP-0.4.1-NEOGS-STAGE-TRACE"
+#define P130_BUILD_ID "BOOTSTRAP-0.4.2-TRDOS-LOAD-ABI-FIX"
 
 static void p130_report_memory(void)
 {
