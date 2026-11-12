@@ -46,6 +46,16 @@ The guest map is a software memory model backed by NeoGS RAM. It does not imply 
 
 ATM host allocations remain separate. The existing resident image, UI, stack, TR-DOS catalogue and physical W3 mapper keep their own ATM-side ownership. The NeoGS DMA staging page is not an ATM physical page. ATM staging buffers must be allocated and mapped only through the established ATM mapper procedure.
 
+### ATM Turbo 2+ physical W3 mapper
+
+- W3 is the 16 KiB CPU window at #C000-#FFFF.
+- The physical page dispatcher is port #FFF7.
+- Page encoding is data = #7F - physical_page (pages 0..63).
+- Project130 may remap W3 only; W0/W1/W2 are fixed and must not be written by this mapper.
+- The video/UI bootstrap enables the shadow ports and restores W3 to physical page 0. The mapper initializes only after the console/video initialization has completed.
+- The mapper pins allocated pages while mapped and supports a bounded nested W3 bank stack. The initial physical self-test saves original bytes, writes distinct signatures into two allocated pages, verifies isolation after switching, and restores the original bytes.
+- Calls are serialized in the resident main loop. Interrupt-driven or concurrent UI/mapper access is not supported until an explicit ownership/critical-section protocol is added.
+
 ## 5. BIOS execution gate
 
 The 8086 must not be released from reset until:

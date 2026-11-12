@@ -1,12 +1,13 @@
 #include <stdint.h>
 #include "diag.h"
 #include "memory.h"
+#include "map.h"
 #include "rtc.h"
 
 #define P130_CATALOGUE_ADDR 0xC800u
 #define P130_CATALOGUE_SIZE 2048u
 
-#define P130_BUILD_ID "P130-0.7.0-P126-FULL-LOADER"
+#define P130_BUILD_ID "P130-0.7.1-PHYSICAL-W3-MAPPER"
 
 volatile uint8_t p130_neogs_entry_status = 1u;
 
@@ -34,6 +35,7 @@ static void p130_report_memory(void)
 
 extern volatile uint8_t p130_trdos_result;
 extern uint16_t p130_trdos_preload(void);
+extern uint8_t p130_memory_init(void);
 extern volatile uint8_t p130_neogs_entry_status;
 extern uint8_t p130_neogs_startup(void);
 extern volatile uint8_t p130_neogs_stage;

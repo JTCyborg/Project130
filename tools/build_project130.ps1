@@ -39,8 +39,8 @@ if ([System.IO.Path]::GetFileName($Out) -ne "disk_A.trd") {
 
 Remove-Item -Force -ErrorAction SilentlyContinue $Resident, $MapFile, $UiImage, $NeoGsBootstrap, (Join-Path $BuildDir "P130BOOT.sym"), $Out
 
-Write-Host "[P130 BUILD] VERSION=P130-0.7.0-P126-FULL-LOADER"
-foreach ($Source in @("src/main.c", "src/diag.c", "src/diag.h", "src/memory.c", "src/memory.h", "src/rtc.h", "src/rtc.asm", "src/trdos.asm", "src/hdd.asm", "src/hdd_fat16.asm", "src/catalog.asm", "src/neogs/loader.asm", "src/neogs/bootstrap.asm", "src/neogs/bootstrap_assemble.asm", "reference/project126/neogs_sub/x86_cpu_state_assemble.asm", "reference/project126/neogs_sub/p126_ipc.asm", "reference/project126/shared/p126_ipc_protocol.inc", "src/entry.asm", "src/ui.asm", "src/boot/main.asm")) {
+Write-Host "[P130 BUILD] VERSION=P130-0.7.1-PHYSICAL-W3-MAPPER"
+foreach ($Source in @("src/main.c", "src/diag.c", "src/diag.h", "src/memory.c", "src/memory.h", "src/map.c", "src/map.h", "src/map_hw.asm", "src/rtc.h", "src/rtc.asm", "src/trdos.asm", "src/hdd.asm", "src/hdd_fat16.asm", "src/catalog.asm", "src/neogs/loader.asm", "src/neogs/bootstrap.asm", "src/neogs/bootstrap_assemble.asm", "reference/project126/neogs_sub/x86_cpu_state_assemble.asm", "reference/project126/neogs_sub/p126_ipc.asm", "reference/project126/shared/p126_ipc_protocol.inc", "src/entry.asm", "src/ui.asm", "src/boot/main.asm")) {
     $Hash = (Get-FileHash $Source -Algorithm SHA256).Hash.Substring(0, 8)
     Write-Host "[P130 BUILD] $Source=$Hash"
 }
@@ -50,7 +50,7 @@ Write-Host "[P130 BUILD] Z80ASM=$Z80Asm"
 Write-Host "[P130 BUILD] SJASMPLUS=$SjAsmPlus"
 
 # Same no-CRT link model and relocation used by the proven Project129 build.
-& $Zcc +zx -v -O2 -compiler=sdcc --no-crt -Cl-r24576 -m -s -bn $Resident src/entry.asm src/main.c src/diag.c src/memory.c src/rtc.asm src/trdos.asm src/hdd.asm src/hdd_fat16.asm src/catalog.asm src/neogs/loader.asm
+& $Zcc +zx -v -O2 -compiler=sdcc --no-crt -Cl-r24576 -m -s -bn $Resident src/entry.asm src/main.c src/diag.c src/memory.c src/map.c src/map_hw.asm src/rtc.asm src/trdos.asm src/hdd.asm src/hdd_fat16.asm src/catalog.asm src/neogs/loader.asm
 if ($LASTEXITCODE -ne 0) { throw "Z88DK compile/link failed: $LASTEXITCODE" }
 if (-not (Test-Path $Resident)) { throw "Z88DK returned success but did not produce $Resident" }
 if (-not (Test-Path $MapFile)) { throw "Z88DK did not produce required map file: $MapFile" }
