@@ -14,7 +14,7 @@ P126_NGS_SYSBIOS_PAGE        EQU #10
 P126_NGS_SYSBIOS_PAGES       EQU #10
 P126_NGS_VGABIOS_PAGE        EQU #20
 P126_NGS_VGABIOS_PAGES       EQU #10
-P126_NGS_VRAM_PAGE           EQU #30
+P126_NGS_VRAM_PAGE           EQU #53
 P126_NGS_VRAM_PAGES          EQU #10
 ; Optional ATM-native large-frame workspace, up to 32 KiB (pages40h-41h).
 ; Page42h is the 16 KiB DMA staging buffer and current RG6 frame output.
@@ -39,7 +39,7 @@ P126_NGS_RESERVED_PAGES      EQU #7C
 ; aperture selected through MPAGEX port 10h. Resident code and stack must
 ; never execute from or be stored in WIN3.
 ; X86VGA is dynamic overlay ID05/page08; X86VID is ID06/page09 and converts
-; VGA text state into ATM-native frames. VGA VRAM remains in pages30h..3Fh.
+; VGA text state into ATM-native frames. VGA VRAM uses Project125 backing pages 53h..62h.
 P126_NGS_OVERLAY_WINDOW_INDEX     EQU 2
 P126_NGS_OVERLAY_WINDOW_BASE      EQU #8000
 P126_NGS_OVERLAY_WINDOW_PORT      EQU #00
@@ -63,7 +63,7 @@ P126_NGS_GUEST_RAM_PAGE_BASE      EQU P126_NGS_GUEST_RAM_PAGE
 
 ; Guest memory backend page-bias constants for the WIN3 selector.
 ; page = (guest_high_nibble*4)+(guest_middle>>6)+bias.
-P126_NGS_GUEST_VRAM_PAGE_BIAS       EQU #08
+P126_NGS_GUEST_VRAM_PAGE_BIAS       EQU #2B
 P126_NGS_GUEST_VGABIOS_PAGE_BIAS    EQU #F0
 P126_NGS_GUEST_SYSBIOS_PAGE_BIAS    EQU #D1
 
