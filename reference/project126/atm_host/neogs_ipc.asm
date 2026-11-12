@@ -871,8 +871,19 @@ p126_ipc_dma_receive_video_frame::
         or      b
         jr      nz,.video_remote_error
 
+        ; Stage 3: dump the exact 80x25 character payload received over
+        ; DMA, before the renderer touches ATM video memory.
+        call    p126_ipc_video_trace_rx_text
         call    p126_screen_apply_text_frame
         jr      c,.video_apply_failed
+        ; Stage 4: this marker is emitted only after all 2000 cells have
+        ; been written to the ATM text planes.
+        ld      hl,p126_ipc_video_trace_screen_ok
+        call    p126_ipc_console_string
+        ld      a,13
+        call    p126_ipc_console_char
+        ld      a,10
+        call    p126_ipc_console_char
         ld      hl,p126_ipc_video_frame_applied
         call    p126_ipc_console_string
         or      a
@@ -946,6 +957,61 @@ p126_ipc_video_failure_code: db 0
 ; IPC status text belongs to the boot console only. Once BIOS is
 ; installed, keep the ATM text page exclusively owned by the guest VGA frame.
 ; IN: A=character. Preserves AF; BC is scratch.
+; Print the complete received BIOS text page as 25 lines.
+; This is the byte-for-byte frame payload after DMA/CRC validation and
+; immediately before p126_screen_apply_text_frame writes ATM video RAM.
+p126_ipc_video_trace_rx_text:
+        push    af
+        push    bc
+        push    de
+        push    hl
+        ld      hl,p126_ipc_video_trace_rx_begin
+        call    p126_ipc_console_string
+        ld      hl,P126_IPC_DMA_RX_BUFFER+P126_IPC_HEADER_SIZE
+        ld      (p126_ipc_video_trace_ptr),hl
+        ld      b,P126_VIDEO_TEXT80_HEIGHT
+.trace_row:
+        push    bc
+        ld      hl,(p126_ipc_video_trace_ptr)
+        ld      c,P126_VIDEO_TEXT80_WIDTH
+.trace_col:
+        ld      a,(hl)
+        inc     hl
+        cp      32
+        jr      c,.trace_nonprint
+        cp      127
+        jr      nc,.trace_nonprint
+        jr      .trace_emit
+.trace_nonprint:
+        ld      a,'.'
+.trace_emit:
+        call    p126_ipc_console_char
+        dec     c
+        jr      nz,.trace_col
+        ld      (p126_ipc_video_trace_ptr),hl
+        ld      a,13
+        call    p126_ipc_console_char
+        ld      a,10
+        call    p126_ipc_console_char
+        pop     bc
+        djnz    .trace_row
+        ld      hl,p126_ipc_video_trace_rx_end
+        call    p126_ipc_console_string
+        ld      a,13
+        call    p126_ipc_console_char
+        ld      a,10
+        call    p126_ipc_console_char
+        pop     hl
+        pop     de
+        pop     bc
+        pop     af
+        ret
+
+p126_ipc_video_trace_ptr: dw 0
+p126_ipc_video_trace_rx_begin: db "[VIDEO RX DMA] BIOS VGA TEXT 80x25:",13,10,0
+p126_ipc_video_trace_rx_end: db "[VIDEO RX DMA] END",0
+p126_ipc_video_trace_screen_ok: db "[SCREEN] ATM TEXT PLANES WRITE OK",0
+
 p126_ipc_console_char:
         push    af
         ld      a,(p126_host_console_ready)

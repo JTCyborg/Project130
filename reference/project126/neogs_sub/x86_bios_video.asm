@@ -490,6 +490,11 @@ bios_int10_teletype:
         ret     nz
         ld      a,(x86_reg_ax)
         ld      (bios_video_char),a
+        ; Stage 1: exact BIOS INT 10h/AH=0Eh output stream to diagnostic #EF.
+        ; Keep this independent from the INT10 register trace and the later
+        ; VGA/frame/ATM dumps so a missing stage is immediately identifiable.
+        call    bios_video_trace_teletype_char
+        ld      a,(bios_video_char)
         or      a
         ret     z
         cp      13
@@ -544,6 +549,26 @@ bios_int10_teletype:
         ret
 .done:
         or      a
+        ret
+
+; Emit the byte BIOS actually passed in AL to INT 10h/AH=0Eh.
+; CR/LF are preserved; other control bytes are represented as '.' in log.
+bios_video_trace_teletype_char:
+        push    af
+        push    bc
+        ld      a,(bios_video_char)
+        cp      13
+        jr      z,.trace_emit
+        cp      10
+        jr      z,.trace_emit
+        cp      32
+        jr      nc,.trace_emit
+        ld      a,'.'
+.trace_emit:
+        ld      bc,#00EF
+        out     (c),a
+        pop     bc
+        pop     af
         ret
 
 ; Character/attribute pair at B8000h + row*160 + column*2.
