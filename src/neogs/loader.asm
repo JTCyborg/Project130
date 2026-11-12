@@ -1402,7 +1402,6 @@ p130_neogs_dma_smoke_test__p130_neogs_dma_crc_payload:
         jp      p126_ipc_dma_send_frame
 
 p130_neogs_dma_test_frame EQU 0C000h
-        ASSERT  p130_neogs_dma_test_frame + P126_IPC_MAX_FRAME_SIZE = 10000h
 
 ; Project126 IPC/IMAGE DMA implementation and ABI constants.
 ; Project126 ATM-side IMAGE/DMA transport used by the full Project130 loader.
@@ -1419,6 +1418,9 @@ P126_IPC_MAX_FRAME_SIZE    EQU 04000h
 P126_IPC_MAX_PAYLOAD       EQU P126_IPC_MAX_FRAME_SIZE-P126_IPC_HEADER_SIZE
 P126_IPC_FRAGMENT_HEADER   EQU 10
 P126_IPC_MAX_FRAGMENT_DATA EQU P126_IPC_MAX_PAYLOAD-P126_IPC_FRAGMENT_HEADER
+
+; The 16 KiB DMA test frame occupies C000h..FFFFh exactly.
+        ASSERT  p130_neogs_dma_test_frame + P126_IPC_MAX_FRAME_SIZE = 10000h
 
 ; Fixed header offsets.
 P126_IPC_OFF_MAGIC        EQU 0
