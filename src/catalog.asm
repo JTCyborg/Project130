@@ -11,6 +11,7 @@ PUBLIC _p130_catalog_load_request
 PUBLIC _p130_catalog_selected_index
 PUBLIC _p130_catalog_selected_entry
 PUBLIC p130_cat_find_index
+PUBLIC p130_cat_get_selected_index
 PUBLIC p130_cat_selected
 PUBLIC p130_cat_debug_string
 EXTERN p130_bios_load_selected
@@ -279,6 +280,11 @@ p130_cat_bios_failed:
         ld      hl,p130_cat_bios_failed_text
         call    p130_cat_debug_string
         call    p130_cat_draw
+        ret
+
+; Return the currently highlighted logical catalogue index in A.
+p130_cat_get_selected_index:
+        ld      a,(p130_cat_selected)
         ret
 
 p130_cat_debug_string:

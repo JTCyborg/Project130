@@ -12,6 +12,7 @@ P130_BIOS_OP_IMAGE_FINISH EQU 002h
 P130_BIOS_SERVICE_IMAGE EQU 007h
 EXTERN p130_cat_debug_string
 EXTERN p130_cat_find_index
+EXTERN p130_cat_get_selected_index
 EXTERN p130_trdos_rom_call
 EXTERN p126_bios_send_frame
 EXTERN p126_bios_frame_flags
@@ -41,7 +42,7 @@ p130_bios_load_selected:
         ld      (p130_bios_disk_mode_active),a
 
         ; Resolve the selected visible catalogue index to its TR-DOS entry.
-        ld      a,(_p130_catalog_selected_index)
+        call    p130_cat_get_selected_index
         call    p130_cat_find_index
         jp      c,p130_bios_bad_selection
         ; Preserve the selected directory-entry pointer across logging.
