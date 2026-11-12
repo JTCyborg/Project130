@@ -35,73 +35,62 @@ _p130_neogs_startup:
         xor     a
         ld      (p130_ngs_result),a
 
-        ; Preserve TR-DOS caller state. Use the same C=0A/C=08/C=05
-        ; file-open + sector-read ABI proven in Project126.
-        ld      a,(05D06h)
-        ld      (p130_ngs_old_name_len),a
-        ld      a,(05CF9h)
-        ld      (p130_ngs_old_drive),a
-        ld      a,(05CE5h)
-        ld      (p130_ngs_old_ext),a
-        ld      a,(05D10h)
-        ld      (p130_ngs_old_status),a
-
-        ; TR-DOS filename is exactly eight name bytes plus extension.
-        ld      hl,p130_ngs_boot_name
-        ld      de,05CDDh
-        ld      bc,8
-        ldir
-        ld      a,'C'
-        ld      (05CE5h),a
-        ld      a,9
-        ld      (05D06h),a
-        xor     a
-        ld      (05CF9h),a
-        ld      (05D0Fh),a
-        ld      (05D10h),a
-
-        ld      a,1
-        ld      (_p130_neogs_stage),a
-        ld      a,'1'
-        call    p130_ngs_trace
-        ; C=0A searches the 8-character name + extension.
+        ; Project127 path: the complete TR-DOS directory is already
+        ; resident at #C800. Find NEOBOOT.C in that snapshot and use only
+        ; the known-working C=5 sector-read entry. Do not call C=0A/C=08.
+        ld      ix,0C800h
+        ld      b,128
         ld      bc,00EFh
         ld      a,'R'
         out     (c),a
-        ld      c,10
-        call    03D13h
-        push    af
+        ld      b,128
+p130_ngs_scan_entry:
+        ld      a,(ix+0)
+        cp      'N'
+        jr      nz,p130_ngs_scan_next
+        ld      a,(ix+1)
+        cp      'E'
+        jr      nz,p130_ngs_scan_next
+        ld      a,(ix+2)
+        cp      'O'
+        jr      nz,p130_ngs_scan_next
+        ld      a,(ix+3)
+        cp      'B'
+        jr      nz,p130_ngs_scan_next
+        ld      a,(ix+4)
+        cp      'O'
+        jr      nz,p130_ngs_scan_next
+        ld      a,(ix+5)
+        cp      'O'
+        jr      nz,p130_ngs_scan_next
+        ld      a,(ix+6)
+        cp      'T'
+        jr      nz,p130_ngs_scan_next
+        ld      a,(ix+7)
+        cp      ' '
+        jr      nz,p130_ngs_scan_next
+        ld      a,(ix+8)
+        cp      'C'
+        jr      z,p130_ngs_scan_found
+p130_ngs_scan_next:
+        push    de
+        ld      de,16
+        add     ix,de
+        pop     de
+        djnz    p130_ngs_scan_entry
+        jp      p130_ngs_fail
+
+p130_ngs_scan_found:
         ld      bc,00EFh
         ld      a,'r'
         out     (c),a
-        pop     af
-        cp      0FFh
-        jp      z,p130_ngs_fail
 
-        ; C=08 fetches the selected file descriptor at #5CE8..#5CEC.
-        push    af
-        xor     a
-        ld      (05D0Fh),a
-        ld      (05D10h),a
-        pop     af
-        ld      bc,00EFh
-        ld      a,'S'
-        out     (c),a
-        ld      c,8
-        call    03D13h
-        push    af
-        ld      bc,00EFh
-        ld      a,'s'
-        out     (c),a
-        pop     af
-        ld      a,(05D0Fh)
-        ld      b,a
-        ld      a,(05D10h)
-        or      b
-        jp      nz,p130_ngs_fail
-
-        ; Stage-0 must fit one ROM receive block (1..256 bytes).
-        ld      hl,(05CE8h)
+        ; On-disk descriptor fields: length at +11/+12,
+        ; first sector at +13, logical track at +14.
+        ld      a,(ix+11)
+        ld      l,a
+        ld      a,(ix+12)
+        ld      h,a
         ld      a,h
         or      l
         jp      z,p130_ngs_fail
@@ -114,16 +103,15 @@ _p130_neogs_startup:
         or      a
         jp      nz,p130_ngs_fail
 p130_ngs_len_ok:
-        ld      hl,(05CE8h)
         ld      (p130_ngs_length),hl
-        ld      a,(05CEBh)
+        ld      a,(ix+13)
         cp      16
         jp      nc,p130_ngs_fail
         ld      (p130_ngs_sector),a
-        ld      a,(05CECh)
+        ld      a,(ix+14)
         ld      (p130_ngs_track),a
 
-        ; C=05 reads the first file sector into #C000.
+        ; C=05, B=1, HL=#C000, DE=track:sector.
         ld      bc,00EFh
         ld      a,'T'
         out     (c),a
