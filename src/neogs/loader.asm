@@ -272,9 +272,23 @@ p130_ngs_stream_done:
         call    p130_ngs_trace
         call    p130_ngs_wait_dbit_set
         jp      c,p130_ngs_fail
+        ld      a,'a'
+        call    p130_ngs_trace
         in      a,(P130_GSDAT)
+        ld      (p130_ngs_ack_value),a
         cp      P130_ACK_READY
-        jp      nz,p130_ngs_fail
+        jr      nz,p130_ngs_ack_bad
+        ld      a,'b'
+        call    p130_ngs_trace
+        xor     a
+        jp      p130_ngs_finish
+
+p130_ngs_ack_bad:
+        ld      a,'x'
+        call    p130_ngs_trace
+        ld      a,(p130_ngs_ack_value)
+        call    p130_ngs_trace_hex
+        jp      p130_ngs_fail
         xor     a
         jp      p130_ngs_finish
 
@@ -319,6 +333,26 @@ p130_ngs_trace:
         call    0A003h
         pop     bc
         ret
+
+; A=byte, emit two hexadecimal digits on the existing debug channel.
+p130_ngs_trace_hex:
+        push    af
+        rrca
+        rrca
+        rrca
+        rrca
+        call    p130_ngs_trace_nibble
+        pop     af
+        and     0Fh
+        jp      p130_ngs_trace_nibble
+p130_ngs_trace_nibble:
+        and     0Fh
+        add     a,'0'
+        cp      '9'+1
+        jr      c,p130_ngs_trace_hex_out
+        add     a,7
+p130_ngs_trace_hex_out:
+        jp      p130_ngs_trace
 
 ; Long bounded CBIT wait for the GS105a cold-reset command.
 p130_ngs_send_command_long:
@@ -427,4 +461,5 @@ p130_ngs_old_ext: db 0
 p130_ngs_old_status: db 0
 p130_ngs_sector: db 0
 p130_ngs_track: db 0
+p130_ngs_ack_value: db 0
 p130_ngs_scan_left: db 0
