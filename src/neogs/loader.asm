@@ -1,5 +1,6 @@
 ; Complete Project126 ATM-side NeoGS loader ported to Project130.
 SECTION CODE
+EXTERN p130_trdos_rom_call
 PUBLIC _p130_neogs_startup
 PUBLIC _p130_neogs_send_video_mode
 PUBLIC _p130_neogs_stage
@@ -799,7 +800,7 @@ p130_neogs_overlay_read_sector__overlay_sector_available:
         ld      a,'r'
         call    p130_neogs_trace_char
         pop     af
-        call 03D13h
+        call p130_trdos_rom_call
         push    af
         ld      a,'R'
         call    p130_neogs_trace_char
@@ -867,7 +868,7 @@ p130_neogs_open_file:
         ld      c,10
         ; Keep the TR-DOS ROM-call boundary byte-for-byte equivalent to
         ; Project126. Do not insert debug-port I/O inside the ROM ABI call.
-        call 03D13h
+        call p130_trdos_rom_call
         ld      a,c
         cp      0FFh
         jp      z,p130_neogs_open_file__p130_neogs_file_not_found
@@ -879,7 +880,7 @@ p130_neogs_open_file:
         ld      (05D10h),a
         pop     af
         ld      c,8
-        call 03D13h
+        call p130_trdos_rom_call
         ld      a,(05D0Fh)
         ld      b,a
         ld      a,(05D10h)
@@ -960,7 +961,7 @@ p130_neogs_read_next_sector__p130_neogs_sector_available:
         xor     a
         ld      (05D0Fh),a
         ld      (05D10h),a
-        call 03D13h
+        call p130_trdos_rom_call
         ld      a,(05D0Fh)
         ld      b,a
         ld      a,(05D10h)
