@@ -994,7 +994,7 @@ p126_ipc_dma_receive_video_frame::
         call    p126_ipc_port_hex_byte
         call    p126_ipc_port_crlf
         pop     af
-        jr      c,.video_apply_failed
+        jp      c,.video_apply_failed
         ld      hl,p126_ipc_dbg_apply_ok
         call    p126_ipc_port_string
         ld      hl,p126_ipc_video_frame_applied
