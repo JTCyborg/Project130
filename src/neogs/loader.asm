@@ -264,6 +264,10 @@ p130_ngs_stream_done:
         ld      a,P130_CMD_JUMP
         call    p130_ngs_send_command
         jp      c,p130_ngs_fail
+        ld      a,9
+        ld      (_p130_neogs_stage),a
+        ld      a,'9'
+        call    p130_ngs_trace
         ld      a,040h
         call    p130_ngs_send_byte
         jr      nc,p130_ngs_jump_tx_done
@@ -280,14 +284,8 @@ p130_ngs_jump_tx_done:
         jp      c,p130_ngs_fail
 p130_ngs_ack_check:
         ld      (p130_ngs_ack_value),a
-        ld      a,9
-        ld      (_p130_neogs_stage),a
-        ld      a,'9'
-        call    p130_ngs_trace
         ; One A1 acknowledgement, matching Project126. It is emitted only
         ; after DMA stop, NOROM/EXPAG and temporary memory-window setup.
-        ; The #13 transfer path above already read A1 in its DBIT edge case.
-        ; Otherwise receive it here, with Project126's turnaround delay.
         cp      P130_ACK_READY
         jr      nz,p130_ngs_ack_bad
         ld      a,'a'
