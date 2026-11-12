@@ -15,6 +15,22 @@ The stock NeoGS GS105a ROM is retained only as a temporary bootstrap launcher.
 
 The GS105a `#14/#13` exchange is the only legacy byte-channel exception. It transfers the bootstrap image itself and nothing else. In particular, the Project126 pattern of sending a resident core over GSDAT after the ROM has been disabled is **not** adopted.
 
+## 1.1 Bootstrap diagnostics
+
+The ATM launcher emits progress characters `1` through `9` on the existing debug channel `#EF` and console output. The corresponding stage codes are:
+
+1. TR-DOS lookup of `NEOBOOT.C`.
+2. TR-DOS file metadata lookup.
+3. Bootstrap length validation (1..256 bytes).
+4. Read the bootstrap sector into ATM scratch at `#C000`.
+5. GS105a reset command `#F4`.
+6. GS105a receive command `#14` and its header.
+7. Transfer the bootstrap bytes through GSDAT.
+8. Jump command `#13` and its target address.
+9. Wait for and read the bootstrap `A1` acknowledgement.
+
+On a returned failure, the host also prints the last stage code as two hexadecimal digits. If execution stops without returning, the last progress character narrows the blocked operation. These markers are diagnostics only; they do not claim that the bootstrap or DMA transport has passed runtime validation.
+
 ## 2. Ownership and port boundary
 
 - ATM Turbo 2+ remains the owner of physical devices, ATM physical memory mapping and host-side DMA orchestration.
