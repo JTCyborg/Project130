@@ -1,4 +1,5 @@
 ; PROJECT126 / X86_CPU_STATE v0.2.0
+; Set X86_BIOS_DIAGNOSTICS to 0 to suppress periodic 8086 progress output.
 ; PCem references: PCem/808x.c resetx86(), PCem/cpu.h CPU_8086.
 ; Intel 8086 Real Mode architectural state and 20-bit physical address helper.
 ; Guest physical decode and banked NeoGS guest-RAM access are implemented here.
@@ -21,6 +22,7 @@
 ;   x86_cpu_state_selftest Carry clear=pass, set=fail. Destructive reset test.
 
 X86_FLAGS_RESET EQU #0002
+X86_BIOS_DIAGNOSTICS EQU 1
 
 x86_cpu_reset:
         ld      hl,0
@@ -204,6 +206,8 @@ x86_bios_startup_trace:
         ld      (x86_bios_trace_eebf_once),a
         ld      (x86_bios_trace_checksum_entry_once),a
         ld      (x86_bios_trace_low_ip_once),a
+        xor     a
+        ld      (x86_bios_trace_first_slice_once),a
         ld      a,1
         ld      (x86_bios_trace_active),a
 .run_slice:
@@ -348,6 +352,9 @@ x86_bios_startup_trace:
         ld      a,h
         and     #0F
         jr      nz,.trace_no_progress
+        ld      a,X86_BIOS_DIAGNOSTICS
+        or      a
+        jr      z,.trace_no_progress
         call    x86_bios_trace_log_cs_ip
         call    x86_bios_trace_log_progress
 .trace_no_progress:
@@ -381,6 +388,9 @@ x86_bios_startup_trace:
         dec     a
         ld      (x86_bios_trace_slice_remaining),a
         jp      nz,.trace_loop
+        ld      a,X86_BIOS_DIAGNOSTICS
+        or      a
+        call    nz,x86_bios_trace_log_first_slice
         or      a
         ret
 .trace_watchdog:
@@ -884,6 +894,41 @@ x86_bios_trace_event_status: db 0
 x86_bios_trace_event_cs:     dw 0
 x86_bios_trace_event_ip:     dw 0
 
+; One compact snapshot after the first completed 64-instruction BIOS slice.
+; This proves that the virtual 8086 advanced beyond the reset-vector probe.
+x86_bios_trace_log_first_slice:
+        push    af
+        push    bc
+        push    de
+        push    hl
+        ld      a,(x86_bios_trace_first_slice_once)
+        or      a
+        jr      nz,.first_slice_done
+        inc     a
+        ld      (x86_bios_trace_first_slice_once),a
+        ld      hl,x86_bios_trace_first_slice_prefix
+        call    p126_ngs_resident_log
+        ld      hl,(x86_reg_cs)
+        call    x86_bios_trace_emit_hex16
+        ld      a,':'
+        call    x86_bios_trace_emit_char
+        ld      hl,(x86_reg_ip)
+        call    x86_bios_trace_emit_hex16
+        ld      hl,x86_bios_trace_first_slice_opcode
+        call    p126_ngs_resident_log
+        ld      a,(x86_exec_opcode)
+        call    x86_bios_trace_emit_hex8
+        ld      a,13
+        call    x86_bios_trace_emit_char
+        ld      a,10
+        call    x86_bios_trace_emit_char
+.first_slice_done:
+        pop     hl
+        pop     de
+        pop     bc
+        pop     af
+        ret
+
 ; Emit the post-instruction CS:IP on the independent NeoGS #EF channel.
 x86_bios_trace_log_cs_ip:
         push    af
@@ -1132,6 +1177,7 @@ x86_bios_trace_far_target_prefix:
 x86_bios_trace_far_target_none:
         db "NONE",0
 x86_bios_trace_slice_remaining: db 0
+x86_bios_trace_first_slice_once: db 0
 x86_bios_trace_stop_kind: db 0
 x86_bios_trace_start_log: db "[P130 NGS] X86 BIOS CONTINUOUS EXECUTION START",13,10,0
 x86_bios_trace_cs_ip_prefix: db "[P130 X86] CS:IP=",0
@@ -1141,6 +1187,8 @@ x86_bios_trace_progress_di: db " DI=",0
 x86_bios_trace_progress_es: db " ES=",0
 x86_bios_trace_progress_flags: db " FLAGS=",0
 x86_bios_trace_progress_opcode: db " OP=",0
+x86_bios_trace_first_slice_prefix: db "[X86 CPU] FIRST 64-INSTRUCTION SLICE CS:IP=",0
+x86_bios_trace_first_slice_opcode: db " OP=",0
 x86_bios_trace_eebf_log: db "[X86 TRACE] FIRST F000:EEBF SNAPSHOT",13,10,0
 x86_bios_trace_checksum_entry_log: db "[X86 TRACE] CHECKSUM ROUTINE ENTRY F000:F9E1",13,10,0
 x86_bios_trace_low_ip_log: db "[X86 TRACE] FIRST EXECUTION BELOW BIOS WINDOW",13,10,0
