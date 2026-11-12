@@ -216,16 +216,19 @@ x86_bios_startup_trace:
         ld      a,1
         ld      (x86_bios_trace_active),a
 .run_slice:
-        ; 256 instructions per pass; service IPC between bounded slices.
-        ; The 8-bit counter wraps from 00h to FFh on DEC, giving exactly
-        ; 256 iterations. REP string instructions still yield once per
-        ; element so interrupt boundaries remain observable.
-        xor     a
-        ld      (x86_bios_trace_slice_remaining),a
+        ; 1024 instructions per pass; amortize IPC/DMA handoff overhead
+        ; while keeping the resident dispatcher responsive.
+        ld      hl,1024
+        ld      (x86_bios_trace_slice_remaining),hl
 .trace_loop:
         call    x86_cpu_step
         jp      c,.trace_fault
-        call    x86_bios_trace_capture_instruction
+        ; The 16-entry history is diagnostic only. Sample every 16th guest
+        ; instruction instead of writing a 13-byte record on every step.
+        ld      hl,(x86_bios_trace_executed)
+        ld      a,l
+        and     #0F
+        call    z,x86_bios_trace_capture_instruction
         ; Watch the BIOS checksum routine entry and the first transfer below
         ; the configured 8 KiB system-BIOS window.
         ld      a,(x86_bios_trace_checksum_entry_once)
@@ -395,9 +398,11 @@ x86_bios_startup_trace:
         or      l
         jr      z,.trace_watchdog
 .watchdog_continue:
-        ld      a,(x86_bios_trace_slice_remaining)
-        dec     a
-        ld      (x86_bios_trace_slice_remaining),a
+        ld      hl,(x86_bios_trace_slice_remaining)
+        dec     hl
+        ld      (x86_bios_trace_slice_remaining),hl
+        ld      a,h
+        or      l
         jp      nz,.trace_loop
         ld      a,X86_BIOS_DIAGNOSTICS
         or      a
@@ -1271,7 +1276,7 @@ x86_bios_trace_far_target_prefix:
         db "[X86 TRACE] LAST EA TARGET=",0
 x86_bios_trace_far_target_none:
         db "NONE",0
-x86_bios_trace_slice_remaining: db 0
+x86_bios_trace_slice_remaining: dw 0
 x86_bios_trace_first_slice_once: db 0
 x86_bios_trace_stop_kind: db 0
 x86_bios_trace_start_log: db "[P130 NGS] X86 BIOS CONTINUOUS EXECUTION START",13,10,0
