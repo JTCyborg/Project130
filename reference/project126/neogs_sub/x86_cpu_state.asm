@@ -366,9 +366,8 @@ x86_bios_startup_trace:
         ld      a,h
         and     #0F
         jr      nz,.trace_no_progress
-        ld      a,X86_BIOS_DIAGNOSTICS
-        or      a
-        jr      z,.trace_no_progress
+        ; Keep a live heartbeat even when verbose diagnostics are disabled.
+        ; This proves whether the guest is progressing through BIOS POST.
         call    x86_bios_trace_log_cs_ip
         call    x86_bios_trace_log_progress
 .trace_no_progress:
