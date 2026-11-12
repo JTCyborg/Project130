@@ -8,6 +8,8 @@
 
 #define P130_BUILD_ID "P130-0.7.0-P126-FULL-LOADER"
 
+volatile uint8_t p130_neogs_entry_status = 1u;
+
 static void p130_report_memory(void)
 {
     uint8_t result;
@@ -32,6 +34,7 @@ static void p130_report_memory(void)
 
 extern volatile uint8_t p130_trdos_result;
 extern uint16_t p130_trdos_preload(void);
+extern volatile uint8_t p130_neogs_entry_status;
 extern uint8_t p130_neogs_startup(void);
 extern volatile uint8_t p130_neogs_stage;
 extern uint8_t p130_neogs_send_video_mode(void);
@@ -170,6 +173,7 @@ static void p130_rtc_start(void)
 void p130_c_entry(void)
 {
     uint8_t neogs_ready = 0u;
+    neogs_ready = (p130_neogs_entry_status == 0u) ? 1u : 0u;
     p130_debug_puts("\r\n[P130] C IMAGE EXECUTED\r\n");
     p130_debug_puts("[P130] Z88DK C ENTRY\r\n");
     p130_debug_puts("[P130] BUILD: " P130_BUILD_ID "\r\n");
@@ -177,23 +181,14 @@ void p130_c_entry(void)
     p130_debug_puts("[P130] DEBUG PORT EF READY\r\n");
     p130_debug_puts("[P130] ATM HOST BOOTSTRAP READY\r\n");
 
-    /*
-     * Match the proven Project126 host order exactly:
-     *   1) start GS105a and load NEOBOOT, X86CORE and all six overlays;
-     *   2) read the TR-DOS directory only after all loader file operations;
-     *   3) initialize ATM video, RTC, then the visible console.
-     * The NeoGS loader uses direct TR-DOS ROM calls and does not require the
-     * catalogue mirror. Preloading it first changes the known-good startup
-     * environment and is deliberately not allowed here.
-     */
-    p130_debug_puts("[NEOGS] GS105a BOOTSTRAP LAUNCH BEGIN\r\n");
-    if (p130_neogs_startup() == 0u) {
-        neogs_ready = 1u;
-        p130_debug_puts("[NEOGS] P126 RESIDENT + SIX OVERLAYS INSTALLED\r\n");
+    /* NeoGS bootstrap has already run from src/entry.asm, before C entry,
+     * matching Project126's native Z80 call context for TR-DOS ROM calls. */
+    if (neogs_ready != 0u) {
+        p130_debug_puts("[NEOGS] P126 RESIDENT + SIX OVERLAYS INSTALLED\\r\\n");
     } else {
-        p130_debug_puts("\r\n[NEOGS] BOOTSTRAP LAUNCH FAILED; STAGE=");
+        p130_debug_puts("\\r\\n[NEOGS] BOOTSTRAP LAUNCH FAILED; STAGE=");
         p130_debug_putc(p130_neogs_stage);
-        p130_debug_puts("\r\n");
+        p130_debug_puts("\\r\\n");
     }
 
     p130_debug_puts("[TR-DOS] CATALOGUE PRELOAD BEGIN\r\n");

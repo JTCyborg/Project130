@@ -4,6 +4,8 @@
 SECTION CODE
 PUBLIC _p130_entry
 EXTERN _p130_c_entry
+EXTERN _p130_neogs_startup
+EXTERN _p130_neogs_entry_status
 
 _p130_entry:
         ld      a,'>'
@@ -34,8 +36,16 @@ _p130_entry:
         ld      bc,0EFF7h
         out     (c),a
 
-        ; Project126 order: enter the resident application first. It starts
-        ; NeoGS before the full TR-DOS catalogue and ATM video/UI initialization.
+        ; Run the NeoGS loader directly from the assembly entry, before C.
+        ; Project126 invokes the same loader from its native Z80 host context;
+        ; do not add a Z88DK C frame to the TR-DOS ROM-call path.
+        ld      hl,p130_entry_ngs_begin
+        call    p130_entry_debug_string
+        call    _p130_neogs_startup
+        ld      a,l
+        ld      (_p130_neogs_entry_status),a
+
+        ; C entry follows only after the complete NeoGS attempt has returned.
         call    _p130_c_entry
 
 ; C entry is expected to remain resident forever.
@@ -44,3 +54,22 @@ _p130_entry:
         out     (c),a
 p130_idle:
         jr      p130_idle
+
+; Port-#EF string output, used before the C runtime is entered.
+p130_entry_debug_string:
+        push    af
+        push    bc
+        ld      bc,00EFh
+.p130_entry_debug_loop:
+        ld      a,(hl)
+        inc     hl
+        or      a
+        jr      z,.p130_entry_debug_done
+        out     (c),a
+        jr      .p130_entry_debug_loop
+.p130_entry_debug_done:
+        pop     bc
+        pop     af
+        ret
+
+p130_entry_ngs_begin: db "[NEOGS] GS105a BOOTSTRAP LAUNCH BEGIN",13,10,0
