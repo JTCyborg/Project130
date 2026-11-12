@@ -6,7 +6,7 @@
 #define P130_CATALOGUE_ADDR 0xC800u
 #define P130_CATALOGUE_SIZE 2048u
 
-#define P130_BUILD_ID "P130-0.5.8-P126-BOOTSTRAP-PREFLIGHT"
+#define P130_BUILD_ID "P130-0.5.9-P126-STARTUP-ORDER"
 
 static void p130_report_memory(void)
 {
@@ -31,6 +31,7 @@ static void p130_report_memory(void)
 
 
 extern volatile uint8_t p130_trdos_result;
+extern uint16_t p130_trdos_preload(void);
 extern uint8_t p130_neogs_startup(void);
 extern volatile uint8_t p130_neogs_stage;
 extern void p130_catalog_init(void);
@@ -176,23 +177,35 @@ void p130_c_entry(void)
     p130_debug_puts("[P130] ATM HOST BOOTSTRAP READY\r\n");
 
     /*
-     * Keep the Project127 startup order:
-     *   entry.asm: DI, stack, ATM paging, TR-DOS catalogue preload
-     *   here:      UI/W3, RTC, memory manager, TR-DOS report, HDD
-     * NeoGS is started only after the host-side storage stages.
+     * Project126 startup order:
+     *   entry.asm: DI, stack and initial ATM/TR-DOS paging only
+     *   here:      GS105a bootstrap first; then TR-DOS catalogue;
+     *              ATM video/UI; RTC; remaining Project130 host services.
+     * The physical Project130 DMA/IPC map remains a separate gated stage.
      */
-    p130_rtc_start();
-    p130_report_memory();
-    p130_storage_start();
     p130_debug_puts("[NEOGS] GS105a BOOTSTRAP LAUNCH BEGIN; TRACE=");
     if (p130_neogs_startup() == 0u) {
-        p130_debug_puts("[NEOGS] NEOBOOT STARTED; GS105a ROM DISABLED\r\n");
-        p130_debug_puts("[NEOGS] DMA/IPC PAYLOAD PATH HELD; MEMORY MAP NOT APPROVED\r\n");
+        p130_debug_puts("[NEOGS] STAGE0 A1 ACK RECEIVED; BOOTSTRAP IDLE\r\n");
+        p130_debug_puts("[NEOGS] DMA/IPC NOT STARTED; MEMORY MAP NOT APPROVED\r\n");
     } else {
         p130_debug_puts("\r\n[NEOGS] BOOTSTRAP LAUNCH FAILED; STAGE=");
         p130_debug_hex8(p130_neogs_stage);
         p130_debug_puts("\r\n");
     }
+
+    /* Project126 loads NeoGS files before reading the full TR-DOS catalogue. */
+    p130_debug_puts("[TR-DOS] CATALOGUE PRELOAD BEGIN\r\n");
+    (void)p130_trdos_preload();
+
+    /* Project126 initializes ATM video after NeoGS and catalogue startup. */
+    __asm
+        call 0A000h
+    __endasm;
+
+    /* RTC uses the shadow-port/video configuration established by the UI. */
+    p130_rtc_start();
+    p130_report_memory();
+    p130_storage_start();
     p130_catalog_init();
     p130_debug_puts("[MAP] PHYSICAL W3 MAPPER NOT INITIALIZED\r\n");
     p130_debug_puts("[NEOGS] DMA/IPC NOT INITIALIZED; PHYSICAL MAP PENDING\r\n");

@@ -1,8 +1,8 @@
 ; Project130 ATM-side GS105a bootstrap launcher.
-; Legacy GSDAT is restricted to transferring NEOBOOT.C (<=256 bytes).
-; After #13, the Project126-compatible A1 bootstrap-ready acknowledgement
-; is accepted. Project130 then switches to its own DMA/IPC initialization;
-; no resident core or application payload is sent over GSDAT.
+; The host launch order and GS105a #F4/#14/#13 handshake follow Project126.
+; Only NEOBOOT.C is sent through the legacy byte channel. The X86CORE.C
+; open/first-sector read is retained as the P126 pre-JUMP disk transaction.
+; After A1, Project130 must continue with its separately approved DMA/IPC path.
 
 SECTION CODE
 PUBLIC _p130_neogs_startup
@@ -14,9 +14,6 @@ P130_CMD_JUMP    EQU 013h
 P130_CMD_RECV    EQU 014h
 P130_CMD_RESET   EQU 0F4h
 P130_ACK_READY   EQU 0A1h
-P130_GFX_MODE    EQU 0C3h
-P130_HOST_PAGE5  EQU 07Ah
-P130_HOST_PAGE0  EQU 07Fh
 
 _p130_neogs_startup:
         ; TR-DOS ROM calls require the Project127 ATM bank/port transition.
@@ -251,7 +248,7 @@ p130_ngs_open_file:
         ld      a,9
         ld      (05D06h),a
         ld      c,10
-        call    p130_ngs_trdos_call
+        call    03D13h
         ld      a,c
         cp      0FFh
         jr      z,p130_ngs_trdos_open_error
@@ -261,7 +258,7 @@ p130_ngs_open_file:
         ld      (05D10h),a
         ld      a,(p130_ngs_trdos_a)
         ld      c,8
-        call    p130_ngs_trdos_call
+        call    03D13h
         ld      a,(05D0Fh)
         ld      b,a
         ld      a,(05D10h)
@@ -313,82 +310,13 @@ p130_ngs_read_first_sector:
         xor     a
         ld      (05D0Fh),a
         ld      (05D10h),a
-        call    p130_ngs_trdos_call
+        call    03D13h
         ld      a,(05D0Fh)
         ld      b,a
         ld      a,(05D10h)
         or      b
         jr      nz,p130_ngs_trdos_open_error
         xor     a
-        ret
-
-; Invoke TR-DOS #3D13 with the Project127 shadow-page transition.
-; Preserve the ROM result registers across video/page restoration.
-p130_ngs_trdos_call:
-        ld      (p130_ngs_trdos_in_a),a
-        ld      (p130_ngs_trdos_in_bc),bc
-        ld      (p130_ngs_trdos_in_de),de
-        ld      (p130_ngs_trdos_in_hl),hl
-        push    af
-        push    bc
-        push    de
-        push    hl
-        ld      a,083h
-        ld      bc,0FFF7h
-        out     (c),a
-        ld      a,P130_GFX_MODE
-        ld      bc,0FF77h
-        out     (c),a
-        ; Restore the exact TR-DOS call inputs after the paging writes.
-        ld      a,(p130_ngs_trdos_in_a)
-        ld      bc,(p130_ngs_trdos_in_bc)
-        ld      de,(p130_ngs_trdos_in_de)
-        ld      hl,(p130_ngs_trdos_in_hl)
-        ld      hl,p130_ngs_trdos_return
-        push    hl
-        ld      (23613),sp
-        ; Restore the requested entry registers once the return trampoline
-        ; has been installed; use the saved copies because HL held its PC.
-        ld      a,(p130_ngs_trdos_in_a)
-        ld      bc,(p130_ngs_trdos_in_bc)
-        ld      de,(p130_ngs_trdos_in_de)
-        ld      hl,(p130_ngs_trdos_in_hl)
-        xor     a
-        ld      (23801),a
-        ld      (23823),a
-        ld      (23824),a
-        ld      a,(p130_ngs_trdos_in_a)
-        jp      03D13h
-p130_ngs_trdos_return:
-        ld      (p130_ngs_trdos_a),a
-        ld      (p130_ngs_trdos_bc),bc
-        ld      (p130_ngs_trdos_de),de
-        ld      (p130_ngs_trdos_hl),hl
-        di
-        ld      bc,p130_ngs_trdos_video_restored
-        push    bc
-        ld      bc,02A53h
-        push    bc
-        ld      bc,00177h
-        ld      a,P130_GFX_MODE
-        jp      03D2Fh
-p130_ngs_trdos_video_restored:
-        ld      a,P130_HOST_PAGE5
-        ld      bc,07FF7h
-        out     (c),a
-        ld      a,P130_HOST_PAGE0
-        ld      bc,0FFF7h
-        out     (c),a
-        ei
-        ; Drop the saved caller inputs, then restore the TR-DOS outputs.
-        pop     hl
-        pop     de
-        pop     bc
-        pop     af
-        ld      hl,(p130_ngs_trdos_hl)
-        ld      de,(p130_ngs_trdos_de)
-        ld      bc,(p130_ngs_trdos_bc)
-        ld      a,(p130_ngs_trdos_a)
         ret
 
 ; Emit a one-character progress marker on the existing #EF debug channel.
@@ -562,12 +490,3 @@ p130_ngs_file_sectors_left: db 0
 p130_ngs_file_sector: db 0
 p130_ngs_file_track: db 0
 
-; TR-DOS #3D13 wrapper: saved entry registers and returned registers.
-p130_ngs_trdos_in_a: db 0
-p130_ngs_trdos_in_bc: dw 0
-p130_ngs_trdos_in_de: dw 0
-p130_ngs_trdos_in_hl: dw 0
-p130_ngs_trdos_a: db 0
-p130_ngs_trdos_bc: dw 0
-p130_ngs_trdos_de: dw 0
-p130_ngs_trdos_hl: dw 0

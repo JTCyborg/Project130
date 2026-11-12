@@ -8,9 +8,9 @@ The stock NeoGS GS105a ROM is retained only as a temporary bootstrap launcher.
 
 1. ATM host locates and validates the small Project130 bootstrap image.
 2. ATM host uses the stock GS105a receive command `#14` to place that image at the ROM-defined receive address (`#4000`). The byte count is encoded as a 16-bit two's-complement negative length, matching Project126; the low byte is preloaded before command dispatch and the high byte follows `#14`.
-3. ATM host immediately uses command `#13` to transfer control to the bootstrap at `#4000`. Project126's intervening `X86CORE` open/read is omitted: that operation prepares the resident payload which Project126 streams after `A1`; Project130 has no such legacy payload, so repeating the file I/O would be unrelated to the GS105a protocol.
+3. After the bootstrap bytes are transferred, ATM opens `X86CORE.C`, reads its first sector and validates the 1..16 KiB length, matching Project126's pre-`#13` TR-DOS transaction. Project130 does not send those bytes through GSDAT. The host then uses command `#13` to transfer control to `#4000`.
 4. The bootstrap follows the Project126 stage-0 order: `DI`, temporary `SP=#3FFF`, emit `[NGS] BOOTSTRAP ENTER`, disable ZX DMA (`#1B/#1F`), settle delay, set `GSCFG0` NOROM+EXPAG with RAMRO clear, emit `[NGS] NOROM ENABLED`, establish the temporary WIN0/WIN3 mapping (`#20/#00/#10`), then move the stack to `#FFFE`.
-5. The bootstrap publishes exactly one `A1` ready acknowledgement using the ZX DBIT producer handshake and idles. There is no `E0` pre-ack. Project130 does not receive a resident core over GSDAT; after `A1`, the host proceeds to the separately gated DMA/IPC initialization.
+5. The bootstrap publishes exactly one `A1` ready acknowledgement using the ZX DBIT producer handshake and idles. There is no `E0` pre-ack. In the current implementation `A1` proves only that stage-0 reached its ready point; it does not prove resident firmware, DMA or IPC is running. Project130 must not report full NeoGS startup success at this boundary.
 6. After the handoff, the stock ROM byte-stream protocol is closed. No resident firmware, module, command, response, event, diagnostic or video payload may be transferred through GSDAT.
 
 The GS105a `#14/#13` exchange is the only legacy byte-channel exception in Project130. It transfers the bootstrap image itself and nothing else. Project126's subsequent resident-core transfer over GSDAT is intentionally not part of Project130's agreed transport boundary.
@@ -73,7 +73,7 @@ Before enabling payload traffic, the Project130 ABI must define:
 
 The control plane may use the documented NeoGS command/status handshake. Application payload bytes must use DMA only.
 
-Project130's pre-A1 host sequence intentionally stops at the small NEOBOOT transfer, then issues #13 and validates A1. It does not perform Project126's pre-A1 X86CORE open/first-sector read: Project130 does not yet package a resident core, and core discovery/loading belongs after the DMA/IPC transport is operational. Do not add a placeholder X86CORE.C or substitute a BIOS image for it.
+Project130 reproduces Project126's pre-`#13` `X86CORE.C` open/first-sector read and length validation, but does not transfer the core bytes through GSDAT. This preserves the host-side launch transaction only. The stage-0 implementation currently stops after `A1`; unlike Project126, it does not exchange the core length (`A3`), receive a resident image, return `A2`, validate `X86MODS.M`, or install the six overlays. These are explicit incomplete stages, not successful startup.
 
 ## 5. Memory-map boundary
 
