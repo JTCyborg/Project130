@@ -211,8 +211,12 @@ x86_bios_startup_trace:
         ld      a,1
         ld      (x86_bios_trace_active),a
 .run_slice:
-        ; 64 instructions per pass; service IPC between slices.
-        ld      a,64
+        ; 256 instructions per pass; service IPC between bounded slices.
+        ; BIOS2 begins with REP STOSW clearing 2000h words. The string
+        ; engine yields after each iteration so IRQ/NMI boundaries remain
+        ; observable; a 256-step slice reduces IPC round-trips without
+        ; changing the architectural REP behavior.
+        ld      a,256
         ld      (x86_bios_trace_slice_remaining),a
 .trace_loop:
         call    x86_cpu_step
