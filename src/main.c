@@ -6,7 +6,7 @@
 #define P130_CATALOGUE_ADDR 0xC800u
 #define P130_CATALOGUE_SIZE 2048u
 
-#define P130_BUILD_ID "BOOTSTRAP-0.4.9-P126-JUMP-DIAG"
+#define P130_BUILD_ID "BOOTSTRAP-0.5.0-P126-FULL-HANDOFF"
 
 static void p130_report_memory(void)
 {
