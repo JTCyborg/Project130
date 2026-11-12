@@ -473,84 +473,6 @@ p126_ngs_ipc_dma_send_video_frame:
         jr      nz,.video_frame_pad
         jp      p126_ngs_ipc_dma_send_staged_frame
 
-
-; Project125-compatible reverse-DMA text transfer.
-; Page42:C000 contains exactly 2000 chars + 2000 VGA attributes.
-; Host performs one dummy aperture read, then receives exactly 4000 bytes.
-p126_ngs_ipc_dma_send_video_raw:
-        ld      a,P126_NGS_DMA_PROD_PAGE
-        rrca
-        out     (P126_NGS_MPAGEX_PORT),a
-        ld      a,1
-        out     (P126_NGS_DMA_MOD),a
-        ld      a,#10
-        out     (P126_NGS_DMA_HAD),a
-        ld      a,#80
-        out     (P126_NGS_DMA_MAD),a
-        xor     a
-        out     (P126_NGS_DMA_LAD),a
-        ld      a,#80
-        out     (P126_NGS_DMA_CST),a
-        xor     a
-        out     (P126_NGS_CLRCBIT),a
-        ld      d,P126_NGS_DMA_WAIT_OUTER
-.video_raw_wait_outer:
-        ld      bc,P126_NGS_DMA_WAIT_LIMIT
-.video_raw_wait:
-        in      a,(P126_NGS_ZXSTAT)
-        bit     0,a
-        jr      nz,.video_raw_done
-        dec     bc
-        ld      a,b
-        or      c
-        jr      nz,.video_raw_wait
-        dec     d
-        jr      nz,.video_raw_wait_outer
-        xor     a
-        out     (P126_NGS_DMA_CST),a
-        out     (P126_NGS_CLRCBIT),a
-        ld      a,P126_STATUS_TIMEOUT
-        scf
-        ret
-.video_raw_done:
-        xor     a
-        out     (P126_NGS_DMA_CST),a
-        out     (P126_NGS_CLRCBIT),a
-        or      a
-        ret
-
-; A failed converter still completes the same fixed-size DMA transaction.
-; Fill a readable blank text page rather than switching to a framed transport.
-p126_ngs_ipc_video_fill_error_frame:
-        ld      a,P126_NGS_DMA_PROD_PAGE
-        rrca
-        out     (P126_NGS_MPAGEX_PORT),a
-        ld      hl,#C000
-        ld      bc,P126_VIDEO_TEXT80_CELLS
-        ld      a,32
-        ld      (p126_ngs_video_fill_value),a
-.video_error_chars:
-        ld      a,(p126_ngs_video_fill_value)
-        ld      (hl),a
-        inc     hl
-        dec     bc
-        ld      a,b
-        or      c
-        jr      nz,.video_error_chars
-        ld      a,7
-        ld      (p126_ngs_video_fill_value),a
-        ld      bc,P126_VIDEO_TEXT80_CELLS
-.video_error_attrs:
-        ld      a,(p126_ngs_video_fill_value)
-        ld      (hl),a
-        inc     hl
-        dec     bc
-        ld      a,b
-        or      c
-        jr      nz,.video_error_attrs
-        ret
-p126_ngs_video_fill_value: db 0
-
 ; Shared CRC and reverse-DMA transport for the diagnostics and VIDEO frames.
 p126_ngs_ipc_dma_send_staged_frame:
         ; CRC covers header[0..15] followed by all 16366 payload bytes.
@@ -807,10 +729,9 @@ p126_ngs_ipc_dispatch_once::
         ; Preserve the converter's F1/F2/F3 reason in the error payload.
 .video_dispatch_error:
         ld      (p126_ngs_video_error_code),a
-        call    p126_ngs_ipc_video_fill_error_frame
-        jp      p126_ngs_ipc_dma_send_video_raw
+        jp      p126_ngs_ipc_dma_send_video_error_frame
 .video_dispatch_success:
-        jp      p126_ngs_ipc_dma_send_video_raw
+        jp      p126_ngs_ipc_dma_send_video_frame
 
 .p126_ngs_dispatch_ngs_frame:
         ; Complete the requested response frame before advancing the guest CPU.

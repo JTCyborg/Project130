@@ -268,13 +268,6 @@ x86_vga_read_text_cell_gate_impl:
         ld      a,b
         jp      x86_vga_read_text_cell_impl
 
-; Project125-style raw text-plane capture.
-; IN: HL=cell index 0..1999. OUT: A=plane 0 character, D=plane 1 attribute.
-; Bypasses CRTC/GDC aperture and odd/even mode checks. The B8000h text
-; aperture's backing planar offset starts at zero.
-x86_vga_read_text_cell_raw_gate_impl:
-        jp      x86_vga_read_text_cell_raw_impl
-
 ; IN HL=guest I/O port, A=value. OUT carry clear if handled.
 x86_vga_io_write8_impl:
         ld      (x86_vga_write_value),a
@@ -1462,29 +1455,6 @@ x86_vga_read_text_cell_impl:
         ld      de,x86_vga_latches
         ld      bc,4
         ldir
-        ld      a,(x86_vga_text_attr)
-        ld      d,a
-        ld      a,(x86_vga_text_char)
-        or      a
-        ret
-
-
-; Directly read the emulated B8000h text backing planes, like Project125.
-; Each guest text cell occupies one four-byte planar group: plane 0 char,
-; plane 1 attribute. No guest VGA register state is modified.
-x86_vga_read_text_cell_raw_impl:
-        add     hl,hl
-        add     hl,hl
-        ld      (x86_vga_vram_offset),hl
-        xor     a
-        ld      (x86_vga_vram_offset+2),a
-        call    x86_vga_vram_read_at_offset
-        ld      (x86_vga_text_char),a
-        ld      hl,(x86_vga_vram_offset)
-        inc     hl
-        ld      (x86_vga_vram_offset),hl
-        call    x86_vga_vram_read_at_offset
-        ld      (x86_vga_text_attr),a
         ld      a,(x86_vga_text_attr)
         ld      d,a
         ld      a,(x86_vga_text_char)

@@ -610,15 +610,15 @@ p126_video_map_vga_attribute:
         pop     bc
         ret
 
-; Apply the raw Project125-compatible 4000-byte reverse-DMA payload:
-; C000..C7CF = characters, C7D0..CF9F = VGA attributes.
+; Apply the compact RG6 frame received from NeoGS:
+; payload[0..1999] = character codes, payload[2000..3999] = attributes.
 p126_screen_apply_text_frame::
         ld      a,(p126_atm_video_mode)
         cp      P126_ATM_VIDEO_MODE_RG6_TEXT80X25
         jp      nz,.apply_text_bad
-        ld      hl,P126_IPC_DMA_RX_BUFFER
+        ld      hl,P126_IPC_DMA_RX_BUFFER+P126_IPC_HEADER_SIZE
         ld      (p126_screen_frame_char_ptr),hl
-        ld      hl,P126_IPC_DMA_RX_BUFFER+P126_VIDEO_TEXT80_CELLS
+        ld      hl,P126_IPC_DMA_RX_BUFFER+P126_IPC_HEADER_SIZE+P126_VIDEO_TEXT80_CELLS
         ld      (p126_screen_frame_attr_ptr),hl
         xor     a
         ld      (p126_screen_frame_row),a
