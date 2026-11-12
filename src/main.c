@@ -6,7 +6,7 @@
 #define P130_CATALOGUE_ADDR 0xC800u
 #define P130_CATALOGUE_SIZE 2048u
 
-#define P130_BUILD_ID "P130-0.6.8-P126-STAGE0-EXACT"
+#define P130_BUILD_ID "P130-0.6.9-P126-RESIDENT-HANDOFF"
 
 static void p130_report_memory(void)
 {
