@@ -21,9 +21,38 @@ P130_B_GSCFG0  EQU #0F
 P130_B_MPAGE   EQU #00
 P130_B_MPAGEEX EQU #10
 P130_B_READY   EQU #A1
+P130_B_ENTRY_ACK EQU #A0
 
 p130_ngs_boot_start:
         di
+        ; Entry probe A0: prove that GS105a #13 actually reached #4000 before
+        ; any stack, paging, DMA or logging code can affect execution. Inline
+        ; DBIT handshake deliberately uses no CALL/PUSH/stack.
+        ld      a,P130_B_ENTRY_ACK
+        ld      bc,#FFFF
+p130_ngs_entry_wait_free:
+        in      a,(P130_B_ZXSTAT)
+        bit     7,a
+        jr      z,p130_ngs_entry_send
+        dec     bc
+        ld      a,b
+        or      c
+        jr      nz,p130_ngs_entry_wait_free
+        jr      p130_ngs_boot_idle
+p130_ngs_entry_send:
+        ld      a,P130_B_ENTRY_ACK
+        out     (P130_B_ZXDATWR),a
+        ld      bc,#FFFF
+p130_ngs_entry_wait_read:
+        in      a,(P130_B_ZXSTAT)
+        bit     7,a
+        jr      z,p130_ngs_entry_done
+        dec     bc
+        ld      a,b
+        or      c
+        jr      nz,p130_ngs_entry_wait_read
+        jr      p130_ngs_boot_idle
+p130_ngs_entry_done:
         ; Exact Project126 entry discipline: valid temporary stack before CALL.
         ld      sp,#3FFF
         ld      hl,p130_boot_msg_enter
