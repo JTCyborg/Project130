@@ -777,6 +777,10 @@ p126_ipc_dma_receive_debug_frame::
         ld      (p126_ipc_debug_opcode),a
         xor     a
         ld      (p126_ipc_debug_opcode+1),a
+        ld      hl,(P126_IPC_DMA_RX_BUFFER+P126_IPC_HEADER_SIZE+6)
+        ld      (p126_ipc_debug_rep_done),hl
+        ld      hl,(P126_IPC_DMA_RX_BUFFER+P126_IPC_HEADER_SIZE+8)
+        ld      (p126_ipc_debug_rep_total),hl
         or      a
         ret
 
@@ -847,6 +851,21 @@ p126_ipc_debug_draw_status::
         ld      c,0
         call    BIOS_DebugConsole_PrintAt
 
+        ; Keep the REP counter visible on the ATM screen, not only on #EF.
+        ld      hl,p126_ipc_debug_rep_label
+        ld      a,22
+        ld      c,0
+        call    BIOS_DebugConsole_PrintAt
+        ld      a,10
+        ld      c,17
+        call    BIOS_DebugConsole_SetCursor
+        ld      hl,(p126_ipc_debug_rep_done)
+        call    BIOS_DebugConsole_PrintHex16
+        ld      a,'/'
+        call    BIOS_DebugConsole_PrintChar
+        ld      hl,(p126_ipc_debug_rep_total)
+        call    BIOS_DebugConsole_PrintHex16
+
         ld      hl,p126_ipc_debug_csip_label
         ld      a,24
         ld      c,0
@@ -878,6 +897,9 @@ p126_ipc_debug_state:  db 7
 p126_ipc_debug_cs:     dw 0
 p126_ipc_debug_ip:     dw 0
 p126_ipc_debug_opcode: dw 0
+p126_ipc_debug_rep_done: dw 0
+p126_ipc_debug_rep_total: dw 0
+p126_ipc_debug_rep_label: db "[BIOS] REP STOSW ",0
 p126_ipc_debug_status_running: db "[NEOGS] 8086 RUNNING - BIOS EXECUTING               ",0
 p126_ipc_debug_status_budget: db "[NEOGS] BIOS SLICE COMPLETE - NEXT POLL             ",0
 p126_ipc_debug_status_halted: db "[NEOGS] BIOS HALTED - SAFE TO EXIT                  ",0
