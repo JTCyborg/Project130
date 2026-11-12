@@ -142,17 +142,26 @@ p130_neogs_startup_impl__p130_neogs_core_size_low:
         ld      (p130_neogs_core_length),hl
 
         ; Enter stage-0 at 4000h; it publishes A1h when ready.
-        ld      a,'7'
+        ; Keep each GS105a handshake independently visible in the runtime
+        ; stage byte. This distinguishes DBIT argument timeout, CBIT command
+        ; timeout, address-byte timeout and missing A1h response.
+        ld      a,'a'                 ; argument byte (00h) / DBIT clear
         ld      (p130_neogs_startup_stage),a
         xor     a
         call    p130_neogs_send_argument
         ret     c
+        ld      a,'b'                 ; command 13h / CBIT clear
+        ld      (p130_neogs_startup_stage),a
         ld      a,P130_NGS_CMD_JUMP
         call    p130_neogs_send_command
         ret     c
+        ld      a,'c'                 ; destination high byte 40h
+        ld      (p130_neogs_startup_stage),a
         ld      a,040h
         call    p130_neogs_send_byte
         jr      nc,p130_neogs_startup_impl__p130_neogs_jump_tx_done
+        ld      a,'d'                 ; distinguish A1h wait after command TX
+        ld      (p130_neogs_startup_stage),a
         in      a,(P130_NGS_GSSTAT)
         bit     P130_NGS_DBIT,a
         jp      z,p130_neogs_transport_error
@@ -162,6 +171,8 @@ p130_neogs_startup_impl__p130_neogs_core_size_low:
         jp      nz,p130_neogs_transport_error
         jr      p130_neogs_startup_impl__p130_neogs_stage0_ready
 p130_neogs_startup_impl__p130_neogs_jump_tx_done:
+        ld      a,'e'                 ; normal TX path: wait for A1h
+        ld      (p130_neogs_startup_stage),a
         call    p130_neogs_receive_byte
         ret     c
         cp      P130_NGS_ACK_READY
