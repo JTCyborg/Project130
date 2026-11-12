@@ -172,7 +172,24 @@ function Get-P130Crc16([byte[]]$Bytes) {
 $Manifest.AddRange([byte[]](0x50,0x31,0x32,0x36,1,6,8))
 foreach ($Profile in $OverlayProfiles) {
     $Path = Join-Path $BuildDir $Profile.File
-    if (-not (Test-Path $Path)) { throw "Required Project126 overlay missing: $Path" }
+
+    # SjASMPlus SAVEBIN output can be rooted relative to the translation unit
+    # depending on the caller's working directory. Normalize the generated
+    # artifact into the canonical build directory before validating/packaging.
+    if (-not (Test-Path $Path)) {
+        $Candidates = @(Get-ChildItem -Path $Root -Filter $Profile.File -File -Recurse -ErrorAction SilentlyContinue |
+            Where-Object {
+                $_.FullName -ne $Path -and
+                $_.FullName -notmatch '[\\/](\.git|\.vs|obj|bin)[\\/]'
+            })
+        if ($Candidates.Count -eq 1) {
+            Copy-Item -Force $Candidates[0].FullName $Path
+            Write-Host ("[P130 BUILD] RECOVERED SAVEBIN OUTPUT {0} FROM {1}" -f $Profile.File,$Candidates[0].FullName)
+        } elseif ($Candidates.Count -gt 1) {
+            throw "Ambiguous SjASMPlus output for $($Profile.File): $($Candidates.FullName -join '; ')"
+        }
+    }
+    if (-not (Test-Path $Path)) { throw "Required Project126 overlay missing after SAVEBIN path normalization: $Path" }
     [byte[]]$Bytes = [System.IO.File]::ReadAllBytes($Path)
     if ($Bytes.Length -lt 1 -or $Bytes.Length -gt $Profile.Max) {
         throw "$($Profile.File) size $($Bytes.Length) exceeds its Project126 page limit."
