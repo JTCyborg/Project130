@@ -218,9 +218,26 @@ void p130_c_entry(void)
     p130_ui_clock_update();
 
     p130_report_memory();
+    {
+        uint8_t map_status = p130_map_init();
+        if (map_status == 0u) {
+            p130_debug_puts("[MAP] W3 READY; PORT=FFF7 ENCODING=7F-PAGE; W0-W2 FIXED\r\n");
+            map_status = p130_map_w3_hw_selftest();
+            if (map_status == 0u) {
+                p130_debug_puts("[MAP] W3 PHYSICAL PAGE SELFTEST PASS; TWO PAGES ISOLATED\r\n");
+            } else {
+                p130_debug_puts("[MAP] W3 PHYSICAL PAGE SELFTEST FAILED; ERROR=");
+                p130_debug_hex8(map_status);
+                p130_debug_puts("\r\n");
+            }
+        } else {
+            p130_debug_puts("[MAP] W3 INIT FAILED; ERROR=");
+            p130_debug_hex8(map_status);
+            p130_debug_puts("\r\n");
+        }
+    }
     p130_storage_start();
     p130_catalog_init();
-    p130_debug_puts("[MAP] PHYSICAL W3 MAPPER NOT INITIALIZED\r\n");
     p130_debug_puts("[NEOGS] P126 IMAGE DMA TRANSPORT INITIALIZED\r\n");
 
     {
