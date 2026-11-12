@@ -221,7 +221,7 @@ x86_cpu_step_fetch_opcode:
         jp      c,x86_exec_subcmp_family
 .not_sub_family_38:
         cp      #0F
-        jp      z,x86_exec_invalid_nop
+        jp      z,x86_exec_pop_cs
         cp      #06
         jp      z,x86_exec_push_segment
         cp      #07
@@ -762,6 +762,15 @@ x86_exec_adc_sbb16:
 ; Resolve the current default data segment with the active segment override.
 ; OUT HL=segment. Prefix codes: ES=1, CS=2, SS=3, DS=4; zero means DS.
 x86_exec_invalid_nop:
+        or      a
+        ret
+
+; 0F POP CS is a documented 8086/8088 instruction (not an 80186+ prefix).
+; It loads CS from SS:SP and advances SP by two, exactly like POP r16.
+x86_exec_pop_cs:
+        call    x86_exec_pop_word
+        ret     c
+        ld      (x86_reg_cs),hl
         or      a
         ret
 
