@@ -3,7 +3,6 @@ SECTION CODE
 PUBLIC _p130_neogs_startup
 PUBLIC _p130_neogs_send_video_mode
 PUBLIC _p130_neogs_stage
-EXTERN p130_trdos_rom_call
 _p130_neogs_startup:
  call p130_neogs_startup_impl
  jr c,p130_c_startup_failed
@@ -784,7 +783,7 @@ p130_neogs_overlay_read_sector__overlay_sector_available:
         xor     a
         ld      (05D0Fh),a
         ld      (05D10h),a
-        call p130_trdos_rom_call
+        call 03D13h
         ld      a,(05D0Fh)
         ld      b,a
         ld      a,(05D10h)
@@ -846,7 +845,7 @@ p130_neogs_open_file:
         ld      a,9
         ld      (05D06h),a
         ld      c,10
-        call p130_trdos_rom_call
+        call 03D13h
         ld      a,c
         cp      0FFh
         jp      z,p130_neogs_open_file__p130_neogs_file_not_found
@@ -858,7 +857,7 @@ p130_neogs_open_file:
         ld      (05D10h),a
         pop     af
         ld      c,8
-        call p130_trdos_rom_call
+        call 03D13h
         ld      a,(05D0Fh)
         ld      b,a
         ld      a,(05D10h)
@@ -937,7 +936,7 @@ p130_neogs_read_next_sector__p130_neogs_sector_available:
         xor     a
         ld      (05D0Fh),a
         ld      (05D10h),a
-        call p130_trdos_rom_call
+        call 03D13h
         ld      a,(05D0Fh)
         ld      b,a
         ld      a,(05D10h)
