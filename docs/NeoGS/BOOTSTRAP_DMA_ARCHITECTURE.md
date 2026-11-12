@@ -7,7 +7,7 @@ Status: stage-0 bootstrap and GS105a launcher implemented in source; DMA/IPC pay
 The stock NeoGS GS105a ROM is retained only as a temporary bootstrap launcher.
 
 1. ATM host locates and validates the small Project130 bootstrap image.
-2. ATM host uses the stock GS105a receive command `#14` to place that image at the ROM-defined receive address (`#4000`).
+2. ATM host uses the stock GS105a receive command `#14` to place that image at the ROM-defined receive address (`#4000`). The byte count is encoded as a 16-bit two's-complement negative length, matching Project126; the low byte is preloaded before command dispatch and the high byte follows `#14`.
 3. ATM host uses command `#13` to transfer control to the bootstrap at `#4000`.
 4. The bootstrap follows the Project126 stage-0 order: `DI`, temporary `SP=#3FFF`, disable ZX DMA (`#1B/#1F`), settle delay, set `GSCFG0` NOROM+EXPAG with RAMRO clear, establish the temporary WIN0/WIN3 mapping (`#20/#00/#10`), then move the stack to `#FFFE`.
 5. The bootstrap publishes exactly one `A1` ready acknowledgement using the ZX DBIT producer handshake and idles. There is no `E0` pre-ack. Project130 does not receive a resident core over GSDAT; after `A1`, the host proceeds to the separately gated DMA/IPC initialization.
