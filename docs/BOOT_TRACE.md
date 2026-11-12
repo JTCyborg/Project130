@@ -9,11 +9,11 @@
 | 3 | `>` | `_p130_entry` | Resident image entered at #6000 |
 | 4 | `130` | `_p130_entry` | Initial stack and ATM/TR-DOS paging established; C handoff follows |
 | 5 | `[P130] C IMAGE EXECUTED` | C entry | C function entered |
-| 6 | `[P130] BUILD: P130-0.5.9-P126-STARTUP-ORDER` | C entry | Exact build identity |
+| 6 | `[P130] BUILD: P130-0.6.0-P126-TRDOS-PRELOAD-FIRST` | C entry | Exact build identity |
 | 7 | `[NEOGS] GS105a BOOTSTRAP LAUNCH BEGIN` | C entry | NeoGS startup is the first subsystem after host entry |
 | 8 | `Rr...` | NeoGS loader | NEOBOOT open/validation, GS105a reset, #14 transfer, X86CORE preflight, #13/A1 handshake |
 | 9 | `[NEOGS] STAGE0 A1 ACK RECEIVED; BOOTSTRAP IDLE` | C entry | Only stage-0 A1 passed; resident firmware and DMA/IPC are not running |
-| 10 | `[TR-DOS] CATALOGUE PRELOAD BEGIN` | C entry | Full 8-sector catalogue preload, after NeoGS launch |
+| 10 | `[TR-DOS] CATALOGUE PRELOAD BEGIN` | C entry | Full 8-sector catalogue preload, before NeoGS launch, matching Project126 |
 | 11 | `[ATM] VIDEO MODE INIT DONE` | C entry | ATM shadow/video mode initialized before RTC, matching Project126 |
 | 12 | `[RTC]` | C entry | RTC probed after video mode initialization |
 | 13 | `[ATM] CONSOLE INIT DONE` | C entry | Visible console drawn after RTC, matching Project126 |
@@ -45,3 +45,10 @@ The BASIC loader changes the diagnostic channel to 2 immediately before calling 
 ## Scope
 
 This trace can validate the host entry, GS105a #14/#13 transaction and A1 acknowledgement. It does not validate the Project126 post-A1 resident transfer, Project130 DMA/IPC initialization, guest memory, x86 execution, VGA or physical device drivers. Those stages remain incomplete and require the separately approved Project130 NeoGS/ATM physical memory and DMA-buffer map.
+
+
+## 2026-11-12 — restore Project126 pre-bootstrap TR-DOS ordering
+
+Project130 previously called `p130_neogs_startup()` before `p130_trdos_preload()`. This is the reverse of the working Project126 host sequence: Project126 preloads the TR-DOS directory before opening the bootstrap and resident files through the TR-DOS ROM API. Project130 now preloads the directory first, then launches GS105a. Build ID: `P130-0.6.0-P126-TRDOS-PRELOAD-FIRST`.
+
+This is a startup-order correction only. It does not claim that the resident core, X86MODS manifest, overlays, or DMA/IPC endpoint are implemented in Project130. Target build and Unreal Speccy runtime verification are still required.
