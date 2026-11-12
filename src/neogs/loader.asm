@@ -6,6 +6,7 @@
 
 SECTION CODE
 PUBLIC _p130_neogs_startup
+EXTERN p130_trdos_rom_call
 
 P130_GSCOM       EQU 0BBh
 P130_GSSTAT      EQU 0BBh
@@ -248,7 +249,7 @@ p130_ngs_open_file:
         ld      a,9
         ld      (05D06h),a
         ld      c,10
-        call    03D13h
+        call    p130_trdos_rom_call
         ld      a,c
         cp      0FFh
         jr      z,p130_ngs_trdos_open_error
@@ -258,7 +259,7 @@ p130_ngs_open_file:
         ld      (05D10h),a
         ld      a,(p130_ngs_trdos_a)
         ld      c,8
-        call    03D13h
+        call    p130_trdos_rom_call
         ld      a,(05D0Fh)
         ld      b,a
         ld      a,(05D10h)
@@ -310,7 +311,7 @@ p130_ngs_read_first_sector:
         xor     a
         ld      (05D0Fh),a
         ld      (05D10h),a
-        call    03D13h
+        call    p130_trdos_rom_call
         ld      a,(05D0Fh)
         ld      b,a
         ld      a,(05D10h)
