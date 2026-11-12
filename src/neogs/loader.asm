@@ -288,12 +288,17 @@ p130_ngs_stream_done:
         ld      (p130_ngs_last_status),a
         bit     7,a
         jp      z,p130_ngs_jump_tx_fail
+        ; Project126 performs TR-DOS file I/O between the final #14 byte
+        ; and #13. Project130 has no such operation, so provide a bounded
+        ; ROM completion window before consuming the bootstrap READY byte.
+        call    p130_ngs_rom_handoff_settle
         ld      a,'W'
         call    p130_ngs_trace
         call    p130_ngs_receive_byte
         jr      c,p130_ngs_ack_timeout
         jr      p130_ngs_ack_check
 p130_ngs_jump_tx_done:
+        call    p130_ngs_rom_handoff_settle
         ld      a,'W'
         call    p130_ngs_trace
         call    p130_ngs_receive_byte
@@ -393,6 +398,25 @@ p130_ngs_trace_nibble:
         add     a,7
 p130_ngs_trace_hex_out:
         jp      p130_ngs_trace
+
+; Allow the stock GS105a ROM to finish its #13 command transition.
+; Eight 16-bit loops provide a deterministic delay without a timer device.
+p130_ngs_rom_handoff_settle:
+        push    bc
+        push    de
+        ld      d,8
+p130_ngs_rom_handoff_outer:
+        ld      bc,0FFFFh
+p130_ngs_rom_handoff_inner:
+        dec     bc
+        ld      a,b
+        or      c
+        jr      nz,p130_ngs_rom_handoff_inner
+        dec     d
+        jr      nz,p130_ngs_rom_handoff_outer
+        pop     de
+        pop     bc
+        ret
 
 ; Receive one NeoGS byte and allow the sender to observe DBIT clear.
 ; This turnaround is present in the Project126 reference implementation.
