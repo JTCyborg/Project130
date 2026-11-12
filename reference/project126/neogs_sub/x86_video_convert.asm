@@ -13,6 +13,18 @@ x86_video_overlay_probe:
         ld      hl,#A55A
         ret
 
+; X86VGA is a separate dynamic overlay (module 05/page08). Never call
+; its routines directly while X86VID (module 06/page09) occupies WIN2.
+x86_video_vga_get_text_snapshot:
+        ld      a,P126_NGS_X86VGA_MODULE_ID
+        ld      ix,x86_vga_get_text_snapshot_impl
+        jp      p126_overlay_call_module
+
+x86_video_vga_read_text_cell:
+        ld      a,P126_NGS_X86VGA_MODULE_ID
+        ld      ix,x86_vga_read_text_cell_impl
+        jp      p126_overlay_call_module
+
 ; Convert one complete VGA text screen using the ATM mode descriptor
 ; received over the VIDEO service. OUT: A=0, HL=frame byte count, CF=0.
 x86_video_convert_impl:
@@ -46,7 +58,7 @@ x86_video_convert_impl:
 
         ; X86VGA returns the text aperture base, CRTC start and row stride
         ; calculated with the same MA units as PCem's text renderer.
-        call    x86_vga_get_text_snapshot
+        call    x86_video_vga_get_text_snapshot
         jp      c,.video_convert_unsupported
         ld      (x86_video_text_base_mid),a
         ld      (x86_video_row_offset),hl
@@ -85,7 +97,7 @@ x86_video_convert_impl:
 .video_convert_col:
         ld      a,(x86_video_text_base_mid)
         ld      hl,(x86_video_cell_offset)
-        call    x86_vga_read_text_cell
+        call    x86_video_vga_read_text_cell
         ld      (x86_video_char),a
         ld      a,d
         ld      (x86_video_attr),a
