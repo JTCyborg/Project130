@@ -9,6 +9,9 @@
 ; The WIN0/WIN3 selections below are the temporary bootstrap execution map,
 ; not a declaration of the final Project130 physical memory allocation.
 ; =========================================================================
+        DEVICE ZXSPECTRUM128
+        ORG #4000
+
 P130_B_ZXSTAT  EQU #04
 P130_B_ZXDATRD EQU #02
 P130_B_ZXDATWR EQU #03
