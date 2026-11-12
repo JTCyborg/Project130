@@ -8,7 +8,8 @@
 ; Guest VRAM accesses are mapped to NeoGS pages 83..98; no NeoGS I/O ports.
 
 x86_vga_io_read8_impl:
-        ld      hl,(x86_io_port)
+        ld      (x86_vga_io_port),hl
+        ld      hl,(x86_vga_io_port)
         ld      de,#03C4
         or      a
         sbc     hl,de
@@ -115,6 +116,7 @@ x86_vga_io_read8_impl:
         ret
 
 x86_vga_io_write8_impl:
+        ld      (x86_vga_io_port),hl
         ld      (x86_io_value),a
         ld      hl,(x86_io_port)
         ld      de,#03C4
@@ -600,6 +602,7 @@ x86_vga_logic:
 MPAGEX                  EQU P126_NGS_BANK_WINDOW_PORT
 x86_mem_addr            EQU x86_phys_addr
 x86_mem_value           EQU x86_mem_data
+x86_vga_io_port:        dw 0
 x86_io_value:           db 0
 
 x86_vga_seq_index:       db 0
