@@ -21,8 +21,9 @@ x86_video_vga_get_text_snapshot:
         jp      p126_overlay_call_module
 
 x86_video_vga_read_text_cell:
+        ld      b,a
         ld      a,P126_NGS_X86VGA_MODULE_ID
-        ld      ix,x86_vga_read_text_cell_impl
+        ld      ix,x86_vga_read_text_cell_gate_impl
         jp      p126_overlay_call_module
 
 ; Convert one complete VGA text screen using the ATM mode descriptor
