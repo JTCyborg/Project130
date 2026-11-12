@@ -37,7 +37,7 @@ function Add-BuildFile([string]$Path,[string]$Role,[bool]$Scan=$true){
  $line="$Role|$rel|$($item.Length)|$hash"
  Add-Content -Path $BuildLog -Value $line
  Write-Host ("[P130 FILE] {0} SIZE={1} SHA256={2} PATH={3}" -f $Role,$item.Length,$hash,$rel)
- if($Scan -and $full -match '\.(asm|inc|s)){
+ if($Scan -and $full -match '\.(asm|inc|s)$'){
   $text=[IO.File]::ReadAllText($full)
   foreach($m in [regex]::Matches($text,'(?im)^\s*(INCLUDE|INCBIN)\s+"([^"]+)"')){
    $dep=$m.Groups[2].Value
