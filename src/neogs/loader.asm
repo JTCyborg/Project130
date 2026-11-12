@@ -1727,7 +1727,8 @@ p126_ipc_debug_crlf:
 p126_host_log_prefix:
 p126_bios_restore_atm_video:
 p126_atm_video_init:
- ret
+        call    0A00Ch
+        ret
 p126_atm_video_mode: db P126_ATM_VIDEO_MODE_RG6_TEXT80X25
 p126_bios_frame_flags: db 0
 p126_ipc_dma_send_frame:
@@ -1871,6 +1872,11 @@ p126_ipc_dma_stage:  db 0
 
 p126_ipc_dma_error: db 0
 
+PUBLIC p126_bios_send_frame
+PUBLIC p126_bios_frame_flags
+PUBLIC p126_ipc_debug_hex_byte
+PUBLIC p126_ipc_crc16_update
+PUBLIC p126_host_log_prefix
 p126_bios_send_frame:
         ld      (p126_bios_operation),a
         ld      a,P126_SERVICE_IMAGE

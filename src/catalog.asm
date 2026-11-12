@@ -10,6 +10,9 @@ PUBLIC _p130_catalog_poll
 PUBLIC _p130_catalog_load_request
 PUBLIC _p130_catalog_selected_index
 PUBLIC _p130_catalog_selected_entry
+PUBLIC p130_cat_find_index
+PUBLIC p130_cat_debug_string
+EXTERN p130_bios_load_selected
 
 _p130_catalog_init:
         xor     a
@@ -261,6 +264,20 @@ p130_cat_confirm_name:
         ld      a,11
         ld      c,1
         call    0A009h
+        ld      hl,p130_cat_bios_begin
+        call    p130_cat_debug_string
+        call    p130_bios_load_selected
+        jr      c,p130_cat_bios_failed
+        xor     a
+        ld      (_p130_catalog_load_request),a
+        ld      hl,p130_cat_bios_loaded
+        call    p130_cat_debug_string
+        ret
+p130_cat_bios_failed:
+        ld      (_p130_catalog_load_request),a
+        ld      hl,p130_cat_bios_failed_text
+        call    p130_cat_debug_string
+        call    p130_cat_draw
         ret
 
 p130_cat_debug_string:
@@ -426,8 +443,11 @@ p130_cat_print_line:
 
 p130_cat_no_files: db "NO TR-DOS FILES",0
 p130_cat_load_prefix: db "[TR-DOS] SELECTED: ",0
-p130_cat_load_pending: db " (LOAD PENDING - NEO GS/DMA NOT READY)",13,10,0
-p130_cat_enter_status: db "LOAD REQUEST RECORDED - WAITING FOR NEO GS/DMA",0
+p130_cat_load_pending: db " (BIOS LOAD STARTING)",13,10,0
+p130_cat_enter_status: db "LOADING SELECTED BIOS...",0
+p130_cat_bios_begin: db "[BIOS] LOAD REQUEST ACCEPTED",13,10,0
+p130_cat_bios_loaded: db "[BIOS] IMAGE TRANSFER COMPLETE",13,10,0
+p130_cat_bios_failed_text: db "[BIOS] LOAD FAILED; MENU RESTORED",13,10,0
 p130_cat_line: db "            ",0
 p130_cat_enabled: db 0
 p130_cat_selected: db 0

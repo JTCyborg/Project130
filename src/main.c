@@ -7,7 +7,7 @@
 #define P130_CATALOGUE_ADDR 0xC800u
 #define P130_CATALOGUE_SIZE 2048u
 
-#define P130_BUILD_ID "P130-0.7.1-PHYSICAL-W3-MAPPER"
+#define P130_BUILD_ID "P130-0.7.2-BIOS-LOADER"
 
 volatile uint8_t p130_neogs_entry_status = 1u;
 
