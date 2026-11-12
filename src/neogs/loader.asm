@@ -53,9 +53,11 @@ _p130_neogs_startup:
         out     (c),a
         ld      c,10
         call    03D13h
+        push    bc
         ld      bc,00EFh
         ld      a,'r'
         out     (c),a
+        pop     bc
         ld      a,c
         cp      0FFh
         jp      z,p130_ngs_fail
