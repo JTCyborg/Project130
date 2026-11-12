@@ -166,6 +166,7 @@ p130_ngs_core_size_low:
         ; before the bootstrap uses a stack or changes the memory map.
         call    p130_ngs_receive_byte
         jr      c,p130_ngs_ack_timeout
+        ld      (p130_ngs_ack_value),a
         cp      0A0h
         jr      nz,p130_ngs_ack_bad
         ld      a,'b'
