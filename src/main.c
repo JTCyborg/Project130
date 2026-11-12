@@ -6,7 +6,7 @@
 #define P130_CATALOGUE_ADDR 0xC800u
 #define P130_CATALOGUE_SIZE 2048u
 
-#define P130_BUILD_ID "P130-0.5.9-P126-STARTUP-ORDER"
+#define P130_BUILD_ID "P130-0.6.0-P126-TRDOS-PRELOAD-FIRST"
 
 static void p130_report_memory(void)
 {
@@ -176,25 +176,25 @@ void p130_c_entry(void)
     p130_debug_puts("[P130] ATM HOST BOOTSTRAP READY\r\n");
 
     /*
-     * Project126 startup order:
-     *   entry.asm: DI, stack and initial ATM/TR-DOS paging only
-     *   here:      GS105a bootstrap first; then TR-DOS catalogue;
-     *              ATM video/UI; RTC; remaining Project130 host services.
-     * The physical Project130 DMA/IPC map remains a separate gated stage.
+     * Project126 host order:
+     *   1) preload the TR-DOS directory;
+     *   2) open/read NEOBOOT and X86CORE through the established TR-DOS API;
+     *   3) reset GS105a, transfer stage-0, enter it and receive A1;
+     *   4) initialize ATM video, RTC, then visible console.
+     * Do not launch GS105a before the directory/ROM-call environment is ready.
      */
+    p130_debug_puts("[TR-DOS] CATALOGUE PRELOAD BEGIN\\r\\n");
+    (void)p130_trdos_preload();
+
     p130_debug_puts("[NEOGS] GS105a BOOTSTRAP LAUNCH BEGIN; TRACE=");
     if (p130_neogs_startup() == 0u) {
-        p130_debug_puts("[NEOGS] STAGE0 A1 ACK RECEIVED; BOOTSTRAP IDLE\r\n");
-        p130_debug_puts("[NEOGS] DMA/IPC NOT STARTED; MEMORY MAP NOT APPROVED\r\n");
+        p130_debug_puts("[NEOGS] STAGE0 A1 ACK RECEIVED; BOOTSTRAP IDLE\\r\\n");
+        p130_debug_puts("[NEOGS] DMA/IPC NOT STARTED; RESIDENT HANDOFF PENDING\\r\\n");
     } else {
-        p130_debug_puts("\r\n[NEOGS] BOOTSTRAP LAUNCH FAILED; STAGE=");
+        p130_debug_puts("\\r\\n[NEOGS] BOOTSTRAP LAUNCH FAILED; STAGE=");
         p130_debug_hex8(p130_neogs_stage);
-        p130_debug_puts("\r\n");
+        p130_debug_puts("\\r\\n");
     }
-
-    /* Project126 loads NeoGS files before reading the full TR-DOS catalogue. */
-    p130_debug_puts("[TR-DOS] CATALOGUE PRELOAD BEGIN\r\n");
-    (void)p130_trdos_preload();
 
     /* Project126 order: ATM video mode first, then RTC, then console. */
     __asm
