@@ -658,6 +658,20 @@ p126_screen_apply_text_frame::
         call    p126_ipc_debug_string
         pop     hl
 .screen_write_trace_done:
+        ; Wait for a printable BIOS character before sampling. The first
+        ; VIDEO frames may only contain the BIOS text-mode clear operation.
+        ld      a,(p126_screen_trace_sample_once)
+        or      a
+        jr      nz,.screen_write_sample_done
+        ld      a,(p126_screen_frame_char)
+        cp      32
+        jr      c,.screen_write_sample_done
+        cp      127
+        jr      nc,.screen_write_sample_done
+        ld      a,1
+        ld      (p126_screen_trace_sample_once),a
+        call    p126_screen_trace_sample
+.screen_write_sample_done:
         ld      a,(p126_screen_frame_col)
         inc     a
         ld      (p126_screen_frame_col),a
@@ -674,6 +688,131 @@ p126_screen_apply_text_frame::
         ld      a,#F3
         scf
         ret
+
+; One-shot end-to-end VIDEO sample. Compare the first printable source
+; cell (frame payload) with the actual ATM text-page bytes after the write.
+; This is diagnostic only and does not alter the renderer's data path.
+p126_screen_trace_sample:
+        push    af
+        push    bc
+        push    de
+        push    hl
+        ld      hl,p126_screen_trace_src_msg
+        call    p126_ipc_debug_string
+        ld      a,(p126_screen_frame_char)
+        call    p126_screen_trace_hex8
+        ld      a,' '
+        ld      bc,#00EF
+        out     (c),a
+        ld      a,(bios_dbg_attr)
+        call    p126_screen_trace_hex8
+        ld      a,13
+        out     (c),a
+        ld      a,10
+        out     (c),a
+
+        call    p126_screen_map_video_pages
+        ; Recreate the exact row/column address used by the screen writer.
+        ld      a,(bios_dbg_write_row)
+        ld      l,a
+        ld      h,0
+        add     hl,hl
+        add     hl,hl
+        add     hl,hl
+        add     hl,hl
+        add     hl,hl
+        add     hl,hl
+        ld      de,#01C0
+        add     hl,de
+        ld      a,(bios_dbg_write_col)
+        ld      c,a
+        and     1
+        ld      (bios_dbg_parity),a
+        ld      a,c
+        srl     a
+        ld      e,a
+        ld      d,0
+        add     hl,de
+        ld      (bios_dbg_offset),hl
+
+        ld      hl,(bios_dbg_offset)
+        ld      a,(bios_dbg_parity)
+        or      a
+        jr      nz,.trace_sample_odd
+        ld      de,#4000
+        add     hl,de
+        ld      a,(hl)
+        ld      (p126_screen_trace_read_char),a
+        ld      hl,(bios_dbg_offset)
+        ld      de,#E000
+        add     hl,de
+        ld      a,(hl)
+        ld      (p126_screen_trace_read_attr),a
+        jr      .trace_sample_read_done
+.trace_sample_odd:
+        ld      de,#6000
+        add     hl,de
+        ld      a,(hl)
+        ld      (p126_screen_trace_read_char),a
+        ld      hl,(bios_dbg_offset)
+        ld      de,#C000
+        add     hl,de
+        inc     hl
+        ld      a,(hl)
+        ld      (p126_screen_trace_read_attr),a
+.trace_sample_read_done:
+        call    p126_screen_restore_host_pages
+        ld      hl,p126_screen_trace_dst_msg
+        call    p126_ipc_debug_string
+        ld      a,(p126_screen_trace_read_char)
+        call    p126_screen_trace_hex8
+        ld      a,' '
+        ld      bc,#00EF
+        out     (c),a
+        ld      a,(p126_screen_trace_read_attr)
+        call    p126_screen_trace_hex8
+        ld      a,13
+        out     (c),a
+        ld      a,10
+        out     (c),a
+        pop     hl
+        pop     de
+        pop     bc
+        pop     af
+        ret
+
+; IN: A=value. Emit two hexadecimal digits on the ATM debug port #EF.
+p126_screen_trace_hex8:
+        ld      (p126_screen_trace_hex_value),a
+        push    bc
+        ld      bc,#00EF
+        ld      a,(p126_screen_trace_hex_value)
+        rra
+        rra
+        rra
+        rra
+        call    p126_screen_trace_hex_nibble
+        ld      a,(p126_screen_trace_hex_value)
+        call    p126_screen_trace_hex_nibble
+        pop     bc
+        ret
+
+p126_screen_trace_hex_nibble:
+        and     #0F
+        cp      10
+        jr      c,.trace_hex_digit
+        add     a,7
+.trace_hex_digit:
+        add     a,'0'
+        out     (c),a
+        ret
+
+p126_screen_trace_sample_once: db 0
+p126_screen_trace_hex_value: db 0
+p126_screen_trace_read_char: db 0
+p126_screen_trace_read_attr: db 0
+p126_screen_trace_src_msg: db "[VIDEO] DMA CHAR/ATTR=",0
+p126_screen_trace_dst_msg: db "[VIDEO] ATM CHAR/ATTR=",0
 
 p126_screen_map_video_pages:
         ld      a, P126_VIDEO_PAGE7
