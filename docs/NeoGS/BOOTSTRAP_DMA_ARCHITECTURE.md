@@ -9,11 +9,11 @@ The stock NeoGS GS105a ROM is retained only as a temporary bootstrap launcher.
 1. ATM host locates and validates the small Project130 bootstrap image.
 2. ATM host uses the stock GS105a receive command `#14` to place that image at the ROM-defined receive address (`#4000`).
 3. ATM host uses command `#13` to transfer control to the bootstrap at `#4000`.
-4. The bootstrap establishes a private stack, disables the ZX DMA channel, and updates `GSCFG0` (`#0F`) using the documented NOROM/EXPAG transition.
-5. The bootstrap emits `E0` after the transition as an entry/transition acknowledgement, then emits `A1` only after the ATM host consumes `E0`; it remains in an idle loop. It does not yet start a DMA receiver because the physical backing map and buffer addresses are unapproved.
+4. The bootstrap follows the Project126 stage-0 order: `DI`, temporary `SP=#3FFF`, disable ZX DMA (`#1B/#1F`), settle delay, set `GSCFG0` NOROM+EXPAG with RAMRO clear, establish the temporary WIN0/WIN3 mapping (`#20/#00/#10`), then move the stack to `#FFFE`.
+5. The bootstrap publishes exactly one `A1` ready acknowledgement using the ZX DBIT producer handshake and idles. There is no `E0` pre-ack. Project130 does not receive a resident core over GSDAT; after `A1`, the host proceeds to the separately gated DMA/IPC initialization.
 6. After the handoff, the stock ROM byte-stream protocol is closed. No resident firmware, module, command, response, event, diagnostic or video payload may be transferred through GSDAT.
 
-The GS105a `#14/#13` exchange is the only legacy byte-channel exception. It transfers the bootstrap image itself and nothing else. In particular, the Project126 pattern of sending a resident core over GSDAT after the ROM has been disabled is **not** adopted.
+The GS105a `#14/#13` exchange is the only legacy byte-channel exception in Project130. It transfers the bootstrap image itself and nothing else. Project126's subsequent resident-core transfer over GSDAT is intentionally not part of Project130's agreed transport boundary.
 
 ## 1.1 Bootstrap diagnostics
 
@@ -27,7 +27,7 @@ The ATM launcher emits progress characters `1` through `9` on the existing debug
 6. GS105a receive command `#14` and its header.
 7. Transfer the bootstrap bytes through GSDAT.
 8. Jump command `#13` and its target address.
-9. Wait for and read the bootstrap `E0` transition acknowledgement, then the `A1` ready acknowledgement.
+9. Wait for and read the single bootstrap `A1` acknowledgement, including the Project126 DBIT turnaround delay.
 
 On a returned failure, the host also prints the last stage code as two hexadecimal digits. If execution stops without returning, the last progress character narrows the blocked operation. These markers are diagnostics only; they do not claim that the bootstrap or DMA transport has passed runtime validation.
 
