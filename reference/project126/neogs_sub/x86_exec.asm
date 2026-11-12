@@ -1705,6 +1705,7 @@ x86_exec_group4_5:
         ld      (x86_exec_group45_opcode),a
         call    x86_decode_modrm16
         ret     c
+        call    x86_exec_group45_trace_decode
         ld      a,(x86_modrm_reg)
         ld      (x86_exec_group45_ext),a
         ld      a,(x86_exec_group45_opcode)
@@ -1766,6 +1767,57 @@ x86_exec_group45_finish_byte:
         call    x86_exec_group45_trace_fe
         or      a
         ret
+
+; Capture the decoder outputs immediately, before any operand/ALU overlay call.
+; This distinguishes a bad ModR/M fetch from later shared-state corruption.
+x86_exec_group45_trace_decode:
+IF X86_FE_TRACE_DIAGNOSTICS
+        push    af
+        push    bc
+        push    de
+        push    hl
+        ld      hl,(x86_exec_instruction_start_cs)
+        ld      de,#F000
+        or      a
+        sbc     hl,de
+        jp      nz,.trace_decode_done
+        ld      hl,(x86_exec_instruction_start_ip)
+        ld      de,#E0C0
+        or      a
+        sbc     hl,de
+        jp      nz,.trace_decode_done
+        ld      hl,x86_exec_group45_decode_prefix
+        call    p126_ngs_resident_log
+        ld      a,(x86_exec_group45_opcode)
+        call    x86_bios_trace_emit_hex8
+        ld      hl,x86_exec_group45_decode_modrm
+        call    p126_ngs_resident_log
+        ld      a,(x86_modrm_byte)
+        call    x86_bios_trace_emit_hex8
+        ld      hl,x86_exec_group45_decode_reg
+        call    p126_ngs_resident_log
+        ld      a,(x86_modrm_reg)
+        call    x86_bios_trace_emit_hex8
+        ld      hl,x86_exec_group45_decode_ip
+        call    p126_ngs_resident_log
+        ld      hl,(x86_reg_ip)
+        call    x86_bios_trace_emit_hex16
+        ld      a,13
+        call    x86_bios_trace_emit_char
+        ld      a,10
+        call    x86_bios_trace_emit_char
+.trace_decode_done:
+        pop     hl
+        pop     de
+        pop     bc
+        pop     af
+ENDIF
+        ret
+
+x86_exec_group45_decode_prefix: db "[X86 FE DEC] OPCODE=",0
+x86_exec_group45_decode_modrm:  db " MODRM=",0
+x86_exec_group45_decode_reg:    db " REG=",0
+x86_exec_group45_decode_ip:     db " IP=",0
 
 x86_exec_group45_trace_fe:
 IF X86_FE_TRACE_DIAGNOSTICS
