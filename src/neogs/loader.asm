@@ -24,7 +24,7 @@ _p130_neogs_startup:
         ld      a,9
         ld      (05D06h),a
         ld      a,1
-        ld      (p130_neogs_stage),a
+        ld      (_p130_neogs_stage),a
         ld      a,'1'
         call    p130_ngs_trace
         ld      c,10
@@ -39,7 +39,7 @@ _p130_neogs_startup:
         ld      (05D10h),a
         pop     af
         ld      a,2
-        ld      (p130_neogs_stage),a
+        ld      (_p130_neogs_stage),a
         ld      a,'2'
         call    p130_ngs_trace
         ld      c,8
@@ -51,7 +51,7 @@ _p130_neogs_startup:
         jp      nz,p130_ngs_fail
 
         ld      a,3
-        ld      (p130_neogs_stage),a
+        ld      (_p130_neogs_stage),a
         ld      a,'3'
         call    p130_ngs_trace
         ; Stage-0 must fit one ROM receive block (1..256 bytes).
@@ -72,7 +72,7 @@ p130_ngs_len_ok:
         ld      (p130_ngs_length),hl
 
         ld      a,4
-        ld      (p130_neogs_stage),a
+        ld      (_p130_neogs_stage),a
         ld      a,'4'
         call    p130_ngs_trace
         ; Read the first and only sector into ATM W3 scratch at #C000.
@@ -94,7 +94,7 @@ p130_ngs_len_ok:
         jp      nz,p130_ngs_fail
 
         ld      a,5
-        ld      (p130_neogs_stage),a
+        ld      (_p130_neogs_stage),a
         ld      a,'5'
         call    p130_ngs_trace
         ; Restart the stock ROM into its known command receive state.
@@ -103,7 +103,7 @@ p130_ngs_len_ok:
         jp      c,p130_ngs_fail
 
         ld      a,6
-        ld      (p130_neogs_stage),a
+        ld      (_p130_neogs_stage),a
         ld      a,'6'
         call    p130_ngs_trace
         ; #14: low length argument, then high length, address low/high.
@@ -126,7 +126,7 @@ p130_ngs_len_ok:
         jp      c,p130_ngs_fail
 
         ld      a,7
-        ld      (p130_neogs_stage),a
+        ld      (_p130_neogs_stage),a
         ld      a,'7'
         call    p130_ngs_trace
         ; The only GSDAT payload is the small bootstrap image.
@@ -144,7 +144,7 @@ p130_ngs_stream:
         jr      p130_ngs_stream
 p130_ngs_stream_done:
         ld      a,8
-        ld      (p130_neogs_stage),a
+        ld      (_p130_neogs_stage),a
         ld      a,'8'
         call    p130_ngs_trace
         ; #13 transfers control to #4000. Bootstrap disables NOROM and
@@ -159,7 +159,7 @@ p130_ngs_stream_done:
         call    p130_ngs_send_byte
         jp      c,p130_ngs_fail
         ld      a,9
-        ld      (p130_neogs_stage),a
+        ld      (_p130_neogs_stage),a
         ld      a,'9'
         call    p130_ngs_trace
         call    p130_ngs_wait_dbit_set
@@ -168,7 +168,7 @@ p130_ngs_stream_done:
         cp      P130_ACK_READY
         jp      nz,p130_ngs_fail
         xor     a
-        ld      (p130_neogs_stage),a
+        ld      (_p130_neogs_stage),a
         ld      hl,0
         ret
 
