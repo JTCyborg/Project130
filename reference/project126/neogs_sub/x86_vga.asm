@@ -1531,6 +1531,16 @@ x86_vga_capture_text_frame_impl:
         ld      (x86_vga_capture_plane),a
         cp      2
         jr      nz,.capture_plane_loop
+        ; Emit one complete 4000-byte snapshot of the DMA frame payload.
+        ; The dump is split into 256-byte blocks and is deliberately one-shot:
+        ; repeated video refreshes must not flood the diagnostic stream.
+        ld      a,(x86_vga_capture_dumped)
+        or      a
+        jp      nz,.capture_dump_done
+        ld      a,1
+        ld      (x86_vga_capture_dumped),a
+        call    x86_vga_dump_dma_frame
+.capture_dump_done:
         xor     a
         ret
 
@@ -1538,6 +1548,124 @@ x86_vga_capture_plane: db 0
 x86_vga_capture_index: dw 0
 x86_vga_capture_dst:   dw 0
 x86_vga_capture_data:  db 0
+x86_vga_capture_dumped: db 0
+
+; One-shot diagnostic: dump all 4000 bytes of the captured 80x25 text frame.
+; Payload layout is 2000 character bytes followed by 2000 attribute bytes.
+; Output format: 16 blocks x 256 bytes, 16 bytes per line, hexadecimal.
+x86_vga_dump_dma_frame:
+        push    af
+        push    bc
+        push    de
+        push    hl
+        ld      a,P126_NGS_DMA_PROD_PAGE
+        rrca
+        out     (P126_NGS_BANK_WINDOW_PORT),a
+        ld      hl,P126_IPC_HEADER_SIZE
+        ld      (x86_vga_dump_offset),hl
+        xor     a
+        ld      (x86_vga_dump_block),a
+        ld      a,16
+        ld      (x86_vga_dump_blocks_left),a
+.dump_block:
+        ld      a,'V'
+        call    x86_vga_dump_char
+        ld      a,'B'
+        call    x86_vga_dump_char
+        ld      a,'U'
+        call    x86_vga_dump_char
+        ld      a,'F'
+        call    x86_vga_dump_char
+        ld      a,' '
+        call    x86_vga_dump_char
+        ld      a,(x86_vga_dump_block)
+        call    x86_vga_dump_hex8
+        ld      a,' '
+        call    x86_vga_dump_char
+        ld      hl,(x86_vga_dump_offset)
+        ld      a,h
+        call    x86_vga_dump_hex8
+        ld      a,l
+        call    x86_vga_dump_hex8
+        ld      a,13
+        call    x86_vga_dump_char
+        ld      a,10
+        call    x86_vga_dump_char
+        ld      a,16
+        ld      (x86_vga_dump_lines_left),a
+.dump_line:
+        ld      a,16
+        ld      (x86_vga_dump_bytes_left),a
+.dump_byte:
+        ld      hl,(x86_vga_dump_offset)
+        ld      a,h
+        and     #3F
+        or      #C0
+        ld      h,a
+        ld      a,(hl)
+        call    x86_vga_dump_hex8
+        ld      a,' '
+        call    x86_vga_dump_char
+        ld      hl,(x86_vga_dump_offset)
+        inc     hl
+        ld      (x86_vga_dump_offset),hl
+        ld      a,(x86_vga_dump_bytes_left)
+        dec     a
+        ld      (x86_vga_dump_bytes_left),a
+        jp      nz,.dump_byte
+        ld      a,13
+        call    x86_vga_dump_char
+        ld      a,10
+        call    x86_vga_dump_char
+        ld      a,(x86_vga_dump_lines_left)
+        dec     a
+        ld      (x86_vga_dump_lines_left),a
+        jp      nz,.dump_line
+        ld      a,(x86_vga_dump_block)
+        inc     a
+        ld      (x86_vga_dump_block),a
+        ld      a,(x86_vga_dump_blocks_left)
+        dec     a
+        ld      (x86_vga_dump_blocks_left),a
+        jp      nz,.dump_block
+        pop     hl
+        pop     de
+        pop     bc
+        pop     af
+        ret
+
+x86_vga_dump_hex8:
+        push    af
+        rrca
+        rrca
+        rrca
+        rrca
+        call    x86_vga_dump_nibble
+        pop     af
+        and     #0F
+        jp      x86_vga_dump_nibble
+
+x86_vga_dump_nibble:
+        and     #0F
+        add     a,'0'
+        cp      '9'+1
+        jr      c,.dump_digit
+        add     a,7
+.dump_digit:
+        jp      x86_vga_dump_char
+
+x86_vga_dump_char:
+        push    bc
+        ld      bc,#00EF
+        out     (c),a
+        pop     bc
+        ret
+
+x86_vga_dump_offset: dw 0
+x86_vga_dump_block: db 0
+x86_vga_dump_blocks_left: db 0
+x86_vga_dump_lines_left: db 0
+x86_vga_dump_bytes_left: db 0
 
 x86_vga_set_text_phys_addr:
         ld      hl,(x86_vga_text_offset)
