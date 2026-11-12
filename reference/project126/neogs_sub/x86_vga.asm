@@ -1591,7 +1591,13 @@ x86_vga_dump_dma_frame:
         call    x86_vga_dump_char
         ld      a,10
         call    x86_vga_dump_char
+        ld      a,(x86_vga_dump_block)
+        cp      15
         ld      a,16
+        jr      nz,.dump_block_line_count_ready
+        ; 4000-byte payload = 15 full 256-byte blocks + final 160 bytes.
+        ld      a,10
+.dump_block_line_count_ready:
         ld      (x86_vga_dump_lines_left),a
 .dump_line:
         ld      a,16
