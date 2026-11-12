@@ -934,25 +934,25 @@ p126_ipc_dma_receive_video_frame::
 
         ld      a,P126_CMD_DMA_END
         call    p126_ipc_send_command
-        jr      c,.video_dma_end_timeout
+        jp      c,.video_dma_end_timeout
 
         ld      hl,P126_IPC_DMA_RX_BUFFER
         ld      bc,P126_IPC_MAX_FRAME_SIZE
         call    p126_ipc_validate_frame
-        jr      c,.video_bad_frame
+        jp      c,.video_bad_frame
         ld      a,(P126_IPC_DMA_RX_BUFFER+7)
         cp      P126_SERVICE_VIDEO
-        jr      nz,.video_bad_service
+        jp      nz,.video_bad_service
         ld      a,(P126_IPC_DMA_RX_BUFFER+8)
         cp      P126_OP_VIDEO_FRAME
-        jr      nz,.video_bad_operation
+        jp      nz,.video_bad_operation
 
         ; Header bytes 14..15 are STATUS (not reserved bytes).
         ld      a,(P126_IPC_DMA_RX_BUFFER+14)
         ld      b,a
         ld      a,(P126_IPC_DMA_RX_BUFFER+15)
         or      b
-        jr      nz,.video_remote_error
+        jp      nz,.video_remote_error
 
         ld      hl,p126_ipc_video_frame_rx_ok
         call    p126_ipc_port_string
