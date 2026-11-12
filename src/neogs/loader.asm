@@ -274,6 +274,9 @@ p130_ngs_stream_done:
         call    p130_ngs_wait_dbit_set
         jp      c,p130_ngs_fail
         in      a,(P130_GSDAT)
+        ; Preserve the actual first ACK too; otherwise a bad E0 is
+        ; incorrectly reported as the zero-initialized second-ACK value.
+        ld      (p130_ngs_ack_value),a
         cp      0E0h
         jr      nz,p130_ngs_ack_bad
         ld      a,'e'
