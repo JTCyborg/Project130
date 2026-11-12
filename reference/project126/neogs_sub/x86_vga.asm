@@ -1410,51 +1410,42 @@ x86_vga_get_text_snapshot_impl:
         scf
         ret
 
-; IN: A=aperture middle byte (00h B0000 / 80h B8000), HL=byte offset.
-; OUT: A=character, D=attribute. Uses chain-2 read semantics temporarily.
+; IN: A=aperture middle byte (00h B0000 / 80h B8000), HL=CPU aperture byte offset.
+; OUT: A=character, D=attribute.
+; Project125-compatible raw plane capture: text cell N is stored at planar
+; byte offset N*4, with character plane 0 at +0 and attribute plane 1 at +1.
+; Read the backing planes directly, independent of CRTC/Sequencer/GDC mode
+; validation. This is intentional: BIOS POST writes B8000 before VGA setup.
 x86_vga_read_text_cell_impl:
         ld      (x86_vga_text_base_mid),a
         ld      (x86_vga_text_offset),hl
-        ld      hl,(x86_phys_addr)
-        ld      (x86_vga_text_saved_phys),hl
-        ld      a,(x86_phys_addr+2)
-        ld      (x86_vga_text_saved_phys+2),a
-        ld      a,(x86_vga_chain2_read)
-        ld      (x86_vga_text_saved_chain2),a
-        ld      a,(x86_vga_readplane)
-        ld      (x86_vga_text_saved_readplane),a
-        ld      hl,x86_vga_latches
-        ld      de,x86_vga_text_saved_latches
-        ld      bc,4
-        ldir
 
-        ld      a,1
-        ld      (x86_vga_chain2_read),a
+        ; Preserve the VGA backing-store cursor used by normal guest accesses.
+        ld      hl,(x86_vga_vram_offset)
+        ld      (x86_vga_text_saved_vram_offset),hl
+        ld      a,(x86_vga_vram_offset+2)
+        ld      (x86_vga_text_saved_vram_offset+2),a
+
+        ; The converter supplies CPU byte offsets 0,2,4... (one word/cell).
+        ; Convert that to planar storage N*4: (CPU offset / 2) * 4.
+        ld      hl,(x86_vga_text_offset)
+        add     hl,hl
+        ld      (x86_vga_vram_offset),hl
         xor     a
-        ld      (x86_vga_readplane),a
-        call    x86_vga_set_text_phys_addr
-        call    x86_vga_mem_read8_impl
+        ld      (x86_vga_vram_offset+2),a
+        call    x86_vga_vram_read_at_offset
         ld      (x86_vga_text_char),a
 
-        ld      hl,(x86_vga_text_offset)
-        inc     hl
-        ld      (x86_vga_text_offset),hl
-        call    x86_vga_set_text_phys_addr
-        call    x86_vga_mem_read8_impl
+        ; Plane 1 is the next interleaved byte in the same VGA word.
+        call    x86_vga_increment_vram_offset
+        call    x86_vga_vram_read_at_offset
         ld      (x86_vga_text_attr),a
 
-        ld      hl,(x86_vga_text_saved_phys)
-        ld      (x86_phys_addr),hl
-        ld      a,(x86_vga_text_saved_phys+2)
-        ld      (x86_phys_addr+2),a
-        ld      a,(x86_vga_text_saved_chain2)
-        ld      (x86_vga_chain2_read),a
-        ld      a,(x86_vga_text_saved_readplane)
-        ld      (x86_vga_readplane),a
-        ld      hl,x86_vga_text_saved_latches
-        ld      de,x86_vga_latches
-        ld      bc,4
-        ldir
+        ; Restore the backing-store cursor before returning to the guest.
+        ld      hl,(x86_vga_text_saved_vram_offset)
+        ld      (x86_vga_vram_offset),hl
+        ld      a,(x86_vga_text_saved_vram_offset+2)
+        ld      (x86_vga_vram_offset+2),a
         ld      a,(x86_vga_text_attr)
         ld      d,a
         ld      a,(x86_vga_text_char)
@@ -1803,6 +1794,7 @@ x86_vga_plane_bits:            db 1,2,4,8
 x86_vga_text_base_mid:         db 0
 x86_vga_text_start:            dw 0
 x86_vga_text_offset:           dw 0
+x86_vga_text_saved_vram_offset: defs 3,0
 x86_vga_text_saved_phys:       defs 3,0
 x86_vga_text_saved_chain2:     db 0
 x86_vga_text_saved_readplane:  db 0
