@@ -37,6 +37,11 @@ x86_alu_version_text:
         defb    "[P130 X86_ALU v0.2.0]",13,10,0
 
 x86_alu_add8_impl:
+        ; Snapshot the actual arguments received inside X86ALU.
+        ld      (x86_fe_dbg_impl_a),a
+        ld      a,c
+        ld      (x86_fe_dbg_impl_c),a
+        ld      a,(x86_fe_dbg_impl_a)
         ld      (x86_alu_lhs),a
         ld      a,c
         ld      (x86_alu_rhs),a
@@ -44,6 +49,7 @@ x86_alu_add8_impl:
         ld      c,a
         ld      a,(x86_alu_lhs)
         add     a,c
+        ld      (x86_fe_dbg_raw),a
         ld      (x86_alu_result),a
         push    af
         pop     hl

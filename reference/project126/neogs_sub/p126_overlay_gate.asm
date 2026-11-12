@@ -792,6 +792,11 @@ x86_vga_io_write8:
 
 ; X86ALU public entry points; implementations live on physical page 05h.
 x86_alu_add8:
+        ; Snapshot arguments before entering the X86ALU overlay.
+        ld      (x86_fe_dbg_call_a),a
+        ld      a,c
+        ld      (x86_fe_dbg_call_c),a
+        ld      a,(x86_fe_dbg_call_a)
         push    af
         push    ix
         ld      a,P126_NGS_ALU_OVERLAY_SELECTOR
@@ -802,6 +807,7 @@ x86_alu_add8:
         ld      ix,x86_alu_add8_impl
         call    p126_overlay_call
         pop     ix
+        ld      (x86_fe_dbg_ret),a
         ret
 
 x86_alu_sub8:

@@ -172,6 +172,13 @@ x86_exec_group45_opcode: db 0
 x86_exec_group45_ext: db 0
 x86_exec_group45_input8: db 0
 x86_exec_group45_readback8: db 0
+; FE /0 overlay-boundary diagnostic snapshots.
+x86_fe_dbg_call_a: db 0
+x86_fe_dbg_call_c: db 0
+x86_fe_dbg_impl_a: db 0
+x86_fe_dbg_impl_c: db 0
+x86_fe_dbg_raw: db 0
+x86_fe_dbg_ret: db 0
 x86_exec_group45_value8: db 0
 x86_exec_group45_value16: dw 0
 x86_exec_group1_opcode: db 0

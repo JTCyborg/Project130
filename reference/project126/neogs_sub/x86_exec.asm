@@ -1800,6 +1800,26 @@ IF X86_FE_TRACE_DIAGNOSTICS
         call    p126_ngs_resident_log
         ld      a,(x86_exec_group45_value8)
         call    x86_bios_trace_emit_hex8
+        ld      hl,x86_exec_group45_trace_call_a
+        call    p126_ngs_resident_log
+        ld      a,(x86_fe_dbg_call_a)
+        call    x86_bios_trace_emit_hex8
+        ld      a,(x86_fe_dbg_call_c)
+        call    x86_bios_trace_emit_hex8
+        ld      hl,x86_exec_group45_trace_impl_a
+        call    p126_ngs_resident_log
+        ld      a,(x86_fe_dbg_impl_a)
+        call    x86_bios_trace_emit_hex8
+        ld      a,(x86_fe_dbg_impl_c)
+        call    x86_bios_trace_emit_hex8
+        ld      hl,x86_exec_group45_trace_raw
+        call    p126_ngs_resident_log
+        ld      a,(x86_fe_dbg_raw)
+        call    x86_bios_trace_emit_hex8
+        ld      hl,x86_exec_group45_trace_ret
+        call    p126_ngs_resident_log
+        ld      a,(x86_fe_dbg_ret)
+        call    x86_bios_trace_emit_hex8
 
         call    x86_modrm_read_rm8
         jr      c,.trace_fe_read_fault
@@ -1833,6 +1853,10 @@ x86_exec_group45_trace_prefix: db "[X86 FE E0C0] MODRM=",0
 x86_exec_group45_trace_ext: db " EXT=",0
 x86_exec_group45_trace_input: db " IN=",0
 x86_exec_group45_trace_alu: db " ALU=",0
+x86_exec_group45_trace_call_a: db " CALL(A/C)=",0
+x86_exec_group45_trace_impl_a: db " IMPL(A/C)=",0
+x86_exec_group45_trace_raw: db " RAW=",0
+x86_exec_group45_trace_ret: db " RET=",0
 x86_exec_group45_trace_writeback: db " WB=",0
 x86_exec_group45_trace_flags: db " FLAGS=",0
 x86_exec_group45_trace_fault: db " WB=READ-FAULT",0
