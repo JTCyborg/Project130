@@ -183,6 +183,73 @@ p130_ngs_jump_tx_done:
         call    p130_ngs_trace
         ld      a,'1'
         call    p130_ngs_trace
+
+        ; Project126 stage-0 resident handoff: length -> A3 -> complete image -> A2.
+        ld      a,8
+        ld      (_p130_neogs_stage),a
+        ld      a,(p130_ngs_core_length)
+        call    p130_ngs_send_byte
+        jp      c,p130_ngs_fail
+        ld      a,(p130_ngs_core_length+1)
+        call    p130_ngs_send_byte
+        jr      nc,p130_ngs_length_sent
+        in      a,(P130_GSSTAT)
+        bit     7,a
+        jp      z,p130_ngs_fail
+        call    p130_ngs_receive_byte
+        jp      c,p130_ngs_fail
+        cp      0A3h
+        jp      nz,p130_ngs_fail
+        jr      p130_ngs_stream_begin
+p130_ngs_length_sent:
+        call    p130_ngs_receive_byte
+        jp      c,p130_ngs_fail
+        cp      0A3h
+        jp      nz,p130_ngs_fail
+
+p130_ngs_stream_begin:
+        ld      a,9
+        ld      (_p130_neogs_stage),a
+        ld      hl,0C000h
+        ld      (p130_ngs_buffer_ptr),hl
+        ld      hl,256
+        ld      (p130_ngs_buffer_remaining),hl
+        ld      de,(p130_ngs_core_length)
+p130_ngs_core_stream:
+        ld      a,d
+        or      e
+        jr      z,p130_ngs_core_stream_done
+        ld      hl,(p130_ngs_buffer_remaining)
+        ld      a,h
+        or      l
+        jr      nz,p130_ngs_core_buffer_ready
+        push    de
+        call    p130_ngs_read_next_sector
+        pop     de
+        jp      c,p130_ngs_fail
+        ld      hl,0C000h
+        ld      (p130_ngs_buffer_ptr),hl
+        ld      hl,256
+        ld      (p130_ngs_buffer_remaining),hl
+p130_ngs_core_buffer_ready:
+        ld      hl,(p130_ngs_buffer_ptr)
+        ld      a,(hl)
+        call    p130_ngs_send_byte
+        jp      c,p130_ngs_fail
+        inc     hl
+        ld      (p130_ngs_buffer_ptr),hl
+        ld      hl,(p130_ngs_buffer_remaining)
+        dec     hl
+        ld      (p130_ngs_buffer_remaining),hl
+        dec     de
+        jr      p130_ngs_core_stream
+p130_ngs_core_stream_done:
+        ld      a,0Bh
+        ld      (_p130_neogs_stage),a
+        call    p130_ngs_receive_byte
+        jp      c,p130_ngs_fail
+        cp      0A2h
+        jp      nz,p130_ngs_fail
         xor     a
         jp      p130_ngs_finish
 
@@ -323,6 +390,71 @@ p130_ngs_read_first_sector:
         or      b
         jr      nz,p130_ngs_trdos_open_error
         xor     a
+        ret
+
+p130_ngs_read_first_sector:
+        ld      a,(p130_ngs_file_sectors_left)
+        or      a
+        jr      z,p130_ngs_trdos_open_error
+        ld      a,(p130_ngs_file_track)
+        ld      d,a
+        ld      a,(p130_ngs_file_sector)
+        ld      e,a
+        ld      hl,0C000h
+        ld      b,1
+        ld      c,5
+        xor     a
+        ld      (05D0Fh),a
+        ld      (05D10h),a
+        call    p130_trdos_rom_call
+        ld      a,(05D0Fh)
+        ld      b,a
+        ld      a,(05D10h)
+        or      b
+        jr      nz,p130_ngs_trdos_open_error
+        jp      p130_ngs_advance_sector_cursor
+
+p130_ngs_read_next_sector:
+        ld      a,(p130_ngs_file_sectors_left)
+        or      a
+        jr      nz,p130_ngs_next_sector_available
+        scf
+        ret
+p130_ngs_next_sector_available:
+        ld      a,(p130_ngs_file_track)
+        ld      d,a
+        ld      a,(p130_ngs_file_sector)
+        ld      e,a
+        ld      hl,0C000h
+        ld      b,1
+        ld      c,5
+        xor     a
+        ld      (05D0Fh),a
+        ld      (05D10h),a
+        call    p130_trdos_rom_call
+        ld      a,(05D0Fh)
+        ld      b,a
+        ld      a,(05D10h)
+        or      b
+        jr      nz,p130_ngs_trdos_open_error
+p130_ngs_advance_sector_cursor:
+        ld      a,(p130_ngs_file_sector)
+        inc     a
+        cp      16
+        jr      c,p130_ngs_sector_same_track
+        xor     a
+        ld      (p130_ngs_file_sector),a
+        ld      a,(p130_ngs_file_track)
+        inc     a
+        ld      (p130_ngs_file_track),a
+        jr      p130_ngs_sector_cursor_advanced
+p130_ngs_sector_same_track:
+        ld      (p130_ngs_file_sector),a
+p130_ngs_sector_cursor_advanced:
+        ld      a,(p130_ngs_file_sectors_left)
+        dec     a
+        ld      (p130_ngs_file_sectors_left),a
+        or      a
         ret
 
 ; Emit a one-character progress marker on the existing #EF debug channel.
@@ -474,6 +606,8 @@ p130_ngs_boot_name: db "NEOBOOT C"
 p130_ngs_core_name: db "X86CORE "
 p130_ngs_length:    dw 0
 p130_ngs_core_length: dw 0
+p130_ngs_buffer_ptr: dw 0
+p130_ngs_buffer_remaining: dw 0
 p130_ngs_block_length: dw 0
 p130_ngs_tx:        db 0
 p130_ngs_saved_sp:  dw 0
