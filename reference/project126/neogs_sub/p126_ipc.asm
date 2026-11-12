@@ -413,6 +413,11 @@ p126_ngs_ipc_dma_send_test_frame::
         ld      (#C015),hl
         ld      a,(x86_exec_opcode)
         ld      (#C017),a
+        ; Extra live REP STOSW progress words for the ATM debug overlay.
+        ld      hl,(x86_bios_rep_stosw_done)
+        ld      (#C018),hl
+        ld      hl,(x86_bios_rep_stosw_total)
+        ld      (#C01A),hl
 
         jp      p126_ngs_ipc_dma_send_staged_frame
 
