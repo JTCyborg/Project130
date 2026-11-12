@@ -73,6 +73,8 @@ Before enabling payload traffic, the Project130 ABI must define:
 
 The control plane may use the documented NeoGS command/status handshake. Application payload bytes must use DMA only.
 
+Project130's pre-A1 host sequence intentionally stops at the small NEOBOOT transfer, then issues #13 and validates A1. It does not perform Project126's pre-A1 X86CORE open/first-sector read: Project130 does not yet package a resident core, and core discovery/loading belongs after the DMA/IPC transport is operational. Do not add a placeholder X86CORE.C or substitute a BIOS image for it.
+
 ## 5. Memory-map boundary
 
 The NeoGS physical map and DMA buffer addresses are a separate Project130 design artifact. They must not be inferred from the x86 guest address map or copied from Project126.

@@ -117,29 +117,10 @@ p130_ngs_stream:
         jr      p130_ngs_stream
 
 p130_ngs_stream_done:
-        ; P126 opens X86CORE and reads its first sector BEFORE #13/A1.
-        ; Project130 keeps the image staged on ATM; it does not stream it
-        ; through GSDAT after A1.
-        ld      a,8
-        ld      (_p130_neogs_stage),a
-        ld      a,'8'
-        call    p130_ngs_trace
-        ld      hl,p130_ngs_core_name
-        call    p130_ngs_open_file
-        jp      c,p130_ngs_fail
-        ld      hl,(p130_ngs_length)
-        ld      a,h
-        cp      040h
-        jr      c,p130_ngs_core_size_low
-        jp      nz,p130_ngs_fail
-        ld      a,l
-        or      a
-        jp      nz,p130_ngs_fail
-p130_ngs_core_size_low:
-        ld      a,h
-        or      l
-        jp      z,p130_ngs_fail
-        ld      (p130_ngs_core_length),hl
+; Project130 deliberately does not open X86CORE before A1.
+        ; The resident core is a DMA/IPC payload and is not yet packaged or
+        ; loaded at this bootstrap-only milestone. Match P126 from NEOBOOT
+        ; transfer through #13 and A1; defer core discovery until DMA/IPC.
 
         ld      a,9
         ld      (_p130_neogs_stage),a
@@ -549,12 +530,10 @@ p130_ngs_ack_value: db 0
 p130_ngs_last_status: db 0
 p130_ngs_scan_left: db 0
 
-; File-open state shared by the NEOBOOT.C and X86CORE pre-A1 paths.
+; File-open state for the NEOBOOT.C bootstrap path.
 ; Keep these buffers in CODE's writable data area, as in the P126 loader.
-p130_ngs_core_name: db "X86CORE "
 p130_ngs_file_extension: db 'C'
 p130_ngs_name_ptr: dw 0
-p130_ngs_core_length: dw 0
 p130_ngs_file_sectors_left: db 0
 p130_ngs_file_sector: db 0
 p130_ngs_file_track: db 0
