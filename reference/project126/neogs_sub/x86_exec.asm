@@ -1695,6 +1695,9 @@ x86_exec_negate_dividend32:
         ld      (x86_exec_dividend32_high),hl
         ret
 
+; BIOS FE /0 regression trace. Set to 0 to remove this diagnostic.
+X86_FE_TRACE_DIAGNOSTICS EQU 1
+
 ; FE Group 4: INC/DEC r/m8.
 ; FF Group 5: INC/DEC, near/far CALL/JMP and PUSH r/m16.
 x86_exec_group4_5:
@@ -1734,6 +1737,7 @@ x86_exec_group4_byte:
         ; PCem treats every nonzero FE /n encoding as DEC.
         call    x86_modrm_read_rm8
         ret     c
+        ld      (x86_exec_group45_input8),a
         ld      (x86_exec_group45_value8),a
         call    x86_exec_group45_save_cf
         ld      a,(x86_exec_group45_value8)
@@ -1741,11 +1745,11 @@ x86_exec_group4_byte:
         call    x86_alu_sub8
         ld      (x86_exec_group45_value8),a
         call    x86_exec_group45_restore_cf
-        ld      a,(x86_exec_group45_value8)
-        jp      x86_modrm_write_rm8
+        jr      x86_exec_group45_finish_byte
 .group4_inc:
         call    x86_modrm_read_rm8
         ret     c
+        ld      (x86_exec_group45_input8),a
         ld      (x86_exec_group45_value8),a
         call    x86_exec_group45_save_cf
         ld      a,(x86_exec_group45_value8)
@@ -1753,8 +1757,75 @@ x86_exec_group4_byte:
         call    x86_alu_add8
         ld      (x86_exec_group45_value8),a
         call    x86_exec_group45_restore_cf
+
+; Write the result and inspect the actual destination only for the BIOS probe.
+x86_exec_group45_finish_byte:
         ld      a,(x86_exec_group45_value8)
-        jp      x86_modrm_write_rm8
+        call    x86_modrm_write_rm8
+        ret     c
+        call    x86_exec_group45_trace_fe
+        or      a
+        ret
+
+x86_exec_group45_trace_fe:
+IF X86_FE_TRACE_DIAGNOSTICS
+        push    af
+        push    bc
+        push    de
+        push    hl
+        ld      hl,(x86_exec_instruction_start_cs)
+        ld      de,#F000
+        or      a
+        sbc     hl,de
+        jr      nz,.trace_fe_done
+        ld      hl,(x86_exec_instruction_start_ip)
+        ld      de,#E0C0
+        or      a
+        sbc     hl,de
+        jr      nz,.trace_fe_done
+
+        ld      hl,x86_exec_group45_trace_prefix
+        call    p126_ngs_resident_log
+        ld      a,(x86_exec_group45_input8)
+        call    x86_bios_trace_emit_hex8
+        ld      hl,x86_exec_group45_trace_alu
+        call    p126_ngs_resident_log
+        ld      a,(x86_exec_group45_value8)
+        call    x86_bios_trace_emit_hex8
+
+        call    x86_modrm_read_rm8
+        jr      c,.trace_fe_read_fault
+        ld      (x86_exec_group45_readback8),a
+        ld      hl,x86_exec_group45_trace_writeback
+        call    p126_ngs_resident_log
+        ld      a,(x86_exec_group45_readback8)
+        call    x86_bios_trace_emit_hex8
+        ld      hl,x86_exec_group45_trace_flags
+        call    p126_ngs_resident_log
+        ld      hl,(x86_reg_flags)
+        call    x86_bios_trace_emit_hex16
+        jr      .trace_fe_newline
+.trace_fe_read_fault:
+        ld      hl,x86_exec_group45_trace_fault
+        call    p126_ngs_resident_log
+.trace_fe_newline:
+        ld      a,13
+        call    x86_bios_trace_emit_char
+        ld      a,10
+        call    x86_bios_trace_emit_char
+.trace_fe_done:
+        pop     hl
+        pop     de
+        pop     bc
+        pop     af
+ENDIF
+        ret
+
+x86_exec_group45_trace_prefix: db "[X86 FE E0C0] IN=",0
+x86_exec_group45_trace_alu: db " ALU=",0
+x86_exec_group45_trace_writeback: db " WB=",0
+x86_exec_group45_trace_flags: db " FLAGS=",0
+x86_exec_group45_trace_fault: db " WB=READ-FAULT",0
 
 
 x86_exec_group5_incdec:
