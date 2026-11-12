@@ -40,153 +40,106 @@ _p130_neogs_startup:
         xor     a
         ld      (p130_ngs_result),a
 
-        ; Project127 path: the complete TR-DOS directory is already
-        ; resident at #C800. Find NEOBOOT.C in that snapshot and use only
-        ; the known-working C=5 sector-read entry. Do not call C=0A/C=08.
-        ld      ix,0C800h
-        ld      a,128
-        ld      (p130_ngs_scan_left),a
-        ld      bc,00EFh
+        ; Project126-compatible TR-DOS open/read path. Do not scan the
+        ; preloaded catalogue: use C=#0A, C=#08 and C=#05 for both files.
         ld      a,'R'
-        out     (c),a
-p130_ngs_scan_entry:
-        ld      a,(ix+0)
-        cp      'N'
-        jr      nz,p130_ngs_scan_next
-        ld      a,(ix+1)
-        cp      'E'
-        jr      nz,p130_ngs_scan_next
-        ld      a,(ix+2)
-        cp      'O'
-        jr      nz,p130_ngs_scan_next
-        ld      a,(ix+3)
-        cp      'B'
-        jr      nz,p130_ngs_scan_next
-        ld      a,(ix+4)
-        cp      'O'
-        jr      nz,p130_ngs_scan_next
-        ld      a,(ix+5)
-        cp      'O'
-        jr      nz,p130_ngs_scan_next
-        ld      a,(ix+6)
-        cp      'T'
-        jr      nz,p130_ngs_scan_next
-        ld      a,(ix+7)
-        cp      ' '
-        jr      nz,p130_ngs_scan_next
-        ld      a,(ix+8)
-        cp      'C'
-        jr      z,p130_ngs_scan_found
-p130_ngs_scan_next:
-        ld      de,16
-        add     ix,de
-        ld      a,(p130_ngs_scan_left)
-        dec     a
-        ld      (p130_ngs_scan_left),a
-        jr      nz,p130_ngs_scan_entry
-        jp      p130_ngs_fail
-
-p130_ngs_scan_found:
-        ld      bc,00EFh
-        ld      a,'r'
-        out     (c),a
-
-        ; TR-DOS descriptor, verified against Project127's actual field accesses:
-        ; length +11/+12, sector count +13, first sector +14,
-        ; logical track +15. Project127's directory-dump comment is off by
-        ; one; its ix-relative loads resolve to these descriptor offsets.
-        ld      a,(ix+11)
-        ld      l,a
-        ld      a,(ix+12)
-        ld      h,a
-        ld      a,h
-        or      l
-        jp      z,p130_ngs_fail
+        call    p130_ngs_trace
+        ld      hl,p130_ngs_boot_name
+        call    p130_ngs_open_file
+        jp      c,p130_ngs_fail
+        ld      hl,(p130_ngs_length)
         ld      a,h
         or      a
-        jr      z,p130_ngs_len_ok
+        jr      z,p130_ngs_boot_len_low
         cp      1
         jp      nz,p130_ngs_fail
         ld      a,l
         or      a
         jp      nz,p130_ngs_fail
-p130_ngs_len_ok:
-        ld      (p130_ngs_length),hl
-        ld      a,(ix+14)
-        cp      16
-        jp      nc,p130_ngs_fail
-        ld      (p130_ngs_sector),a
-        ld      a,(ix+15)
-        ld      (p130_ngs_track),a
+        jr      p130_ngs_boot_len_ok
+p130_ngs_boot_len_low:
+        ld      a,l
+        or      a
+        jp      z,p130_ngs_fail
+p130_ngs_boot_len_ok:
+        ld      a,'r'
+        call    p130_ngs_trace
 
-        ; C=05, B=1, HL=#C000, DE=track:sector.
-        ld      bc,00EFh
-        ld      a,'T'
-        out     (c),a
-        ld      a,(p130_ngs_track)
-        ld      d,a
-        ld      a,(p130_ngs_sector)
-        ld      e,a
+        ; Match Project126 reset and #14 transaction byte-for-byte.
+        ld      a,5
+        ld      (_p130_neogs_stage),a
+        ld      a,'5'
+        call    p130_ngs_trace
+        ld      a,P130_CMD_RESET
+        call    p130_ngs_send_command_long
+        jp      c,p130_ngs_fail
+
+        ld      a,6
+        ld      (_p130_neogs_stage),a
+        ld      a,'6'
+        call    p130_ngs_trace
+        ld      hl,0
+        ld      de,(p130_ngs_length)
+        or      a
+        sbc     hl,de
+        ld      (p130_ngs_block_length),hl
+        ld      a,l
+        call    p130_ngs_send_argument
+        jp      c,p130_ngs_fail
+        ld      a,P130_CMD_RECV
+        call    p130_ngs_send_command
+        jp      c,p130_ngs_fail
+        ld      a,(p130_ngs_block_length+1)
+        call    p130_ngs_send_byte
+        jp      c,p130_ngs_fail
+        xor     a
+        call    p130_ngs_send_byte
+        jp      c,p130_ngs_fail
+        ld      a,040h
+        call    p130_ngs_send_byte
+        jp      c,p130_ngs_fail
+
+        ld      a,7
+        ld      (_p130_neogs_stage),a
+        ld      a,'7'
+        call    p130_ngs_trace
         ld      hl,0C000h
-        ld      b,1
-        ld      c,5
-        xor     a
-        ld      (05D0Fh),a
-        ld      (05D10h),a
+        ld      de,(p130_ngs_length)
+p130_ngs_stream:
+        ld      a,d
+        or      e
+        jr      z,p130_ngs_stream_done
+        ld      a,(hl)
+        call    p130_ngs_send_byte
+        jp      c,p130_ngs_fail
+        inc     hl
+        dec     de
+        jr      p130_ngs_stream
 
-        ; Project127 sys_SHADOFF sequence:
-        ; map the BASIC-48/DOS page into window 0, then write the saved
-        ; RG6 mode to the ATM system port #FF77 (shadow ports off).
-        ld      a,083h
-        ld      bc,0FFF7h
-        out     (c),a
-        ld      a,P130_GFX_MODE
-        ld      bc,0FF77h
-        out     (c),a
-
-        ; TR-DOS expects its return address through system variable 23613,
-        ; not an ordinary CALL return alone. Project127 installs this
-        ; trampoline and enters #3D13 with JP.
-        ld      hl,p130_ngs_trdos_return
-        push    hl
-        ld      (23613),sp
-        xor     a
-        ld      (23801),a
-        ld      (23823),a
-        ld      (23824),a
-        jp      03D13h
-
-p130_ngs_trdos_return:
-        push    af
-        ld      bc,00EFh
-        ld      a,'t'
-        out     (c),a
-        pop     af
-
-        ; Re-enable shadow ports/video first, exactly as ui.asm does,
-        ; then restore the host's W2/W3 pages.
-        di
-        ld      bc,p130_ngs_trdos_video_restored
-        push    bc
-        ld      bc,02A53h
-        push    bc
-        ld      bc,00177h
-        ld      a,P130_GFX_MODE
-        jp      03D2Fh
-
-p130_ngs_trdos_video_restored:
-        ld      a,P130_HOST_PAGE5
-        ld      bc,07FF7h
-        out     (c),a
-        ld      a,P130_HOST_PAGE0
-        ld      bc,0FFF7h
-        out     (c),a
-        ei
-        ld      a,(05D0Fh)
-        ld      b,a
-        ld      a,(05D10h)
-        or      b
+p130_ngs_stream_done:
+        ; P126 opens X86CORE and reads its first sector BEFORE #13/A1.
+        ; Project130 keeps the image staged on ATM; it does not stream it
+        ; through GSDAT after A1.
+        ld      a,8
+        ld      (_p130_neogs_stage),a
+        ld      a,'8'
+        call    p130_ngs_trace
+        ld      hl,p130_ngs_core_name
+        call    p130_ngs_open_file
+        jp      c,p130_ngs_fail
+        ld      hl,(p130_ngs_length)
+        ld      a,h
+        cp      040h
+        jr      c,p130_ngs_core_size_low
         jp      nz,p130_ngs_fail
+        ld      a,l
+        or      a
+        jp      nz,p130_ngs_fail
+p130_ngs_core_size_low:
+        ld      a,h
+        or      l
+        jp      z,p130_ngs_fail
+        ld      (p130_ngs_core_length),hl
 
         ld      a,2
         ld      (_p130_neogs_stage),a
@@ -276,34 +229,17 @@ p130_ngs_stream_done:
         ld      (_p130_neogs_stage),a
         ld      a,'9'
         call    p130_ngs_trace
-        ; Keep the target-byte / response boundary observable without
-        ; invoking the UI renderer during the DBIT handoff.
-        ld      a,'J'
-        call    p130_ngs_trace
-        ; Keep the two DBIT phases separate. A timeout BEFORE the #40
-        ; write is a transmit failure, not a reason to read stale GSDAT data.
-        ; Only a timeout AFTER the write may mean that GS105a has started
-        ; replying while the host-side sender is still observing DBIT.
+        ; P126's exact #13 target-byte send and DBIT fallback.
         ld      a,040h
-        ld      (p130_ngs_tx),a
-        call    p130_ngs_wait_dbit_clear
-        jp      c,p130_ngs_jump_tx_fail
-        ld      a,(p130_ngs_tx)
-        out     (P130_GSDAT),a
-        call    p130_ngs_wait_dbit_clear
+        call    p130_ngs_send_byte
         jr      nc,p130_ngs_jump_tx_done
         in      a,(P130_GSSTAT)
-        ld      (p130_ngs_last_status),a
         bit     7,a
-        jp      z,p130_ngs_jump_tx_fail
-        ld      a,'W'
-        call    p130_ngs_trace
+        jp      z,p130_ngs_fail
         call    p130_ngs_receive_byte
         jr      c,p130_ngs_ack_timeout
         jr      p130_ngs_ack_check
 p130_ngs_jump_tx_done:
-        ld      a,'W'
-        call    p130_ngs_trace
         call    p130_ngs_receive_byte
         jr      c,p130_ngs_ack_timeout
 p130_ngs_ack_check:
@@ -370,6 +306,142 @@ p130_ngs_finish:
         ld      a,(p130_ngs_result)
         ld      l,a
         ld      h,0
+        ret
+
+; Project126 TR-DOS file-open ABI, with Project130's required ATM
+; shadow/video banking around each ROM call. IN HL=8-char name; OUT C=0,
+; first sector at C000h and exact file length in p130_ngs_length.
+p130_ngs_open_file:
+        ld      (p130_ngs_name_ptr),hl
+        ld      hl,(p130_ngs_name_ptr)
+        ld      de,05CDDh
+        ld      bc,8
+        ldir
+        ld      a,(p130_ngs_file_extension)
+        ld      (05CE5h),a
+        ld      a,9
+        ld      (05D06h),a
+        ld      c,10
+        call    p130_ngs_trdos_call
+        ld      a,c
+        cp      0FFh
+        jr      z,p130_ngs_trdos_open_error
+        ld      (p130_ngs_trdos_a),a
+        xor     a
+        ld      (05D0Fh),a
+        ld      (05D10h),a
+        ld      a,(p130_ngs_trdos_a)
+        ld      c,8
+        call    p130_ngs_trdos_call
+        ld      a,(05D0Fh)
+        ld      b,a
+        ld      a,(05D10h)
+        or      b
+        jr      nz,p130_ngs_trdos_open_error
+        ld      hl,(05CE8h)
+        ld      (p130_ngs_length),hl
+        ld      a,h
+        or      l
+        jr      z,p130_ngs_trdos_open_error
+        ld      de,0C010h
+        or      a
+        sbc     hl,de
+        jr      nc,p130_ngs_trdos_open_error
+        ld      hl,(p130_ngs_length)
+        ld      de,255
+        add     hl,de
+        ld      a,h
+        or      a
+        jr      z,p130_ngs_trdos_open_error
+        ld      (p130_ngs_file_sectors_left),a
+        ld      a,(05CEBh)
+        cp      16
+        jr      nc,p130_ngs_trdos_open_error
+        ld      (p130_ngs_file_sector),a
+        ld      a,(05CECh)
+        ld      (p130_ngs_file_track),a
+        call    p130_ngs_read_first_sector
+        ret
+
+p130_ngs_trdos_open_error:
+        scf
+        ret
+
+; C=5/B=1 sector read, same cursor semantics as Project126.
+p130_ngs_read_first_sector:
+        ld      a,(p130_ngs_file_sectors_left)
+        or      a
+        jr      z,p130_ngs_trdos_open_error
+        ld      a,(p130_ngs_file_track)
+        ld      d,a
+        ld      a,(p130_ngs_file_sector)
+        ld      e,a
+        ld      hl,0C000h
+        ld      b,1
+        ld      c,5
+        xor     a
+        ld      (05D0Fh),a
+        ld      (05D10h),a
+        call    p130_ngs_trdos_call
+        ld      a,(05D0Fh)
+        ld      b,a
+        ld      a,(05D10h)
+        or      b
+        jr      nz,p130_ngs_trdos_open_error
+        xor     a
+        ret
+
+; Invoke TR-DOS #3D13 with the Project127 shadow-page transition.
+; Preserve the ROM result registers across video/page restoration.
+p130_ngs_trdos_call:
+        push    af
+        push    bc
+        push    de
+        push    hl
+        ld      a,083h
+        ld      bc,0FFF7h
+        out     (c),a
+        ld      a,P130_GFX_MODE
+        ld      bc,0FF77h
+        out     (c),a
+        ld      hl,p130_ngs_trdos_return
+        push    hl
+        ld      (23613),sp
+        xor     a
+        ld      (23801),a
+        ld      (23823),a
+        ld      (23824),a
+        jp      03D13h
+p130_ngs_trdos_return:
+        ld      (p130_ngs_trdos_a),a
+        ld      (p130_ngs_trdos_bc),bc
+        ld      (p130_ngs_trdos_de),de
+        ld      (p130_ngs_trdos_hl),hl
+        di
+        ld      bc,p130_ngs_trdos_video_restored
+        push    bc
+        ld      bc,02A53h
+        push    bc
+        ld      bc,00177h
+        ld      a,P130_GFX_MODE
+        jp      03D2Fh
+p130_ngs_trdos_video_restored:
+        ld      a,P130_HOST_PAGE5
+        ld      bc,07FF7h
+        out     (c),a
+        ld      a,P130_HOST_PAGE0
+        ld      bc,0FFF7h
+        out     (c),a
+        ei
+        ; Drop the saved caller inputs, then restore the TR-DOS outputs.
+        pop     hl
+        pop     de
+        pop     bc
+        pop     af
+        ld      hl,(p130_ngs_trdos_hl)
+        ld      de,(p130_ngs_trdos_de)
+        ld      bc,(p130_ngs_trdos_bc)
+        ld      a,(p130_ngs_trdos_a)
         ret
 
 ; Emit a one-character progress marker on the existing #EF debug channel.

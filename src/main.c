@@ -6,7 +6,7 @@
 #define P130_CATALOGUE_ADDR 0xC800u
 #define P130_CATALOGUE_SIZE 2048u
 
-#define P130_BUILD_ID "P130-0.5.4-P126-HANDOFF-PHASES"
+#define P130_BUILD_ID "P130-0.5.5-P126-PRE-A1-MIRROR"
 
 static void p130_report_memory(void)
 {
