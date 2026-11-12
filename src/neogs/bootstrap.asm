@@ -26,6 +26,8 @@ p130_ngs_boot_start:
         di
         ; Exact Project126 entry discipline: valid temporary stack before CALL.
         ld      sp,#3FFF
+        ld      hl,p130_boot_msg_enter
+        call    p130_boot_log
 
         ; Disable the ZX DMA engine and let the control write settle.
         ld      a,1
@@ -41,6 +43,8 @@ p130_ngs_dma_disable_settle:
         and     #FD
         or      #09
         out     (P130_B_GSCFG0),a
+        ld      hl,p130_boot_msg_norom
+        call    p130_boot_log
 
         ; Project126 temporary bootstrap window setup.
         xor     a
@@ -94,6 +98,26 @@ p130_ngs_send_done:
         or      a
         ret
 
+; Independent NeoGS-side diagnostics copied from the Project126
+; bootstrap. These bytes are emitted locally on the NeoGS debug port.
+p130_boot_log:
+        push    af
+        push    bc
+        ld      bc,#00EF
+p130_boot_log_loop:
+        ld      a,(hl)
+        inc     hl
+        or      a
+        jr      z,p130_boot_log_done
+        out     (c),a
+        jr      p130_boot_log_loop
+p130_boot_log_done:
+        pop     bc
+        pop     af
+        ret
+
+p130_boot_msg_enter: db "[NGS] BOOTSTRAP ENTER",13,10,0
+p130_boot_msg_norom: db "[NGS] NOROM ENABLED",13,10,0
 p130_ngs_tx: db 0
 p130_ngs_boot_end:
         ASSERT  p130_ngs_boot_start = #4000
