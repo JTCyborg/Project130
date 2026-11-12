@@ -571,19 +571,10 @@ p130_neogs_verify_overlay_manifest__manifest_verify_bad:
 p130_neogs_load_fixed_overlay:
         ld      (p130_neogs_overlay_kind),a
         ld      (p130_neogs_overlay_max_size),de
-        ld      (p130_neogs_name_ptr),hl
-        ; Diagnostic boundary: distinguish TR-DOS open entry from return.
-        ld      hl,p130_neogs_overlay_open_begin
-        call    p130_neogs_log_text
-        ld      hl,(p130_neogs_name_ptr)
+        ; Keep the Project126 call boundary exact: no diagnostic output or
+        ; helper calls between the descriptor setup and the TR-DOS ROM call.
         call    p130_neogs_open_file
-        jr      c,p130_neogs_load_fixed_overlay__fixed_overlay_open_failed
-        ld      hl,p130_neogs_overlay_open_ok
-        call    p130_neogs_log_text
-        jr      p130_neogs_load_fixed_overlay__fixed_overlay_open
-p130_neogs_load_fixed_overlay__fixed_overlay_open_failed:
-        ld      hl,p130_neogs_overlay_open_failed
-        call    p130_neogs_log_text
+        jr      nc,p130_neogs_load_fixed_overlay__fixed_overlay_open
         ld      a,5
         jp      p130_neogs_store_error
 
@@ -916,8 +907,6 @@ p130_neogs_open_file__p130_neogs_file_length_ok:
 
         ; Acquire only the first sector now; subsequent sectors are read
         ; on demand after the current 256-byte buffer has been consumed.
-        ld      a,'s'
-        call    p130_neogs_trace_char
         call    p130_neogs_read_next_sector
         ret     c
         ld      hl,0C000h
