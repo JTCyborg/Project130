@@ -8,6 +8,7 @@
 SECTION CODE
 PUBLIC _p130_trdos_preload
 PUBLIC _p130_trdos_result
+PUBLIC p130_trdos_rom_call
 
 _p130_trdos_preload:
         push    af
@@ -135,8 +136,12 @@ p130_trdos_rom_call:
         pop     bc
         pop     af
 
-        ld      hl,p130_trdos_rom_return
+        ; Keep the caller's HL destination in HL while placing the ROM
+        ; return trampoline on the stack. EX (SP),HL swaps the destination
+        ; with the trampoline address; ERR_SP then points at the trampoline.
         push    hl
+        ld      hl,p130_trdos_rom_return
+        ex      (sp),hl
         ld      (23613),sp
         xor     a
         ld      (23801),a

@@ -61,3 +61,8 @@ Build `P130-0.6.1-P127-TRDOS-ROM-TRAMPOLINE` fixes the catalogue read path. A di
 Startup diagnostics now use actual CR/LF escapes rather than printing the literal characters `\\r\\n`.
 
 Target-side build and runtime verification are pending. The expected next marker after `[TR-DOS] CATALOGUE PRELOAD BEGIN` is `r0`; then `r1` through `r7`. A failure or stop before `r0` still needs a fresh runtime trace.
+
+
+## 2026-11-12 — preserve the TR-DOS destination register
+
+Build `P130-0.6.2-P127-TRDOS-HL-PRESERVE` fixes the remaining hang before the first `r0` marker. The trampoline setup previously loaded its return address into HL after restoring the caller registers, silently replacing the sector destination pointer required by the TR-DOS `C=5/B=1` ABI. The wrapper now uses `PUSH HL` / `LD HL,return` / `EX (SP),HL` so HL again contains the destination when execution jumps to `#3D13`. The same shared wrapper is now used by all Project130 loader calls (`C=#0A`, `C=#08`, `C=#05`) instead of direct jumps into the ROM API. Target build and runtime verification remain pending.
