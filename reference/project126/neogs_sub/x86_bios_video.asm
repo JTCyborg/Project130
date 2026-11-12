@@ -624,12 +624,34 @@ bios_video_write_cell:
         jr      nz,.write_return
         inc     a
         ld      (bios_video_trace_vga_write_once),a
+        ; Read the just-written character/attribute pair back from the actual
+        ; VGA plane backing store before the frame DMA capture can obscure
+        ; whether the failure is on the write or capture side.
         push    af
         push    bc
+        push    de
         push    hl
+        ld      hl,(bios_video_guest_offset)
+        dec     hl
+        ld      a,#80
+        call    x86_vga_read_text_cell_impl
+        ld      (bios_video_readback_char),a
+        ld      a,d
+        ld      (bios_video_readback_attr),a
         ld      hl,bios_video_trace_vga_write_msg
         call    bios_video_trace_string
+        ld      a,(bios_video_readback_char)
+        call    bios_video_trace_hex8
+        ld      a,' '
+        out     (#EF),a
+        ld      a,(bios_video_readback_attr)
+        call    bios_video_trace_hex8
+        ld      a,13
+        out     (#EF),a
+        ld      a,10
+        out     (#EF),a
         pop     hl
+        pop     de
         pop     bc
         pop     af
 .write_return:
@@ -790,7 +812,9 @@ bios_video_trace_count: db 0
 ; Set after INT10 mode 03h or lazy text-console initialization.
 bios_video_text_state_ready: db 0
 bios_video_trace_vga_write_once: db 0
-bios_video_trace_vga_write_msg: db "[TRACE] BIOS VGA WRITE OK",13,10,0
+bios_video_trace_vga_write_msg: db "[BIOS VGA READBACK] CHAR/ATTR=",0
+bios_video_readback_char: db 0
+bios_video_readback_attr: db 0
 
 bios_video_row:           db 0
 bios_video_col:           db 0
