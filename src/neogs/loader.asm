@@ -394,6 +394,10 @@ p130_ngs_read_first_sector:
 ; Invoke TR-DOS #3D13 with the Project127 shadow-page transition.
 ; Preserve the ROM result registers across video/page restoration.
 p130_ngs_trdos_call:
+        ld      (p130_ngs_trdos_in_a),a
+        ld      (p130_ngs_trdos_in_bc),bc
+        ld      (p130_ngs_trdos_in_de),de
+        ld      (p130_ngs_trdos_in_hl),hl
         push    af
         push    bc
         push    de
@@ -404,9 +408,20 @@ p130_ngs_trdos_call:
         ld      a,P130_GFX_MODE
         ld      bc,0FF77h
         out     (c),a
+        ; Restore the exact TR-DOS call inputs after the paging writes.
+        ld      a,(p130_ngs_trdos_in_a)
+        ld      bc,(p130_ngs_trdos_in_bc)
+        ld      de,(p130_ngs_trdos_in_de)
+        ld      hl,(p130_ngs_trdos_in_hl)
         ld      hl,p130_ngs_trdos_return
         push    hl
         ld      (23613),sp
+        ; Restore the requested entry registers once the return trampoline
+        ; has been installed; use the saved copies because HL held its PC.
+        ld      a,(p130_ngs_trdos_in_a)
+        ld      bc,(p130_ngs_trdos_in_bc)
+        ld      de,(p130_ngs_trdos_in_de)
+        ld      hl,(p130_ngs_trdos_in_hl)
         xor     a
         ld      (23801),a
         ld      (23823),a
