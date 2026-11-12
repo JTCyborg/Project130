@@ -117,12 +117,20 @@ p130_trdos_restore:
 ; (#5C3D), and its DOS/shadow mapping must be restored through #3D2F.
 ; Preserve the host's W2/W3 pages around the DOS ROM mapping.
 p130_trdos_rom_call:
+        ; Shadow-off transition changes BC; restore the sector-read ABI
+        ; registers afterwards, immediately before entering the ROM.
+        push    bc
+        push    de
+        push    hl
         ld      a,083h
         ld      bc,0FFF7h
         out     (c),a
         ld      a,0C3h
         ld      bc,0FF77h
         out     (c),a
+        pop     hl
+        pop     de
+        pop     bc
 
         ld      hl,p130_trdos_rom_return
         push    hl
