@@ -961,42 +961,42 @@ p126_ipc_dma_receive_video_frame::
         ; receiver. This distinguishes an empty/wrong capture from a renderer
         ; or paging failure even when the frame CRC is valid.
         ld      hl,p126_ipc_dbg_payload_chars
-        call    p126_ipc_debug_string
+        call    p126_ipc_port_string
         ld      hl,P126_IPC_DMA_RX_BUFFER+P126_IPC_HEADER_SIZE
         ld      b,8
 .video_dbg_chars:
         ld      a,(hl)
         inc     hl
-        call    p126_ipc_debug_hex_byte
+        call    p126_ipc_port_hex_byte
         djnz    .video_dbg_chars
-        call    p126_ipc_debug_crlf
+        call    p126_ipc_port_crlf
         ld      hl,p126_ipc_dbg_payload_attrs
-        call    p126_ipc_debug_string
+        call    p126_ipc_port_string
         ld      hl,P126_IPC_DMA_RX_BUFFER+P126_IPC_HEADER_SIZE+P126_VIDEO_TEXT80_CELLS
         ld      b,8
 .video_dbg_attrs:
         ld      a,(hl)
         inc     hl
-        call    p126_ipc_debug_hex_byte
+        call    p126_ipc_port_hex_byte
         djnz    .video_dbg_attrs
-        call    p126_ipc_debug_crlf
+        call    p126_ipc_port_crlf
 
         ld      hl,p126_ipc_dbg_apply_enter
-        call    p126_ipc_debug_string
+        call    p126_ipc_port_string
         call    p126_screen_apply_text_frame
         push    af
         push    hl
         ld      hl,p126_ipc_dbg_apply_return
-        call    p126_ipc_debug_string
+        call    p126_ipc_port_string
         pop     hl
         pop     af
         push    af
-        call    p126_ipc_debug_hex_byte
-        call    p126_ipc_debug_crlf
+        call    p126_ipc_port_hex_byte
+        call    p126_ipc_port_crlf
         pop     af
         jr      c,.video_apply_failed
         ld      hl,p126_ipc_dbg_apply_ok
-        call    p126_ipc_debug_string
+        call    p126_ipc_port_string
         ld      hl,p126_ipc_video_frame_applied
         call    p126_ipc_console_string
         or      a
@@ -1199,6 +1199,60 @@ p126_ipc_debug_crlf:
 
 ; ATM-local trace output, on ATM's own physical #EF stream.
 ; IN: HL=zero-terminated string. Preserves AF/BC; clobbers HL.
+; Port-only diagnostics: do not write trace text into the video console.
+p126_ipc_port_string:
+        push    af
+        push    bc
+        ld      bc,#00EF
+.p126_ipc_port_string_loop:
+        ld      a,(hl)
+        inc     hl
+        or      a
+        jr      z,.p126_ipc_port_string_done
+        out     (c),a
+        jr      .p126_ipc_port_string_loop
+.p126_ipc_port_string_done:
+        pop     bc
+        pop     af
+        ret
+
+p126_ipc_port_hex_byte:
+        push    af
+        push    bc
+        ld      b,a
+        rrca
+        rrca
+        rrca
+        rrca
+        and     #0F
+        call    p126_ipc_port_hex_nibble
+        ld      a,b
+        and     #0F
+        call    p126_ipc_port_hex_nibble
+        pop     bc
+        pop     af
+        ret
+p126_ipc_port_hex_nibble:
+        add     a,'0'
+        cp      '9'+1
+        jr      c,.p126_ipc_port_hex_emit
+        add     a,7
+.p126_ipc_port_hex_emit:
+        out     (#EF),a
+        ret
+
+p126_ipc_port_crlf:
+        push    af
+        push    bc
+        ld      bc,#00EF
+        ld      a,13
+        out     (c),a
+        ld      a,10
+        out     (c),a
+        pop     bc
+        pop     af
+        ret
+
 p126_ipc_debug_string:
         push    af
         push    bc
