@@ -263,10 +263,138 @@ p130_ngs_stream_done:
         ld      a,'8'
         call    p130_ngs_trace
         ; Project126's X86CORE read before #13 prepares the resident
-        ; payload that Project126 streams after A1. Project130 has no such
-        ; GSDAT payload, so this unrelated TR-DOS transaction is omitted.
-        ; The GS105a handoff is now the direct #14 -> #13 sequence.
-        ; Receive one NeoGS byte and allow the sender to observe DBIT clear.
+        ; payload which Project126 streams after A1. Project130 has no such
+        ; GSDAT payload, so the unrelated TR-DOS transaction is omitted.
+        ; Continue directly with the GS105a #13 handoff.
+        xor     a
+        call    p130_ngs_send_argument
+        jp      c,p130_ngs_fail
+        ld      a,P130_CMD_JUMP
+        call    p130_ngs_send_command
+        jp      c,p130_ngs_fail
+        ld      a,9
+        ld      (_p130_neogs_stage),a
+        ld      a,'9'
+        call    p130_ngs_trace
+        ; Keep the target-byte / response boundary observable without
+        ; invoking the UI renderer during the DBIT handoff.
+        ld      a,'J'
+        call    p130_ngs_trace
+        ld      a,040h
+        call    p130_ngs_send_byte
+        jr      nc,p130_ngs_jump_tx_done
+        ; The #13 target byte may still be pending while the ROM switches
+        ; to the bootstrap receiver. Preserve the Project126 fallback.
+        in      a,(P130_GSSTAT)
+        ld      (p130_ngs_last_status),a
+        bit     7,a
+        jp      z,p130_ngs_jump_tx_fail
+        ld      a,'W'
+        call    p130_ngs_trace
+        call    p130_ngs_receive_byte
+        jr      c,p130_ngs_ack_timeout
+        jr      p130_ngs_ack_check
+p130_ngs_jump_tx_done:
+        ld      a,'W'
+        call    p130_ngs_trace
+        call    p130_ngs_receive_byte
+        jr      c,p130_ngs_ack_timeout
+p130_ngs_ack_check:
+        ld      (p130_ngs_ack_value),a
+        ; Exactly one A1 ready byte; no resident payload follows it.
+        cp      P130_ACK_READY
+        jr      nz,p130_ngs_ack_bad
+        ld      a,'a'
+        call    p130_ngs_trace
+        ld      a,'1'
+        call    p130_ngs_trace
+        xor     a
+        jp      p130_ngs_finish
+
+p130_ngs_ack_bad:
+        ld      a,'x'
+        call    p130_ngs_trace
+        ld      a,(p130_ngs_ack_value)
+        call    p130_ngs_trace_hex
+        jp      p130_ngs_fail
+
+p130_ngs_ack_timeout:
+        ld      a,'!'
+        call    p130_ngs_trace
+        ld      a,(p130_ngs_last_status)
+        call    p130_ngs_trace_hex
+        jp      p130_ngs_fail
+
+p130_ngs_jump_tx_fail:
+        ld      a,'j'
+        call    p130_ngs_trace
+        ld      a,(p130_ngs_last_status)
+        call    p130_ngs_trace_hex
+        jp      p130_ngs_fail
+
+p130_ngs_fail:
+        ld      a,1
+
+p130_ngs_finish:
+        ld      (p130_ngs_result),a
+        ld      a,(p130_ngs_old_name_len)
+        ld      (05D06h),a
+        ld      a,(p130_ngs_old_drive)
+        ld      (05CF9h),a
+        ld      a,(p130_ngs_old_ext)
+        ld      (05CE5h),a
+        ld      a,(p130_ngs_old_status)
+        ld      (05D10h),a
+        ld      sp,(p130_ngs_saved_sp)
+        ex      af,af'
+        pop     af
+        ex      af,af'
+        exx
+        pop     hl
+        pop     de
+        pop     bc
+        exx
+        pop     iy
+        pop     ix
+        pop     hl
+        pop     de
+        pop     bc
+        pop     af
+        ld      a,(p130_ngs_result)
+        ld      l,a
+        ld      h,0
+        ret
+
+; Emit a one-character progress marker on the existing #EF debug channel.
+p130_ngs_trace:
+        push    bc
+        ld      bc,00EFh
+        out     (c),a
+        ; Side-effect-free: the #EF channel is sufficient for diagnostics.
+        pop     bc
+        ret
+
+; A=byte, emit two hexadecimal digits on the existing debug channel.
+p130_ngs_trace_hex:
+        push    af
+        rrca
+        rrca
+        rrca
+        rrca
+        call    p130_ngs_trace_nibble
+        pop     af
+        and     0Fh
+        jp      p130_ngs_trace_nibble
+p130_ngs_trace_nibble:
+        and     0Fh
+        add     a,'0'
+        cp      '9'+1
+        jr      c,p130_ngs_trace_hex_out
+        add     a,7
+p130_ngs_trace_hex_out:
+        jp      p130_ngs_trace
+
+; Receive one NeoGS byte and allow the sender to observe DBIT clear.
 ; This turnaround is present in the Project126 reference implementation.
 p130_ngs_receive_byte:
         call    p130_ngs_wait_dbit_set
