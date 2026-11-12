@@ -6,7 +6,7 @@
 #define P130_CATALOGUE_ADDR 0xC800u
 #define P130_CATALOGUE_SIZE 2048u
 
-#define P130_BUILD_ID "P130-0.6.7-P126-ROM-HANDSHAKE-RESTORE"
+#define P130_BUILD_ID "P130-0.6.8-P126-STAGE0-EXACT"
 
 static void p130_report_memory(void)
 {
