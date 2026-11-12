@@ -200,6 +200,11 @@ p126_host_ngs_start_done:
         call    p126_host_debug_string
         jr      p126_host_video_mode_done
 p126_host_video_mode_sent:
+        ; Enable E1 BIOS slices and E2 VGA frame requests only after NeoGS
+        ; accepted the ATM video-mode descriptor. Without this latch the
+        ; host idle loop skips both BIOS execution and screen refresh forever.
+        ld      a,1
+        ld      (p126_atm_video_enabled),a
         ld      hl,p126_log_video_mode_sent
         call    p126_host_debug_string
 p126_host_video_mode_done:
