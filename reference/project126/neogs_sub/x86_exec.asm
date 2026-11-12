@@ -1777,12 +1777,12 @@ IF X86_FE_TRACE_DIAGNOSTICS
         ld      de,#F000
         or      a
         sbc     hl,de
-        jr      nz,.trace_fe_done
+        jp      nz,.trace_fe_done
         ld      hl,(x86_exec_instruction_start_ip)
         ld      de,#E0C0
         or      a
         sbc     hl,de
-        jr      nz,.trace_fe_done
+        jp      nz,.trace_fe_done
 
         ld      hl,x86_exec_group45_trace_prefix
         call    p126_ngs_resident_log
