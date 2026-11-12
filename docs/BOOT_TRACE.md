@@ -66,3 +66,8 @@ Target-side build and runtime verification are pending. The expected next marker
 ## 2026-11-12 — preserve the TR-DOS destination register
 
 Build `P130-0.6.2-P127-TRDOS-HL-PRESERVE` fixes the remaining hang before the first `r0` marker. The trampoline setup previously loaded its return address into HL after restoring the caller registers, silently replacing the sector destination pointer required by the TR-DOS `C=5/B=1` ABI. The wrapper now uses `PUSH HL` / `LD HL,return` / `EX (SP),HL` so HL again contains the destination when execution jumps to `#3D13`. The same shared wrapper is now used by all Project130 loader calls (`C=#0A`, `C=#08`, `C=#05`) instead of direct jumps into the ROM API. Target build and runtime verification remain pending.
+
+
+## 2026-11-12 — GS105a #13 jump argument ordering
+
+Build `P130-0.6.3-GS105A-JUMP-ARG` corrects the #13 launch transaction. The GS105a programming protocol specifies that a one-byte command argument is written to GSDAT before the command is written to GSCOM; this argument transfer does not use DBIT handshaking. Project130 previously preloaded zero, issued #13, and then attempted to send #40 as a DBIT-stream byte. That caused the ROM to receive jump target #0000 rather than #4000. The host now preloads #40 with `p130_ngs_send_argument`, issues #13, waits for CBIT completion, then receives the bootstrap's A1 byte over DBIT. Target build and runtime verification remain pending.
