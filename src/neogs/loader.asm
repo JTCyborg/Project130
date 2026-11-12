@@ -571,9 +571,11 @@ p130_neogs_verify_overlay_manifest__manifest_verify_bad:
 p130_neogs_load_fixed_overlay:
         ld      (p130_neogs_overlay_kind),a
         ld      (p130_neogs_overlay_max_size),de
+        ld      (p130_neogs_name_ptr),hl
         ; Diagnostic boundary: distinguish TR-DOS open entry from return.
         ld      hl,p130_neogs_overlay_open_begin
         call    p130_neogs_log_text
+        ld      hl,(p130_neogs_name_ptr)
         call    p130_neogs_open_file
         jr      c,p130_neogs_load_fixed_overlay__fixed_overlay_open_failed
         ld      hl,p130_neogs_overlay_open_ok
