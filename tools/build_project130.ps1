@@ -1,5 +1,5 @@
 [CmdletBinding()]
-param([string]$SjAsmPlus="sjasmplus",[string]$Output=".\disk_A.trd")
+param([string]$Zcc="zcc",[string]$SjAsmPlus="sjasmplus",[string]$Output=".\disk_A.trd")
 $ErrorActionPreference="Stop"
 $Root=Split-Path -Parent $PSScriptRoot
 Set-Location $Root
