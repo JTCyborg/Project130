@@ -8,9 +8,8 @@ The stock NeoGS GS105a ROM is retained only as a temporary bootstrap launcher.
 
 1. ATM host locates and validates the small Project130 bootstrap image.
 2. ATM host uses the stock GS105a receive command `#14` to place that image at the ROM-defined receive address (`#4000`). The byte count is encoded as a 16-bit two's-complement negative length, matching Project126; the low byte is preloaded before command dispatch and the high byte follows `#14`.
-3. After the `#14` upload, ATM host performs the same intervening TR-DOS operation as Project126: it opens `P130BOOT.C` through C=`#0A` / C=`#08`, validates the descriptor and reads its first sector through C=`#05`. This occurs after the bootstrap bytes have been sent, so the `#C000` staging buffer may be reused. It deliberately reproduces the Project126 file-I/O phase between `#14` and `#13`; it is not an arbitrary delay.
-4. ATM host uses command `#13` to transfer control to the bootstrap at `#4000`.
-5. The bootstrap follows the Project126 stage-0 order: `DI`, temporary `SP=#3FFF`, emit `[NGS] BOOTSTRAP ENTER`, disable ZX DMA (`#1B/#1F`), settle delay, set `GSCFG0` NOROM+EXPAG with RAMRO clear, emit `[NGS] NOROM ENABLED`, establish the temporary WIN0/WIN3 mapping (`#20/#00/#10`), then move the stack to `#FFFE`.
+3. ATM host immediately uses command `#13` to transfer control to the bootstrap at `#4000`. Project126's intervening `X86CORE` open/read is omitted: that operation prepares the resident payload which Project126 streams after `A1`; Project130 has no such legacy payload, so repeating the file I/O would be unrelated to the GS105a protocol.
+4. The bootstrap follows the Project126 stage-0 order: `DI`, temporary `SP=#3FFF`, emit `[NGS] BOOTSTRAP ENTER`, disable ZX DMA (`#1B/#1F`), settle delay, set `GSCFG0` NOROM+EXPAG with RAMRO clear, emit `[NGS] NOROM ENABLED`, establish the temporary WIN0/WIN3 mapping (`#20/#00/#10`), then move the stack to `#FFFE`.
 6. The bootstrap publishes exactly one `A1` ready acknowledgement using the ZX DBIT producer handshake and idles. There is no `E0` pre-ack. Project130 does not receive a resident core over GSDAT; after `A1`, the host proceeds to the separately gated DMA/IPC initialization.
 7. After the handoff, the stock ROM byte-stream protocol is closed. No resident firmware, module, command, response, event, diagnostic or video payload may be transferred through GSDAT.
 
@@ -18,7 +17,7 @@ The GS105a `#14/#13` exchange is the only legacy byte-channel exception in Proje
 
 ## 1.1 Bootstrap diagnostics
 
-The ATM launcher emits progress characters `1` through `9` plus the `P` pre-jump marker on the existing debug channel `#EF` and console output. The corresponding stage codes are:
+The ATM launcher emits progress characters `1` through `9` on the existing debug channel `#EF`. The trace routine does not call the UI renderer, particularly during the `#13`/`A1` handshake. The corresponding stage codes are:
 
 1. TR-DOS catalogue lookup of `NEOBOOT.C`.
 2. Bootstrap file descriptor validation.
@@ -27,7 +26,7 @@ The ATM launcher emits progress characters `1` through `9` plus the `P` pre-jump
 5. GS105a reset command `#F4`.
 6. GS105a receive command `#14` and its header.
 7. Transfer the bootstrap bytes through GSDAT.
-8. Open `P130BOOT.C` through the Project126 C=`#0A` / C=`#08` sequence and read its first sector with C=`#05`.
+8. Complete the bootstrap byte transfer through GSDAT.
 9. Jump command `#13` and its target address, followed by the `J` target-byte handoff marker and `W` acknowledgement wait marker. The host then reads the single bootstrap `A1` acknowledgement. A timeout prints `!` plus the last sampled `GSSTAT`; a target-byte handoff failure prints `j` plus the sampled status.
 
 On a returned failure, the host also prints the last stage code as two hexadecimal digits. If execution stops without returning, the last progress character narrows the blocked operation. These markers are diagnostics only; they do not claim that the bootstrap or DMA transport has passed runtime validation.
