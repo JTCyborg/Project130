@@ -215,16 +215,22 @@ p130_ngs_trdos_video_restored:
         ld      (_p130_neogs_stage),a
         ld      a,'6'
         call    p130_ngs_trace
-        ; #14: low length argument, then high length, address low/high.
-        ld      hl,(p130_ngs_length)
+        ; GS105a #14 encodes the byte count as a 16-bit two's-complement
+        ; negative length (same as Project126), not the positive file size.
+        ; The low byte is preloaded before command dispatch; the high byte
+        ; follows #14. For 1..256 bytes this is FFxx or FF00.
+        ld      hl,0
+        ld      de,(p130_ngs_length)
+        or      a
+        sbc     hl,de
+        ld      (p130_ngs_block_length),hl
         ld      a,l
         call    p130_ngs_send_argument
         jp      c,p130_ngs_fail
         ld      a,P130_CMD_RECV
         call    p130_ngs_send_command
         jp      c,p130_ngs_fail
-        ld      hl,(p130_ngs_length)
-        ld      a,h
+        ld      a,(p130_ngs_block_length+1)
         call    p130_ngs_send_byte
         jp      c,p130_ngs_fail
         xor     a
@@ -483,6 +489,7 @@ _p130_neogs_stage: db 0
 
 p130_ngs_boot_name: db "NEOBOOT C"
 p130_ngs_length:    dw 0
+p130_ngs_block_length: dw 0
 p130_ngs_tx:        db 0
 p130_ngs_saved_sp:  dw 0
 p130_ngs_result:    db 0
