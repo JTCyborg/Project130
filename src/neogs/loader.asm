@@ -292,8 +292,6 @@ p130_neogs_startup_impl__p130_neogs_module_loop:
         ld      hl,p130_neogs_module_return_log
         call    p130_neogs_log_text
         pop     hl
-        pop     bc
-        pop     af
         ret     c
         djnz    p130_neogs_startup_impl__p130_neogs_module_loop
 
@@ -758,12 +756,6 @@ p130_neogs_load_fixed_overlay__fixed_overlay_log_vga_ready:
         ld      hl,p130_neogs_exec_log_ready
 p130_neogs_load_fixed_overlay__fixed_overlay_log_ready:
         call    p130_neogs_log_text
-        push    af
-        push    hl
-        ld      hl,p130_neogs_overlay_return_log
-        call    p130_neogs_log_text
-        pop     hl
-        pop     af
         or      a
         ret
 
@@ -788,15 +780,7 @@ p130_neogs_overlay_read_sector__overlay_sector_available:
         xor     a
         ld      (05D0Fh),a
         ld      (05D10h),a
-        push    af
-        ld      a,'r'
-        call    p130_neogs_trace_char
-        pop     af
         call 03D13h
-        push    af
-        ld      a,'R'
-        call    p130_neogs_trace_char
-        pop     af
         ld      a,(05D0Fh)
         ld      b,a
         ld      a,(05D10h)
@@ -1255,19 +1239,6 @@ p130_neogs_send_video_mode_impl:
         ret
 
 
-; Runtime trace for the first TR-DOS transaction. This writes single markers
-; to the independent ATM debug port and preserves caller registers/flags.
-p130_neogs_trace_start:
-        ld      a,'1'
-p130_neogs_trace_char:
-        push    af
-        push    bc
-        ld      bc,00EFh
-        out     (c),a
-        pop     bc
-        pop     af
-        ret
-
 p130_neogs_boot_name: db "NEOBOOT "
 p130_neogs_core_name: db "X86CORE "
 p130_neogs_io_name:   db "X86IO   "
@@ -1314,8 +1285,6 @@ p130_neogs_overlay_data_ptr: dw 0C11Ch
 p130_neogs_overlay_open_begin: db "[NGS HOST] OVERLAY OPEN BEGIN",13,10,0
 p130_neogs_overlay_open_ok:    db "[NGS HOST] OVERLAY OPEN OK",13,10,0
 p130_neogs_overlay_open_failed: db "[NGS HOST] OVERLAY OPEN FAILED",13,10,0
-p130_neogs_module_return_log: db "[NGS HOST] MODULE CALL RETURNED",13,10,0
-p130_neogs_overlay_return_log: db "[NGS HOST] OVERLAY ROUTINE RETURNING",13,10,0
 p130_neogs_io_log_begin: db "[NGS HOST] X86IO IMAGE BEGIN",13,10,0
 p130_neogs_io_log_ready: db "[NGS HOST] X86IO IMAGE TX COMPLETE",13,10,0
 p130_neogs_alu_log_begin: db "[NGS HOST] X86ALU IMAGE BEGIN",13,10,0
