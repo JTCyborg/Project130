@@ -262,6 +262,17 @@ p130_ngs_stream_done:
         ld      (_p130_neogs_stage),a
         ld      a,'8'
         call    p130_ngs_trace
+        ; Reproduce Project126's complete pre-jump file-open phase:
+        ; after #14 has received NEOBOOT, open P130BOOT.C through the native
+        ; TR-DOS C=0A/C=08 ABI and read its first sector with C=05. This is
+        ; intentionally between #14 and #13, just like X86CORE in Project126.
+        ld      a,'P'
+        ld      (_p130_neogs_stage),a
+        ld      a,'P'
+        call    p130_ngs_trace
+        call    p130_ngs_probe_host_file
+        jp      c,p130_ngs_fail
+
         ; #13 transfers control to #4000. Bootstrap follows the Project126
         ; stack/DMA/GSCFG0/temporary-window sequence, then publishes A1.
         xor     a
@@ -288,17 +299,12 @@ p130_ngs_stream_done:
         ld      (p130_ngs_last_status),a
         bit     7,a
         jp      z,p130_ngs_jump_tx_fail
-        ; Project126 performs TR-DOS file I/O between the final #14 byte
-        ; and #13. Project130 has no such operation, so provide a bounded
-        ; ROM completion window before consuming the bootstrap READY byte.
-        call    p130_ngs_rom_handoff_settle
         ld      a,'W'
         call    p130_ngs_trace
         call    p130_ngs_receive_byte
         jr      c,p130_ngs_ack_timeout
         jr      p130_ngs_ack_check
 p130_ngs_jump_tx_done:
-        call    p130_ngs_rom_handoff_settle
         ld      a,'W'
         call    p130_ngs_trace
         call    p130_ngs_receive_byte
@@ -399,23 +405,124 @@ p130_ngs_trace_nibble:
 p130_ngs_trace_hex_out:
         jp      p130_ngs_trace
 
-; Allow the stock GS105a ROM to finish its #13 command transition.
-; Eight 16-bit loops provide a deterministic delay without a timer device.
-p130_ngs_rom_handoff_settle:
+; Project126-equivalent TR-DOS open-file probe, deliberately run after
+; NEOBOOT has been transferred and before GS105a command #13.
+; It opens the already-loaded host resident P130BOOT.C, validates its
+; descriptor, and reads the first sector exactly as p126_neogs_open_file
+; does for X86CORE. No resident bytes are sent to NeoGS over GSDAT.
+p130_ngs_probe_host_file:
+        xor     a
+        ld      (p130_ngs_probe_error),a
+
+        ; Match Project126/Project125 TR-DOS file-open ABI.
+        ld      hl,p130_ngs_host_name
+        ld      de,05CDDh
+        ld      bc,8
+        ldir
+        ld      a,'C'
+        ld      (05CE5h),a
+        ld      a,9
+        ld      (05D06h),a
+
+        ; Enter the same shadow-off DOS mapping used by Project127.
+        ld      a,083h
+        ld      bc,0FFF7h
+        out     (c),a
+        ld      a,P130_GFX_MODE
+        ld      bc,0FF77h
+        out     (c),a
+
+        ; C=0A: locate P130BOOT.C.
+        ld      c,10
+        xor     a
+        ld      (05D0Fh),a
+        ld      (05D10h),a
+        call    03D13h
+        ld      a,c
+        cp      0FFh
+        jr      z,p130_ngs_probe_trdos_error
+
+        ; C=08: fetch the complete TR-DOS file descriptor.
+        push    af
+        xor     a
+        ld      (05D0Fh),a
+        ld      (05D10h),a
+        pop     af
+        ld      c,8
+        call    03D13h
+        ld      a,(05D0Fh)
+        ld      b,a
+        ld      a,(05D10h)
+        or      b
+        jr      nz,p130_ngs_probe_trdos_error
+
+        ; Match Project126 descriptor checks: nonzero length, bounded file,
+        ; valid first-sector index.
+        ld      hl,(05CE8h)
+        ld      a,h
+        or      l
+        jr      z,p130_ngs_probe_trdos_error
+        ld      (p130_ngs_host_length),hl
+        ld      de,0C010h
+        or      a
+        sbc     hl,de
+        jr      c,p130_ngs_probe_length_ok
+        jr      z,p130_ngs_probe_length_ok
+        jr      p130_ngs_probe_trdos_error
+p130_ngs_probe_length_ok:
+        ld      a,(05CEBh)
+        cp      16
+        jr      nc,p130_ngs_probe_trdos_error
+
+        ; C=05: acquire the first sector into the Project126 staging buffer.
+        ld      e,a
+        ld      a,(05CECh)
+        ld      d,a
+        ld      hl,0C000h
+        ld      b,1
+        ld      c,5
+        xor     a
+        ld      (05D0Fh),a
+        ld      (05D10h),a
+        call    03D13h
+        ld      a,(05D0Fh)
+        ld      b,a
+        ld      a,(05D10h)
+        or      b
+        jr      nz,p130_ngs_probe_trdos_error
+        jr      p130_ngs_probe_restore_video
+
+p130_ngs_probe_trdos_error:
+        ld      a,1
+        ld      (p130_ngs_probe_error),a
+
+p130_ngs_probe_restore_video:
+        ; Restore the RG6 console and host W2/W3 mapping before returning.
+        di
+        ld      bc,p130_ngs_probe_video_restored
         push    bc
-        push    de
-        ld      d,8
-p130_ngs_rom_handoff_outer:
-        ld      bc,0FFFFh
-p130_ngs_rom_handoff_inner:
-        dec     bc
-        ld      a,b
-        or      c
-        jr      nz,p130_ngs_rom_handoff_inner
-        dec     d
-        jr      nz,p130_ngs_rom_handoff_outer
-        pop     de
-        pop     bc
+        ld      bc,02A53h
+        push    bc
+        ld      bc,00177h
+        ld      a,P130_GFX_MODE
+        jp      03D2Fh
+
+p130_ngs_probe_video_restored:
+        ld      a,P130_HOST_PAGE5
+        ld      bc,07FF7h
+        out     (c),a
+        ld      a,P130_HOST_PAGE0
+        ld      bc,0FFF7h
+        out     (c),a
+        ei
+        ld      a,(p130_ngs_probe_error)
+        or      a
+        jr      nz,p130_ngs_probe_failed
+        or      a
+        ret
+
+p130_ngs_probe_failed:
+        scf
         ret
 
 ; Receive one NeoGS byte and allow the sender to observe DBIT clear.
@@ -547,5 +654,8 @@ p130_ngs_old_status: db 0
 p130_ngs_sector: db 0
 p130_ngs_track: db 0
 p130_ngs_ack_value: db 0
+p130_ngs_probe_error: db 0
+p130_ngs_host_length: dw 0
+p130_ngs_host_name: db "P130BOOT"
 p130_ngs_last_status: db 0
 p130_ngs_scan_left: db 0
