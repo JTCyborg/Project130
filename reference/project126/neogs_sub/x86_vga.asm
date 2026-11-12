@@ -268,6 +268,11 @@ x86_vga_read_text_cell_gate_impl:
         ld      a,b
         jp      x86_vga_read_text_cell_impl
 
+; Public guest-memory write gate used by BIOS INT10 text output.
+; The caller has already calculated x86_phys_addr and supplies A=value.
+x86_vga_mem_write8_gate_impl:
+        jp      x86_vga_mem_write8_impl
+
 ; IN HL=guest I/O port, A=value. OUT carry clear if handled.
 x86_vga_io_write8_impl:
         ld      (x86_vga_write_value),a
