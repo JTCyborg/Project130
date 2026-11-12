@@ -27,7 +27,7 @@ The ATM launcher emits progress characters `1` through `9` on the existing debug
 6. GS105a receive command `#14` and its header.
 7. Transfer the bootstrap bytes through GSDAT.
 8. Jump command `#13` and its target address.
-9. Wait for and read the single bootstrap `A1` acknowledgement, including the Project126 DBIT turnaround delay.
+9. Jump target-byte handoff (`J`), then wait for and read the single bootstrap `A1` acknowledgement (`W`). A timeout prints `!` plus the last sampled `GSSTAT`; a target-byte handoff failure prints `j` plus the sampled status.
 
 On a returned failure, the host also prints the last stage code as two hexadecimal digits. If execution stops without returning, the last progress character narrows the blocked operation. These markers are diagnostics only; they do not claim that the bootstrap or DMA transport has passed runtime validation.
 
