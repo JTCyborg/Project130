@@ -5,7 +5,7 @@
 ; Initial ATM target: RG6 80x25 text, compact frame layout:
 ;   bytes 0000..07CF = 2000 character codes
 ;   bytes 07D0..0F9F = 2000 attribute bytes
-; The current 4000-byte RG6 frame is written directly into page42h at payload offset 18, ready for reverse DMA. Pages40h..41h remain available for larger future frame formats.
+; The exact 4000-byte Project125 text payload is staged at page42h:C000h for reverse DMA.
 ; =========================================================================
 
 x86_video_overlay_probe:
@@ -21,9 +21,8 @@ x86_video_vga_get_text_snapshot:
         jp      p126_overlay_call_module
 
 x86_video_vga_read_text_cell:
-        ld      b,a
         ld      a,P126_NGS_X86VGA_MODULE_ID
-        ld      ix,x86_vga_read_text_cell_gate_impl
+        ld      ix,x86_vga_read_text_cell_raw_gate_impl
         jp      p126_overlay_call_module
 
 ; Convert one complete 80x25 B800 text page using the Project125 capture
@@ -57,37 +56,18 @@ x86_video_convert_impl:
         sbc     hl,de
         jp      nz,.video_convert_bad_mode
 
-        ; Project125-compatible capture policy:
-        ; always pull the legacy 80x25 colour text page at B800:0000.
-        ; Do not wait for CRTC/Sequencer/GDC mode programming. Real BIOS POST
-        ; writes its first status strings to B8000h before completing VGA init.
-        ; Project125 captured the backing character and attribute planes
-        ; directly; this uses the X86VGA cell API over the same fixed aperture.
-        ld      a,#80
-        ld      (x86_video_text_base_mid),a
-        ld      hl,0
-        ld      (x86_video_row_offset),hl
-        ld      hl,160
-        ld      (x86_video_stride),hl
-
+        ; Exact Project125 capture layout: 2000 character bytes followed
+        ; by 2000 attribute bytes. Project130 stores VGA planes in its 256 KiB
+        ; backing VRAM, so the X86VGA raw-plane gate reads plane 0/1 directly.
         ld      hl,0
         ld      (x86_video_frame_index),hl
-        xor     a
-        ld      (x86_video_row),a
-.video_convert_row:
-        ld      hl,(x86_video_row_offset)
-        ld      (x86_video_cell_offset),hl
-        xor     a
-        ld      (x86_video_col),a
-.video_convert_col:
-        ld      a,(x86_video_text_base_mid)
-        ld      hl,(x86_video_cell_offset)
+.video_convert_cell:
+        ld      hl,(x86_video_frame_index)
         call    x86_video_vga_read_text_cell
         ld      (x86_video_char),a
         ld      a,d
         ld      (x86_video_attr),a
 
-        ; Character plane followed by attribute plane.
         ld      hl,(x86_video_frame_index)
         ld      a,(x86_video_char)
         call    x86_video_write_frame_byte
@@ -100,31 +80,11 @@ x86_video_convert_impl:
         ld      hl,(x86_video_frame_index)
         inc     hl
         ld      (x86_video_frame_index),hl
-        ld      hl,(x86_video_cell_offset)
-        inc     hl
-        inc     hl
-        ld      (x86_video_cell_offset),hl
-        ld      a,(x86_video_col)
-        inc     a
-        ld      (x86_video_col),a
-        cp      P126_VIDEO_TEXT80_WIDTH
-        jp      c,.video_convert_col
-
-        ld      hl,(x86_video_row_offset)
-        ld      de,(x86_video_stride)
-        add     hl,de
-        ld      (x86_video_row_offset),hl
-        ld      a,(x86_video_row)
-        inc     a
-        ld      (x86_video_row),a
-        cp      P126_VIDEO_TEXT80_HEIGHT
-        jp      c,.video_convert_row
-
-        ld      hl,(x86_video_frame_index)
         ld      de,P126_VIDEO_TEXT80_CELLS
         or      a
         sbc     hl,de
-        jp      nz,.video_convert_bad_mode
+        jr      c,.video_convert_cell
+
         ld      hl,P126_VIDEO_TEXT80_FRAME_SIZE
         ld      (x86_video_frame_size),hl
         ld      a,1
@@ -157,7 +117,7 @@ x86_video_write_frame_byte:
         rrca
         out     (P126_NGS_BANK_WINDOW_PORT),a
         ld      hl,(x86_video_frame_offset)
-        ld      de,P126_IPC_HEADER_SIZE
+        ld      de,#C000
         add     hl,de
         ld      a,h
         and     #3F
