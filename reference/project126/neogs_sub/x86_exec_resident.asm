@@ -46,6 +46,7 @@ ENDIF
 ; address, actual byte returned by the memory backend, and WIN3 slot/page.
 x86_cpu_fetch_trace_bios_window:
         push    af
+        ld      (x86_fetch_trace_byte),a
         push    bc
         push    de
         push    hl
@@ -65,7 +66,6 @@ x86_cpu_fetch_trace_bios_window:
         sbc     hl,de
         jr      nc,.trace_done
 
-        ld      (x86_fetch_trace_byte),a
         ld      hl,x86_fetch_trace_prefix
         call    p126_ngs_resident_log
         ld      hl,(x86_reg_cs)
