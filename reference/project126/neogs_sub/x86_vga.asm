@@ -1697,6 +1697,7 @@ x86_vga_dump_nibble:
 x86_vga_dump_char:
         push    bc
         out     (#EF),a
+        pop     bc
         ret
 
 x86_vga_dump_offset: dw 0
