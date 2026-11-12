@@ -67,7 +67,7 @@ foreach ($n in $names) {
  if (-not (Test-Path $target)){throw "Project126 output missing: $n"}
 }
 $limits=@{ "X86CORE.C"=0x4000;"X86IO.C"=0x1000;"X86ALU.C"=0x1000;"X86DEV.C"=0x1000;"X86EXEC.C"=0x4000;"X86VGA.C"=0x4000;"X86VID.C"=0x4000 }
-foreach($n in $limits.Keys){
+foreach ($n in $limits.Keys) {
  $size=(Get-Item (Join-Path $Build $n)).Length
  if ($size -lt 1 -or $size -gt $limits[$n]){throw "$n size $size exceeds Project126 limit"}
  Write-Host "[P130 BUILD] $n SIZE=$size"
@@ -120,7 +120,7 @@ $diskText=(Get-Content -Raw "src/project126/project126_disk.asm").Replace("@@HOS
 Set-Content -Path (Join-Path $Root "project130_disk.generated.asm") -Value $diskText -Encoding ASCII
 & $SjAsmPlus --msg=all "--lst=build/P130_DISK.lst" "--lstlab=sort" "--sym=build/P130_DISK.map" "project130_disk.generated.asm"
 if ($LASTEXITCODE -ne 0){throw "Project126 TR-DOS packaging failed: $LASTEXITCODE"}
-if(-not(Test-Path $Out)){throw "disk_A.trd was not produced"}
+if (-not (Test-Path $Out)){throw "disk_A.trd was not produced"}
 $diskSize=(Get-Item $Out).Length
 if ($diskSize -ne 655360){throw "TR-DOS image size invalid: $diskSize"}
 
@@ -133,12 +133,12 @@ $entries=@(
  @{Name="X86VID  C";Length=0},@{Name="X86MODS C";Length=55},
  @{Name="BIOS1   C";Length=8192;Sectors=32},@{Name="BIOS2   C";Length=8192;Sectors=32},@{Name="COMPAQ  C";Length=8192;Sectors=32}
 )
-foreach($e in $entries){
+foreach ($e in $entries) {
  [byte[]]$key=[Text.Encoding]::ASCII.GetBytes($e.Name);$found=$false
  for ($off = 0; $off -lt 2048; $off += 16){
   $match=$true
-  for ($i = 0; $i -lt $key.Length; $i++){if($disk[$off + $i] -ne $key[$i]){$match=$false;break}}
-  if($match){
+  for ($i = 0; $i -lt $key.Length; $i++){if ($disk[$off + $i] -ne $key[$i]){$match=$false;break}}
+  if ($match) {
    $found=$true;$length=[int]$disk[$off+11]+([int]$disk[$off+12]-shl 8)
    if ($e.Length -ne 0 -and $length -ne $e.Length){throw "$($e.Name) length $length; expected $($e.Length)"}
    $sectors=[int]$disk[$off+13]
