@@ -115,6 +115,7 @@ x86_vga_io_read8_impl:
         ret
 
 x86_vga_io_write8_impl:
+        ld      (x86_io_value),a
         ld      hl,(x86_io_port)
         ld      de,#03C4
         or      a
@@ -404,6 +405,7 @@ x86_vga_compare_one:
         ret
 
 x86_vga_mem_write8_impl:
+        ld      (x86_mem_data),a
         call    x86_vga_decode_aperture
         ret     c
         ; Chain-2 writes use A0 to choose plane pair member and address>>1.
@@ -594,6 +596,12 @@ x86_vga_logic:
         xor     c
         ret
 
+ ; Project130 compatibility aliases for the Project125 register core.
+MPAGEX                  EQU P126_NGS_BANK_WINDOW_PORT
+x86_mem_addr            EQU x86_phys_addr
+x86_mem_value           EQU x86_mem_data
+x86_io_value:           db 0
+
 x86_vga_seq_index:       db 0
 x86_vga_gc_index:        db 0
 x86_vga_attr_index:      db 0
@@ -750,7 +758,8 @@ x86_vga_capture_text_frame_gate_impl:
         ld      a,#80
         call    x86_vga_read_text_cell_impl
         jr      c,.capture_fail
-        ld      (de),d
+        ld      a,d
+        ld      (de),a
         inc     de
         ld      hl,(x86_vga_capture_index)
         inc     hl
@@ -776,3 +785,47 @@ x86_vga_capture_text_frame_gate_impl:
         scf
         ret
 x86_vga_capture_index: dw 0
+
+; Project130 dynamic-overlay ABI.
+x86_vga_overlay_probe:
+        ld      a,#56
+        ld      hl,#A55A
+        ret
+
+x86_vga_register_selftest_impl:
+        call    x86_vga_reset_impl
+        ld      a,(x86_vga_seq_regs)
+        cp      3
+        jr      nz,.selftest_fail
+        ld      a,(x86_vga_gc_regs+8)
+        cp      #FF
+        jr      nz,.selftest_fail
+        ld      a,#5A
+        ld      hl,#A55A
+        ret
+.selftest_fail:
+        xor     a
+        ld      hl,0
+        scf
+        ret
+
+; Compatibility snapshot API. The converter uses the bulk capture entry
+; below; legacy callers receive the text register-state block.
+x86_vga_get_text_snapshot_impl:
+        ld      hl,x86_vga_seq_regs
+        xor     a
+        ret
+
+; The BIOS video overlay passes the port in HL and the byte in B.
+x86_vga_io_write8_gate_impl:
+        ld      a,b
+        ld      (x86_io_value),a
+        ld      (x86_io_port),hl
+        jp      x86_vga_io_write8_impl
+
+; The BIOS video overlay passes the physical address in x86_phys_addr
+; and the byte in B.
+x86_vga_mem_write8_gate_impl:
+        ld      a,b
+        ld      (x86_mem_data),a
+        jp      x86_vga_mem_write8_impl
