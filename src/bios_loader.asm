@@ -1,11 +1,15 @@
 ; Project130 SYSBIOS file loader, ported from Project126 working path.
 SECTION CODE
-P126_BIOS_FRAME EQU 0C000h
-P126_FLAG_FRAGMENT EQU 002h
-P126_BIOS_FILE_SIZE EQU 02000h
-P126_BIOS_SECTOR_COUNT EQU 32
-P126_BIOS_SECTOR_SIZE EQU 00100h
-P126_BIOS_FRAGMENT_DATA EQU 0C01Ch
+; Private names avoid collisions with the shared Project126 transport module.
+P130_BIOS_FRAME EQU 0C000h
+P130_BIOS_FLAG_FRAGMENT EQU 002h
+P130_BIOS_FILE_SIZE EQU 02000h
+P130_BIOS_SECTOR_COUNT EQU 32
+P130_BIOS_SECTOR_SIZE EQU 00100h
+P130_BIOS_FRAGMENT_DATA EQU 0C01Ch
+P130_BIOS_OP_IMAGE_FRAGMENT EQU 001h
+P130_BIOS_OP_IMAGE_FINISH EQU 002h
+P130_BIOS_SERVICE_IMAGE EQU 007h
 EXTERN p130_cat_debug_string
 EXTERN p130_cat_find_index
 EXTERN p130_trdos_rom_call
@@ -23,11 +27,11 @@ PUBLIC p130_bios_load_selected
 ; NeoGS installs the fragment into physical SYSBIOS page 10h.
 ; =========================================================================
 
-P126_BIOS_FILE_SIZE       EQU 02000h
-P126_BIOS_SECTOR_COUNT    EQU 32
-P126_BIOS_SECTOR_SIZE     EQU 00100h
-P126_BIOS_FRAME           EQU 0C000h
-P126_BIOS_FRAGMENT_DATA   EQU 0C01Ch
+P130_BIOS_FILE_SIZE       EQU 02000h
+P130_BIOS_SECTOR_COUNT    EQU 32
+P130_BIOS_SECTOR_SIZE     EQU 00100h
+P130_BIOS_FRAME           EQU 0C000h
+P130_BIOS_FRAGMENT_DATA   EQU 0C01Ch
 
 ; Called by the catalogue after Enter has been pressed and released.
 ; OUT: carry clear after NeoGS has acknowledged all three IMAGE operations.
@@ -115,12 +119,12 @@ p130_bios_load_selected:
 
         ; All selectable BIOS files must be exactly 8192 bytes / 32 sectors.
         ld      hl,(05CE8h)
-        ld      de,P126_BIOS_FILE_SIZE
+        ld      de,P130_BIOS_FILE_SIZE
         or      a
         sbc     hl,de
         jp      nz,p130_bios_bad_size
         ld      a,(05CEAh)
-        cp      P126_BIOS_SECTOR_COUNT
+        cp      P130_BIOS_SECTOR_COUNT
         jp      nz,p130_bios_bad_size
         ld      (p130_bios_sectors_left),a
         ld      hl,p130_bios_log_size_ok
@@ -133,18 +137,18 @@ p130_bios_load_selected:
         ld      (p130_bios_sector),a
         ld      a,(05CECh)
         ld      (p130_bios_track),a
-        ld      hl,P126_BIOS_FRAGMENT_DATA
+        ld      hl,P130_BIOS_FRAGMENT_DATA
         ld      (p130_bios_buffer_ptr),hl
 
-.p130_bios_read_loop:
+p130_bios_local_read_loop:
         ld      a,(p130_bios_sectors_left)
         or      a
-        jr      z,.p130_bios_read_done
+        jr      z,p130_bios_local_read_done
         call    p130_bios_read_next_sector
         jp      c,p130_bios_sector_error
-        jr      .p130_bios_read_loop
+        jr      p130_bios_local_read_loop
 
-.p130_bios_read_done:
+p130_bios_local_read_done:
         ; Identify the exact 8 KiB image that was read from TR-DOS.
         ; CRC-16/CCITT-FALSE is calculated over the staged BIOS bytes,
         ; before the DMA transaction, so the log identifies the payload sent.
@@ -162,18 +166,18 @@ p130_bios_load_selected:
         ; IMAGE_BEGIN payload:
         ; message-id=0001h, image-kind=SYSBIOS, physical-page=10h, size=2000h.
         ld      a,1
-        ld      (P126_BIOS_FRAME+18),a
+        ld      (P130_BIOS_FRAME+18),a
         xor     a
-        ld      (P126_BIOS_FRAME+19),a
-        ld      (P126_BIOS_FRAME+20),a
+        ld      (P130_BIOS_FRAME+19),a
+        ld      (P130_BIOS_FRAME+20),a
         ld      a,010h
-        ld      (P126_BIOS_FRAME+21),a
+        ld      (P130_BIOS_FRAME+21),a
         xor     a
-        ld      (P126_BIOS_FRAME+22),a
+        ld      (P130_BIOS_FRAME+22),a
         ld      a,020h
-        ld      (P126_BIOS_FRAME+23),a
+        ld      (P130_BIOS_FRAME+23),a
         xor     a
-        ld      (p130_bios_frame_flags),a
+        ld      (p126_bios_frame_flags),a
         ld      hl,p130_bios_log_image_begin_tx
         call    p130_cat_debug_string
         ld      bc,6
@@ -187,28 +191,28 @@ p130_bios_load_selected:
         ; IMAGE_FRAGMENT payload begins with the ABI 1.0 ten-byte extension:
         ; message-id=1, index=0, count=1, total logical data length=8192.
         ld      a,1
-        ld      (P126_BIOS_FRAME+18),a
+        ld      (P130_BIOS_FRAME+18),a
         xor     a
-        ld      (P126_BIOS_FRAME+19),a
-        ld      (P126_BIOS_FRAME+20),a
-        ld      (P126_BIOS_FRAME+21),a
+        ld      (P130_BIOS_FRAME+19),a
+        ld      (P130_BIOS_FRAME+20),a
+        ld      (P130_BIOS_FRAME+21),a
         ld      a,1
-        ld      (P126_BIOS_FRAME+22),a
+        ld      (P130_BIOS_FRAME+22),a
         xor     a
-        ld      (P126_BIOS_FRAME+23),a
-        ld      (P126_BIOS_FRAME+24),a
+        ld      (P130_BIOS_FRAME+23),a
+        ld      (P130_BIOS_FRAME+24),a
         ld      a,020h
-        ld      (P126_BIOS_FRAME+25),a
+        ld      (P130_BIOS_FRAME+25),a
         xor     a
-        ld      (P126_BIOS_FRAME+26),a
-        ld      (P126_BIOS_FRAME+27),a
-        ld      a,P126_FLAG_FRAGMENT
-        ld      (p130_bios_frame_flags),a
+        ld      (P130_BIOS_FRAME+26),a
+        ld      (P130_BIOS_FRAME+27),a
+        ld      a,P130_BIOS_FLAG_FRAGMENT
+        ld      (p126_bios_frame_flags),a
         ld      hl,p130_bios_log_image_fragment_tx
         call    p130_cat_debug_string
         ld      bc,0200Ah
         ld      de,2
-        ld      a,P126_OP_IMAGE_FRAGMENT
+        ld      a,P130_BIOS_OP_IMAGE_FRAGMENT
         call    p126_bios_send_frame
         jp      c,p130_bios_transport_error
         ld      hl,p130_bios_log_image_fragment_ok
@@ -216,16 +220,16 @@ p130_bios_load_selected:
 
         ; IMAGE_FINISH payload carries the same message ID.
         ld      a,1
-        ld      (P126_BIOS_FRAME+18),a
+        ld      (P130_BIOS_FRAME+18),a
         xor     a
-        ld      (P126_BIOS_FRAME+19),a
+        ld      (P130_BIOS_FRAME+19),a
         xor     a
-        ld      (p130_bios_frame_flags),a
+        ld      (p126_bios_frame_flags),a
         ld      hl,p130_bios_log_image_finish_tx
         call    p130_cat_debug_string
         ld      bc,2
         ld      de,3
-        ld      a,P126_OP_IMAGE_FINISH
+        ld      a,P130_BIOS_OP_IMAGE_FINISH
         call    p126_bios_send_frame
         jp      c,p130_bios_transport_error
         ld      hl,p130_bios_log_image_finish_ok
@@ -251,14 +255,14 @@ p130_bios_trace_search_state:
         call    p126_host_log_prefix
         ld      bc,000EFh
         ld      hl,p130_bios_trace_state_prefix
-.p130_bios_trace_state_text:
+p130_bios_local_trace_state_text:
         ld      a,(hl)
         inc     hl
         or      a
-        jr      z,.p130_bios_trace_state_values
+        jr      z,p130_bios_local_trace_state_values
         out     (c),a
-        jr      .p130_bios_trace_state_text
-.p130_bios_trace_state_values:
+        jr      p130_bios_local_trace_state_text
+p130_bios_local_trace_state_values:
         ld      a,(05C3Bh)
         call    p126_ipc_debug_hex_byte
         ld      a,' '
@@ -281,13 +285,13 @@ p130_bios_trace_search_state:
         out     (c),a
         ld      hl,03D13h
         ld      b,8
-.p130_bios_trace_rom_loop:
+p130_bios_local_trace_rom_loop:
         ld      a,(hl)
         call    p126_ipc_debug_hex_byte
         inc     hl
         ld      a,' '
         out     (c),a
-        djnz    .p130_bios_trace_rom_loop
+        djnz    p130_bios_local_trace_rom_loop
         ld      a,13
         out     (c),a
         ld      a,10
@@ -296,21 +300,21 @@ p130_bios_trace_search_state:
         call    p126_host_log_prefix
         ld      bc,000EFh
         ld      hl,p130_bios_trace_name_prefix
-.p130_bios_trace_name_text:
+p130_bios_local_trace_name_text:
         ld      a,(hl)
         inc     hl
         or      a
-        jr      z,.p130_bios_trace_name_value
+        jr      z,p130_bios_local_trace_name_value
         out     (c),a
-        jr      .p130_bios_trace_name_text
-.p130_bios_trace_name_value:
+        jr      p130_bios_local_trace_name_text
+p130_bios_local_trace_name_value:
         ld      hl,05CDDh
         ld      b,8
-.p130_bios_trace_name_loop:
+p130_bios_local_trace_name_loop:
         ld      a,(hl)
         inc     hl
         out     (c),a
-        djnz    .p130_bios_trace_name_loop
+        djnz    p130_bios_local_trace_name_loop
         ld      a,13
         out     (c),a
         ld      a,10
@@ -329,16 +333,16 @@ p130_bios_calculate_image_crc:
         push    de
         push    hl
         ld      hl,0FFFFh
-        ld      de,P126_BIOS_FRAGMENT_DATA
-        ld      bc,P126_BIOS_FILE_SIZE
-.p130_bios_image_crc_loop:
+        ld      de,P130_BIOS_FRAGMENT_DATA
+        ld      bc,P130_BIOS_FILE_SIZE
+p130_bios_local_image_crc_loop:
         ld      a,(de)
         inc     de
         call    p126_ipc_crc16_update
         dec     bc
         ld      a,b
         or      c
-        jr      nz,.p130_bios_image_crc_loop
+        jr      nz,p130_bios_local_image_crc_loop
         ld      (p130_bios_image_crc),hl
         pop     hl
         pop     de
@@ -355,28 +359,28 @@ p130_bios_log_image_identity:
         call    p126_host_log_prefix
         ld      bc,000EFh
         ld      hl,p130_bios_log_image_identity_prefix
-.p130_bios_image_identity_text:
+p130_bios_local_image_identity_text:
         ld      a,(hl)
         inc     hl
         or      a
-        jr      z,.p130_bios_image_identity_name
+        jr      z,p130_bios_local_image_identity_name
         out     (c),a
-        jr      .p130_bios_image_identity_text
-.p130_bios_image_identity_name:
+        jr      p130_bios_local_image_identity_text
+p130_bios_local_image_identity_name:
         ld      hl,05CDDh
         ld      b,8
-.p130_bios_image_identity_name_loop:
+p130_bios_local_image_identity_name_loop:
         ld      a,(hl)
         inc     hl
         out     (c),a
-        djnz    .p130_bios_image_identity_name_loop
+        djnz    p130_bios_local_image_identity_name_loop
         ld      a,'.'
         out     (c),a
         ld      a,'C'
         out     (c),a
         ld      a,' '
         out     (c),a
-        ld      hl,P126_BIOS_FILE_SIZE
+        ld      hl,P130_BIOS_FILE_SIZE
         ld      a,h
         call    p126_ipc_debug_hex_byte
         ld      a,l
@@ -408,21 +412,21 @@ p130_bios_log_selected_filename:
         call    p126_host_log_prefix
         ld      bc,000EFh
         ld      hl,p130_bios_log_filename_prefix
-.p130_bios_log_filename_prefix_loop:
+p130_bios_local_log_filename_prefix_loop:
         ld      a,(hl)
         inc     hl
         or      a
-        jr      z,.p130_bios_log_filename_name
+        jr      z,p130_bios_local_log_filename_name
         out     (c),a
-        jr      .p130_bios_log_filename_prefix_loop
-.p130_bios_log_filename_name:
+        jr      p130_bios_local_log_filename_prefix_loop
+p130_bios_local_log_filename_name:
         ld      hl,05CDDh
         ld      b,8
-.p130_bios_log_filename_name_loop:
+p130_bios_local_log_filename_name_loop:
         ld      a,(hl)
         inc     hl
         out     (c),a
-        djnz    .p130_bios_log_filename_name_loop
+        djnz    p130_bios_local_log_filename_name_loop
         ld      a,'.'
         out     (c),a
         ld      a,'C'
@@ -456,31 +460,31 @@ p130_bios_read_next_sector:
         ld      b,a
         ld      a,(05D10h)
         or      b
-        jr      nz,.p130_bios_read_failed
+        jr      nz,p130_bios_local_read_failed
 
         ld      hl,(p130_bios_buffer_ptr)
-        ld      de,P126_BIOS_SECTOR_SIZE
+        ld      de,P130_BIOS_SECTOR_SIZE
         add     hl,de
         ld      (p130_bios_buffer_ptr),hl
         ld      a,(p130_bios_sector)
         inc     a
         cp      16
-        jr      c,.p130_bios_same_track
+        jr      c,p130_bios_local_same_track
         xor     a
         ld      (p130_bios_sector),a
         ld      a,(p130_bios_track)
         inc     a
         ld      (p130_bios_track),a
-        jr      .p130_bios_cursor_done
-.p130_bios_same_track:
+        jr      p130_bios_local_cursor_done
+p130_bios_local_same_track:
         ld      (p130_bios_sector),a
-.p130_bios_cursor_done:
+p130_bios_local_cursor_done:
         ld      a,(p130_bios_sectors_left)
         dec     a
         ld      (p130_bios_sectors_left),a
         or      a
         ret
-.p130_bios_read_failed:
+p130_bios_local_read_failed:
         scf
         ret
 
@@ -566,47 +570,47 @@ p130_bios_fail:
         ld      (p130_bios_error),a
         ld      a,(p130_bios_disk_mode_active)
         or      a
-        jr      z,.p130_bios_fail_restore_stack
+        jr      z,p130_bios_local_fail_restore_stack
         call    p130_bios_restore_atm_video
         xor     a
         ld      (p130_bios_disk_mode_active),a
-.p130_bios_fail_restore_stack:
+p130_bios_local_fail_restore_stack:
         ld      hl,(p130_bios_saved_sp)
         ld      sp,hl
         ld      a,(p130_bios_error)
         cp      1
         ld      hl,p130_bios_log_bad_selection
-        jr      z,.p130_bios_log_failure
+        jr      z,p130_bios_local_log_failure
         cp      2
         ld      hl,p130_bios_log_bad_type
-        jr      z,.p130_bios_log_failure
+        jr      z,p130_bios_local_log_failure
         cp      3
         ld      hl,p130_bios_log_not_found
-        jr      z,.p130_bios_log_failure
+        jr      z,p130_bios_local_log_failure
         cp      4
         ld      hl,p130_bios_log_bad_descriptor
-        jr      z,.p130_bios_log_failure
+        jr      z,p130_bios_local_log_failure
         cp      5
         ld      hl,p130_bios_log_bad_size
-        jr      z,.p130_bios_log_failure
+        jr      z,p130_bios_local_log_failure
         cp      6
         ld      hl,p130_bios_log_sector_error
-        jr      z,.p130_bios_log_failure
+        jr      z,p130_bios_local_log_failure
         ld      hl,p130_bios_log_transport_error
-.p130_bios_log_failure:
+p130_bios_local_log_failure:
         call    p130_cat_debug_string
         ld      a,(p130_bios_error)
         scf
         ret
 
 p130_bios_saved_sp:        dw 0
-p130_bios_buffer_ptr:      dw P126_BIOS_FRAGMENT_DATA
+p130_bios_buffer_ptr:      dw P130_BIOS_FRAGMENT_DATA
 p130_bios_sectors_left:    db 0
 p130_bios_track:           db 0
 p130_bios_sector:          db 0
 p130_bios_error:           db 0
 p130_bios_disk_mode_active: db 0
-p130_bios_service:         db P126_SERVICE_IMAGE
+p130_bios_service:         db P130_BIOS_SERVICE_IMAGE
 p130_bios_operation:       db 0
 p130_bios_payload_length:  dw 0
 p130_bios_sequence:        dw 0
