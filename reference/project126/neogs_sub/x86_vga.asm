@@ -719,85 +719,57 @@ x86_vga_read_text_cell_impl:
 x86_vga_text_char: db 0
 x86_vga_text_attr: db 0
 
-; Capture 2000 text cells as contiguous chars then attrs in the P130 DMA page.
+; Capture follows the Project125 live-video data path:
+;   plane 0 -> 2000 character bytes
+;   plane 1 -> 2000 attribute bytes
+; The two planes are copied through the free WIN1 staging area because
+; Project130 executes this overlay from WIN2 and uses WIN3 for banked RAM.
+; WIN1 stack ends below #5000; host input mailbox starts at #7000.
+X86_VGA_CAPTURE_STAGE EQU #5000
+
 x86_vga_capture_text_frame_gate_impl:
         push    af
         push    bc
         push    de
         push    hl
-        ld      hl,0
-        ld      (x86_vga_capture_index),hl
+
+        ; Gather the complete character plane from the Project125-compatible
+        ; physical plane allocation. Keep the VGA plane page mapped only while
+        ; reading it; the staging buffer is in the independent WIN1 window.
+        ld      a,VGA_PLANE0_FIRST_PAGE
+        rrca
+        out     (P126_NGS_BANK_WINDOW_PORT),a
+        ld      hl,#C000
+        ld      de,X86_VGA_CAPTURE_STAGE
+        ld      bc,#07D0
+        ldir
+
+        ; Gather the complete attribute plane immediately after the chars.
+        ld      a,VGA_PLANE1_FIRST_PAGE
+        rrca
+        out     (P126_NGS_BANK_WINDOW_PORT),a
+        ld      hl,#C000
+        ld      de,X86_VGA_CAPTURE_STAGE+#07D0
+        ld      bc,#07D0
+        ldir
+
+        ; Restore the normal page-42 DMA producer mapping and publish the
+        ; exact Project125 payload layout at the P126 frame payload offset.
         ld      a,P126_NGS_DMA_PAGE
         rrca
         out     (P126_NGS_BANK_WINDOW_PORT),a
+        ld      hl,X86_VGA_CAPTURE_STAGE
         ld      de,#C000+P126_IPC_HEADER_SIZE
-        ld      bc,2000
-.capture_chars:
-        push    bc
-        ld      hl,(x86_vga_capture_index)
-        ld      a,#80
-        call    x86_vga_read_text_cell_impl
-        jr      c,.capture_fail
-        push    af
-        ld      a,P126_NGS_DMA_PAGE
-        rrca
-        out     (P126_NGS_BANK_WINDOW_PORT),a
-        pop     af
-        ld      (de),a
-        inc     de
-        ld      hl,(x86_vga_capture_index)
-        inc     hl
-        ld      (x86_vga_capture_index),hl
-        pop     bc
-        dec     bc
-        ld      a,b
-        or      c
-        jr      nz,.capture_chars
-        ld      hl,0
-        ld      (x86_vga_capture_index),hl
-        ld      a,P126_NGS_DMA_PAGE
-        rrca
-        out     (P126_NGS_BANK_WINDOW_PORT),a
-        ld      de,#C000+P126_IPC_HEADER_SIZE+2000
-        ld      bc,2000
-.capture_attrs:
-        push    bc
-        ld      hl,(x86_vga_capture_index)
-        ld      a,#80
-        call    x86_vga_read_text_cell_impl
-        jr      c,.capture_fail
-        push    af
-        ld      a,P126_NGS_DMA_PAGE
-        rrca
-        out     (P126_NGS_BANK_WINDOW_PORT),a
-        pop     af
-        ld      a,d
-        ld      (de),a
-        inc     de
-        ld      hl,(x86_vga_capture_index)
-        inc     hl
-        ld      (x86_vga_capture_index),hl
-        pop     bc
-        dec     bc
-        ld      a,b
-        or      c
-        jr      nz,.capture_attrs
+        ld      bc,#0FA0
+        ldir
+
         pop     hl
         pop     de
         pop     bc
         pop     af
-        ld      hl,4000
-        or      a
+        ld      hl,#0FA0
+        xor     a
         ret
-.capture_fail:
-        pop     bc
-        pop     hl
-        pop     de
-        pop     bc
-        pop     af
-        scf
-        ret
-x86_vga_capture_index: dw 0
 
 ; Project130 dynamic-overlay ABI.
 x86_vga_overlay_probe:
