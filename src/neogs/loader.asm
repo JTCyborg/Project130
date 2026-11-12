@@ -854,15 +854,9 @@ p130_neogs_open_file:
         ld      a,9
         ld      (05D06h),a
         ld      c,10
-        push    af
-        ld      a,'o'
-        call    p130_neogs_trace_char
-        pop     af
+        ; Keep the TR-DOS ROM-call boundary byte-for-byte equivalent to
+        ; Project126. Do not insert debug-port I/O inside the ROM ABI call.
         call 03D13h
-        push    af
-        ld      a,'O'
-        call    p130_neogs_trace_char
-        pop     af
         ld      a,c
         cp      0FFh
         jp      z,p130_neogs_open_file__p130_neogs_file_not_found
@@ -874,15 +868,7 @@ p130_neogs_open_file:
         ld      (05D10h),a
         pop     af
         ld      c,8
-        push    af
-        ld      a,'d'
-        call    p130_neogs_trace_char
-        pop     af
         call 03D13h
-        push    af
-        ld      a,'D'
-        call    p130_neogs_trace_char
-        pop     af
         ld      a,(05D0Fh)
         ld      b,a
         ld      a,(05D10h)
