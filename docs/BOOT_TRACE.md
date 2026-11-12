@@ -81,3 +81,10 @@ Build `P130-0.6.4-GS105A-JUMP-16BIT` corrects the #13 jump address according to 
 ## 2026-11-12 — GS105a jump entry probe
 
 Build `P130-0.6.5-BOOT-ENTRY-PROBE` adds a stackless DBIT entry signature `A0` as the first operation at `#4000`, before the bootstrap performs CALLs, changes GSCFG0, maps pages or initializes DMA. The ATM host now requires `A0` followed by `A1`: `A0` proves that #13 entered the uploaded image; `A1` proves that the bootstrap completed its setup. If the trace remains `!7E`, execution did not publish the first byte. If it reaches `b0` and then times out, the fault is inside bootstrap setup/ready transmission. This is a diagnostic handshake only; it does not start resident payload or DMA/IPC. Target build and runtime verification are pending.
+
+
+## 2026-11-12 — restore the exact Project126 bootstrap entry and A1 handshake
+
+Build `P130-0.6.6-P126-EXACT-BOOT-HANDSHAKE` removes the experimental A0 entry probe. The Project130 bootstrap now follows the proven Project126 entry order: DI, establish SP=#3FFF, local entry log, stop ZX DMA and settle, apply the same GSCFG0 NOROM/EXPAG transition, map the temporary windows, set SP=#FFFE, perform the #FF02 dummy read, and publish A1 as its first DBIT byte. The ATM host consumes exactly one A1 byte after the #13 high-address transfer. No extra byte is inserted into the Project126 protocol.
+
+This is a source-level restoration of the proven bootstrap entry/handshake, not a claim of a successful target build or Unreal Speccy runtime test. Those remain required.
