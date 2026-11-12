@@ -209,6 +209,10 @@ x86_bios_startup_trace:
         xor     a
         ld      (x86_bios_trace_first_slice_once),a
         ld      (x86_bios_rep_stosw_active),a
+        ld      (x86_bios_rep_stosw_done),a
+        ld      (x86_bios_rep_stosw_done+1),a
+        ld      (x86_bios_rep_stosw_total),a
+        ld      (x86_bios_rep_stosw_total+1),a
         ld      a,1
         ld      (x86_bios_trace_active),a
 .run_slice:
@@ -458,6 +462,13 @@ x86_bios_rep_stosw_progress:
         ld      a,1
         ld      (x86_bios_rep_stosw_active),a
 .rep_started:
+        ; Publish a live count for the ATM debug-screen overlay. The E1
+        ; snapshot copies these words into the host-visible status payload.
+        ld      hl,(x86_bios_rep_stosw_total)
+        ld      de,(x86_reg_cx)
+        or      a
+        sbc     hl,de
+        ld      (x86_bios_rep_stosw_done),hl
         ld      hl,(x86_reg_cx)
         ld      a,h
         or      l
@@ -499,6 +510,7 @@ x86_bios_rep_stosw_separator: db "/",0
 x86_bios_rep_stosw_suffix:    db 13,10,0
 x86_bios_rep_stosw_active:    db 0
 x86_bios_rep_stosw_total:     dw 0
+x86_bios_rep_stosw_done:      dw 0
 
 ; A=0 logs SS:SP; A=1 logs SS:(SP-2). Used only by the one-shot
 ; BIOS checksum-entry / invalid-return diagnostics.
