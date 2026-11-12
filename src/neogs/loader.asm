@@ -389,29 +389,6 @@ p130_ngs_read_first_sector:
         ld      a,(05D10h)
         or      b
         jr      nz,p130_ngs_trdos_open_error
-        xor     a
-        ret
-
-p130_ngs_read_first_sector:
-        ld      a,(p130_ngs_file_sectors_left)
-        or      a
-        jr      z,p130_ngs_trdos_open_error
-        ld      a,(p130_ngs_file_track)
-        ld      d,a
-        ld      a,(p130_ngs_file_sector)
-        ld      e,a
-        ld      hl,0C000h
-        ld      b,1
-        ld      c,5
-        xor     a
-        ld      (05D0Fh),a
-        ld      (05D10h),a
-        call    p130_trdos_rom_call
-        ld      a,(05D0Fh)
-        ld      b,a
-        ld      a,(05D10h)
-        or      b
-        jr      nz,p130_ngs_trdos_open_error
         jp      p130_ngs_advance_sector_cursor
 
 p130_ngs_read_next_sector:
