@@ -286,12 +286,6 @@ p130_neogs_startup_impl__p130_neogs_module_loop:
         call    p130_neogs_load_fixed_overlay
         pop     bc
         pop     hl
-        push    af
-        push    bc
-        push    hl
-        ld      hl,p130_neogs_module_return_log
-        call    p130_neogs_log_text
-        pop     hl
         ret     c
         djnz    p130_neogs_startup_impl__p130_neogs_module_loop
 
