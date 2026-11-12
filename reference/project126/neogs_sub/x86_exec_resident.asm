@@ -170,6 +170,8 @@ x86_exec_group3_imm16: dw 0
 x86_exec_group3_value8: db 0
 x86_exec_group45_opcode: db 0
 x86_exec_group45_ext: db 0
+x86_exec_group45_input8: db 0
+x86_exec_group45_readback8: db 0
 x86_exec_group45_value8: db 0
 x86_exec_group45_value16: dw 0
 x86_exec_group1_opcode: db 0
