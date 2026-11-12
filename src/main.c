@@ -185,12 +185,14 @@ void p130_c_entry(void)
     p130_report_memory();
     p130_rtc_start();
     p130_storage_start();
-    p130_debug_puts("[NEOGS] GS105a BOOTSTRAP LAUNCH BEGIN\r\n");
+    p130_debug_puts("[NEOGS] GS105a BOOTSTRAP LAUNCH BEGIN; TRACE=");
     if (p130_neogs_startup() == 0u) {
         p130_debug_puts("[NEOGS] NEOBOOT STARTED; GS105a ROM DISABLED\r\n");
         p130_debug_puts("[NEOGS] DMA/IPC PAYLOAD PATH HELD; MEMORY MAP NOT APPROVED\r\n");
     } else {
-        p130_debug_puts("[NEOGS] BOOTSTRAP LAUNCH FAILED / NOT PRESENT\r\n");
+        p130_debug_puts("\r\n[NEOGS] BOOTSTRAP LAUNCH FAILED; STAGE=");
+        p130_debug_hex8(p130_neogs_stage);
+        p130_debug_puts("\r\n");
     }
     p130_catalog_init();
     p130_debug_puts("[MAP] PHYSICAL W3 MAPPER NOT INITIALIZED\r\n");
