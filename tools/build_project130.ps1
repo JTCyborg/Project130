@@ -130,11 +130,15 @@ Write-Host "[P130 BUILD] NEOBOOT_SIZE=$NeoGsBootstrapSize (SAVEBIN #4000..#40FF;
 # over GSDAT; Project130's post-A1 payload path remains DMA/IPC.
 $CoreListing = Join-Path $BuildDir "P130_X86CORE.lst"
 $CoreSymbols = Join-Path $BuildDir "P130_X86CORE.map"
-Remove-Item -Force -ErrorAction SilentlyContinue $CoreListing, $CoreSymbols, (Join-Path $BuildDir "X86CORE.C")
+$CoreImage = Join-Path $BuildDir "X86CORE.C"
+# Clean stale outputs BEFORE assembly. The Project126 assembler itself emits
+# X86CORE.C and all six split overlays via SAVEBIN; never delete them afterward.
+Remove-Item -Force -ErrorAction SilentlyContinue $CoreListing, $CoreSymbols
+foreach ($Overlay in @("X86CORE.C","X86IO.C","X86ALU.C","X86DEV.C","X86EXEC.C","X86VGA.C","X86VID.C","X86MODS.MF")) {
+    Remove-Item -Force -ErrorAction SilentlyContinue (Join-Path $BuildDir $Overlay)
+}
 & $SjAsmPlus --msg=all "--lst=build/P130_X86CORE.lst" --lstlab=sort "--sym=build/P130_X86CORE.map" "reference/project126/neogs_sub/x86_cpu_state_assemble.asm"
 if ($LASTEXITCODE -ne 0) { throw "Project126-compatible resident preflight image assembly failed: $LASTEXITCODE" }
-$CoreImage = Join-Path $BuildDir "X86CORE.C"
-foreach ($Overlay in @("X86IO.C","X86ALU.C","X86DEV.C","X86EXEC.C","X86VGA.C","X86VID.C","X86MODS.MF")) { Remove-Item -Force -ErrorAction SilentlyContinue (Join-Path $BuildDir $Overlay) }
 if (-not (Test-Path $CoreImage)) { throw "Resident preflight image was not produced: build/X86CORE.C" }
 $CoreSize = (Get-Item $CoreImage).Length
 if ($CoreSize -le 0 -or $CoreSize -gt 0x4000) {
