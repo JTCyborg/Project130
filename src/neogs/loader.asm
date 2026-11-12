@@ -1602,6 +1602,7 @@ P126_IPC_TIMEOUT EQU 0FFFFh
 P126_IPC_DMA_WINDOW EQU 0000h
 P126_IPC_DMA_END EQU 0FFh
 P126_BIOS_FRAME EQU 0C000h
+PUBLIC p126_ipc_crc16_update
 p126_ipc_crc16_update:
         push    bc
         xor     h
@@ -1875,8 +1876,6 @@ p126_ipc_dma_error: db 0
 PUBLIC p126_bios_send_frame
 PUBLIC p126_bios_frame_flags
 PUBLIC p126_ipc_debug_hex_byte
-PUBLIC p126_ipc_crc16_update
-PUBLIC p126_ipc_crc16_update
 PUBLIC p126_host_log_prefix
 p126_bios_send_frame:
         ld      (p126_bios_operation),a

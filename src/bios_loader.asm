@@ -27,12 +27,6 @@ PUBLIC p130_bios_load_selected
 ; NeoGS installs the fragment into physical SYSBIOS page 10h.
 ; =========================================================================
 
-P130_BIOS_FILE_SIZE       EQU 02000h
-P130_BIOS_SECTOR_COUNT    EQU 32
-P130_BIOS_SECTOR_SIZE     EQU 00100h
-P130_BIOS_FRAME           EQU 0C000h
-P130_BIOS_FRAGMENT_DATA   EQU 0C01Ch
-
 ; Called by the catalogue after Enter has been pressed and released.
 ; OUT: carry clear after NeoGS has acknowledged all three IMAGE operations.
 p130_bios_load_selected:
@@ -47,7 +41,7 @@ p130_bios_load_selected:
         ld      (p130_bios_disk_mode_active),a
 
         ; Resolve the selected visible catalogue index to its TR-DOS entry.
-        ld      a,(p130_cat_selected)
+        ld      a,(_p130_catalog_selected_index)
         call    p130_cat_find_index
         jp      c,p130_bios_bad_selection
         ; Preserve the selected directory-entry pointer across logging.
@@ -325,6 +319,27 @@ p130_bios_local_trace_name_loop:
         pop     af
         ret
 
+; Local CRC-16/CCITT-FALSE byte update. HL=CRC, A=input byte.
+; Kept local so the BIOS loader does not depend on cross-object visibility.
+p130_bios_crc16_update:
+        push    bc
+        xor     h
+        ld      h,a
+        ld      b,8
+p130_bios_crc16_update_bit:
+        add     hl,hl
+        jr      nc,p130_bios_crc16_update_no_xor
+        ld      a,h
+        xor     010h
+        ld      h,a
+        ld      a,l
+        xor     021h
+        ld      l,a
+p130_bios_crc16_update_no_xor:
+        djnz    p130_bios_crc16_update_bit
+        pop     bc
+        ret
+
 ; CRC-16/CCITT-FALSE over the exact 8192 bytes staged at C01C.
 ; OUT: p130_bios_image_crc contains the CRC, all caller registers preserved.
 p130_bios_calculate_image_crc:
@@ -338,7 +353,7 @@ p130_bios_calculate_image_crc:
 p130_bios_local_image_crc_loop:
         ld      a,(de)
         inc     de
-        call    p126_ipc_crc16_update
+        call    p130_bios_crc16_update
         dec     bc
         ld      a,b
         or      c
