@@ -6,7 +6,7 @@
 #define P130_CATALOGUE_ADDR 0xC800u
 #define P130_CATALOGUE_SIZE 2048u
 
-#define P130_BUILD_ID "BOOTSTRAP-0.4.6-P126-GS105A-ENTRY"
+#define P130_BUILD_ID "BOOTSTRAP-0.4.7-P126-REFERENCE"
 
 static void p130_report_memory(void)
 {
