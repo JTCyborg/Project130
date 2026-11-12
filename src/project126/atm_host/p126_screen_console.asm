@@ -619,7 +619,8 @@ p126_screen_apply_text_frame::
         ld      hl,P126_IPC_DMA_RX_BUFFER
         ld      (p126_screen_frame_char_ptr),hl
         ld      hl,P126_IPC_DMA_RX_BUFFER+P126_VIDEO_TEXT80_CELLS
-        ld      (p126_screen_frame_attr_ptr),hl        xor     a
+        ld      (p126_screen_frame_attr_ptr),hl
+        xor     a
         ld      (p126_screen_frame_row),a
 .apply_text_row:
         xor     a
