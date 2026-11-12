@@ -319,3 +319,5 @@ x86_video_module_end:
     ASSERT x86_video_module_end > x86_video_module_start
     ASSERT x86_video_module_end <= #C000
     ASSERT x86_video_module_end-x86_video_module_start <= P126_IMAGE_X86VID_MAX_SIZE
+    ASSERT bios_int10_dispatch_impl >= x86_video_module_start
+    ASSERT bios_int10_dispatch_impl < x86_video_module_end

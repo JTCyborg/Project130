@@ -2459,6 +2459,19 @@ x86_exec_interrupt:
         ld      h,a
         ld      (x86_reg_flags),hl
 
+        ; Project125-compatible BIOS INT 10h text services in X86VID.
+        ld      a,(x86_exec_interrupt_vector)
+        cp      #10
+        jr      nz,.interrupt_use_guest_ivt
+        ld      a,(p126_ngs_vid_overlay_ready)
+        or      a
+        jr      z,.interrupt_use_guest_ivt
+        ld      a,6
+        ld      ix,bios_int10_dispatch_impl
+        call    p126_overlay_call_module
+        jp      x86_exec_iret
+
+.interrupt_use_guest_ivt:
         ; IVT entry is vector*4 at physical segment 0000.
         ld      a,(x86_exec_interrupt_vector)
         ld      l,a

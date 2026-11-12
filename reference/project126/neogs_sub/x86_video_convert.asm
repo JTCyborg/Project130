@@ -183,3 +183,6 @@ x86_video_row:           db 0
 x86_video_col:           db 0
 x86_video_char:          db 0
 x86_video_attr:          db 0
+
+; Project125-compatible BIOS INT 10h text services.
+INCLUDE "reference/project126/neogs_sub/x86_bios_video.asm"
