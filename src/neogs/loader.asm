@@ -270,6 +270,16 @@ p130_ngs_stream_done:
         ld      (_p130_neogs_stage),a
         ld      a,'9'
         call    p130_ngs_trace
+        ; First acknowledgement proves execution reached #4000.
+        call    p130_ngs_wait_dbit_set
+        jp      c,p130_ngs_fail
+        in      a,(P130_GSDAT)
+        cp      0E0h
+        jr      nz,p130_ngs_ack_bad
+        ld      a,'e'
+        call    p130_ngs_trace
+
+        ; Second acknowledgement proves bootstrap completed ROM/DMA setup.
         call    p130_ngs_wait_dbit_set
         jp      c,p130_ngs_fail
         ld      a,'a'
