@@ -22,7 +22,7 @@ Set-Content -Path $BuildLog -Value "# Project130 build input/output manifest" -E
 Add-Content -Path $BuildLog -Value "# FORMAT=ROLE|PATH|BYTES|SHA256"
 $BuildFileSeen=@{}
 function Add-BuildFile([string]$Path,[string]$Role,[bool]$Scan=$true){
- $full=[IO.Path]::GetFullPath((Join-Path $Root $Path))
+ if([IO.Path]::IsPathRooted($Path)){$full=[IO.Path]::GetFullPath($Path)}else{$full=[IO.Path]::GetFullPath((Join-Path $Root $Path))}
  $key=$full.ToLowerInvariant()
  if($BuildFileSeen.ContainsKey($key)){return}
  $BuildFileSeen[$key]=$true
