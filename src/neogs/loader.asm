@@ -15,6 +15,8 @@ P130_CMD_JUMP    EQU 013h
 P130_CMD_RECV    EQU 014h
 P130_CMD_RESET   EQU 0F4h
 P130_ACK_READY   EQU 0A1h
+P130_ACK_LENGTH  EQU 0A3h
+P130_ACK_DONE    EQU 0A2h
 
 _p130_neogs_startup:
         ; Run the Project126 pre-video TR-DOS ROM call path directly.
@@ -36,45 +38,51 @@ _p130_neogs_startup:
         xor     a
         ld      (p130_ngs_result),a
 
-        ; Project126-compatible TR-DOS open/read path. Do not scan the
-        ; preloaded catalogue: use C=#0A, C=#08 and C=#05 for both files.
-        ld      a,'R'
+        ; Project126 startup transaction, ported in the same order and with
+        ; the same diagnostic markers. Only the P130 symbol/filename names
+        ; and the C-callable entry/return wrapper differ.
+        ld      a,1
+        ld      (_p130_neogs_stage),a
+        ld      a,'1'
         call    p130_ngs_trace
         ld      hl,p130_ngs_boot_name
         call    p130_ngs_open_file
         jp      c,p130_ngs_fail
+
+        ld      a,2
+        ld      (_p130_neogs_stage),a
+        ld      a,'2'
+        call    p130_ngs_trace
+        ; Accept bootstrap files of 1..255 bytes and exactly 256 bytes.
         ld      hl,(p130_ngs_length)
         ld      a,h
         or      a
-        jr      z,p130_ngs_boot_len_low
+        jr      z,p130_ngs_boot_length_low
         cp      1
         jp      nz,p130_ngs_fail
         ld      a,l
         or      a
         jp      nz,p130_ngs_fail
-        jr      p130_ngs_boot_len_ok
-p130_ngs_boot_len_low:
+        jr      p130_ngs_boot_length_ok
+p130_ngs_boot_length_low:
         ld      a,l
         or      a
         jp      z,p130_ngs_fail
-p130_ngs_boot_len_ok:
-        ld      a,'r'
-        call    p130_ngs_trace
+p130_ngs_boot_length_ok:
 
-        ; Match Project126 reset and #14 transaction byte-for-byte.
-        ld      a,5
+        ; Exact Project126 reset step: no #20 RAM probe.
+        ld      a,0Ah
         ld      (_p130_neogs_stage),a
-        ld      a,'5'
+        ld      a,'A'
         call    p130_ngs_trace
         ld      a,P130_CMD_RESET
         call    p130_ngs_send_command_long
         jp      c,p130_ngs_fail
 
-        ; Project126 rule: do not issue the stock-ROM #20 RAM query.
-        ; It is not part of the proven #F4 -> #14 -> #13 bootstrap sequence.
-        ld      a,6
+        ; GS105a #14 receives NEOBOOT.C at logical #4000.
+        ld      a,4
         ld      (_p130_neogs_stage),a
-        ld      a,'6'
+        ld      a,'4'
         call    p130_ngs_trace
         ld      hl,0
         ld      de,(p130_ngs_length)
@@ -96,38 +104,35 @@ p130_ngs_boot_len_ok:
         ld      a,040h
         call    p130_ngs_send_byte
         jp      c,p130_ngs_fail
-
-        ld      a,7
-        ld      (_p130_neogs_stage),a
-        ld      a,'7'
-        call    p130_ngs_trace
         ld      hl,0C000h
         ld      de,(p130_ngs_length)
-p130_ngs_stream:
+p130_ngs_boot_stream:
         ld      a,d
         or      e
-        jr      z,p130_ngs_stream_done
+        jr      z,p130_ngs_boot_loaded
         ld      a,(hl)
         call    p130_ngs_send_byte
         jp      c,p130_ngs_fail
         inc     hl
         dec     de
-        jr      p130_ngs_stream
-
-p130_ngs_stream_done:
-        ; Match Project126's pre-JUMP disk transaction exactly: open X86CORE.C,
-        ; read its first sector into C000h and validate the 1..16 KiB length.
-        ; The image is NOT sent over GSDAT here; Project130 will hand off to
-        ; its own DMA/IPC transport after the common A1 bootstrap handshake.
-        ld      a,8
+        jr      p130_ngs_boot_stream
+p130_ngs_boot_loaded:
+        ; Project126 opens X86CORE.C and primes its first 256-byte sector
+        ; BEFORE entering stage-0. Preserve that ordering exactly.
+        ld      a,5
         ld      (_p130_neogs_stage),a
-        ld      a,'8'
+        ld      a,'5'
         call    p130_ngs_trace
         ld      hl,p130_ngs_core_name
         ld      a,'C'
         ld      (p130_ngs_file_extension),a
         call    p130_ngs_open_file
         jp      c,p130_ngs_fail
+
+        ld      a,6
+        ld      (_p130_neogs_stage),a
+        ld      a,'6'
+        call    p130_ngs_trace
         ld      hl,(p130_ngs_length)
         ld      a,h
         cp      040h
@@ -140,15 +145,14 @@ p130_ngs_core_size_low:
         ld      a,h
         or      l
         jp      z,p130_ngs_fail
+        ld      hl,(p130_ngs_length)
         ld      (p130_ngs_core_length),hl
 
-        ld      a,9
+        ; Enter stage-0 at #4000. This is the Project126 #13 transaction.
+        ld      a,7
         ld      (_p130_neogs_stage),a
-        ld      a,'9'
+        ld      a,'7'
         call    p130_ngs_trace
-        ; Match the working Project126/125 #13 16-bit address transaction:
-        ; preload the LOW byte #00 before dispatch, then send HIGH byte #40
-        ; through DBIT after command completion. #40 is NOT the first argument.
         xor     a
         call    p130_ngs_send_argument
         jp      c,p130_ngs_fail
@@ -157,38 +161,32 @@ p130_ngs_core_size_low:
         jp      c,p130_ngs_fail
         ld      a,040h
         call    p130_ngs_send_byte
-        ; Match Project126's special DBIT turnaround: a timeout while
-        ; sending the final address byte may mean the target has already
-        ; switched to bootstrap mode and is publishing A1.
         jr      nc,p130_ngs_jump_tx_done
         in      a,(P130_GSSTAT)
         bit     7,a
         jp      z,p130_ngs_jump_tx_fail
-p130_ngs_jump_tx_done:
-        ld      a,9
-        ld      (_p130_neogs_stage),a
-        ld      a,'9'
-        call    p130_ngs_trace
-        ; Project126 publishes A1 as the FIRST byte after entering
-        ; and initializing the bootstrap. Do not insert a diagnostic A0 byte:
-        ; the host must consume the original Project126 handshake unchanged.
         call    p130_ngs_receive_byte
         jp      c,p130_ngs_ack_timeout
-        ld      (p130_ngs_ack_value),a
         cp      P130_ACK_READY
         jp      nz,p130_ngs_ack_bad
-        ld      a,'a'
-        call    p130_ngs_trace
-        ld      a,'1'
-        call    p130_ngs_trace
+        jr      p130_ngs_stage0_ready
+p130_ngs_jump_tx_done:
+        call    p130_ngs_receive_byte
+        jp      c,p130_ngs_ack_timeout
+        cp      P130_ACK_READY
+        jp      nz,p130_ngs_ack_bad
 
-        ; Project126 stage-0 resident handoff: length -> A3 -> complete image -> A2.
+p130_ngs_stage0_ready:
+        ; Stage-0 length exchange; A3 confirms the exact resident size.
         ld      a,8
         ld      (_p130_neogs_stage),a
-        ld      a,(p130_ngs_core_length)
+        ld      a,'8'
+        call    p130_ngs_trace
+        ld      hl,(p130_ngs_core_length)
+        ld      a,l
         call    p130_ngs_send_byte
         jp      c,p130_ngs_fail
-        ld      a,(p130_ngs_core_length+1)
+        ld      a,h
         call    p130_ngs_send_byte
         jr      nc,p130_ngs_length_sent
         in      a,(P130_GSSTAT)
@@ -208,6 +206,8 @@ p130_ngs_length_sent:
 p130_ngs_stream_begin:
         ld      a,9
         ld      (_p130_neogs_stage),a
+        ld      a,'9'
+        call    p130_ngs_trace
         ld      hl,0C000h
         ld      (p130_ngs_buffer_ptr),hl
         ld      hl,256
@@ -217,6 +217,7 @@ p130_ngs_core_stream:
         ld      a,d
         or      e
         jr      z,p130_ngs_core_stream_done
+        ; Refill only after all 256 bytes in the current sector are consumed.
         ld      hl,(p130_ngs_buffer_remaining)
         ld      a,h
         or      l
@@ -241,9 +242,13 @@ p130_ngs_core_buffer_ready:
         ld      (p130_ngs_buffer_remaining),hl
         dec     de
         jr      p130_ngs_core_stream
+
 p130_ngs_core_stream_done:
+        ; P126 marks the post-transfer resident-ready wait with 'B'.
         ld      a,0Bh
         ld      (_p130_neogs_stage),a
+        ld      a,'B'
+        call    p130_ngs_trace
         call    p130_ngs_receive_byte
         jp      c,p130_ngs_fail
         cp      0A2h
@@ -576,7 +581,7 @@ p130_ngs_ok:
 PUBLIC _p130_neogs_stage
 _p130_neogs_stage: db 0
 
-p130_ngs_boot_name: db "NEOBOOT C"
+p130_ngs_boot_name: db "NEOBOOT "
 p130_ngs_core_name: db "X86CORE "
 p130_ngs_length:    dw 0
 p130_ngs_core_length: dw 0
