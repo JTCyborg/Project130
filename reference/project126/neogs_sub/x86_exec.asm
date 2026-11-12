@@ -3711,6 +3711,51 @@ x86_exec_string:
         ld      (x86_exec_string_width),a
         ld      a,(x86_exec_prefix_rep)
         ld      (x86_exec_string_rep),a
+
+        ; PROJECT130 TEST BYPASS:
+        ; BIOS F000:E12F executes F3 AB (REP STOSW) as a RAM-clear test.
+        ; Skip the memory writes but preserve the architectural completion
+        ; state: CX becomes zero and DI advances by the full CX*2 byte count
+        ; in the direction selected by DF. IP already points past F3 AB.
+        ; This is deliberately limited to this exact BIOS instruction.
+        ld      hl,(x86_exec_instruction_start_cs)
+        ld      de,#F000
+        or      a
+        sbc     hl,de
+        jr      nz,.string_not_bios_clear
+        ld      hl,(x86_exec_instruction_start_ip)
+        ld      de,#E12F
+        or      a
+        sbc     hl,de
+        jr      nz,.string_not_bios_clear
+        ld      a,(x86_exec_opcode)
+        cp      #AB
+        jr      nz,.string_not_bios_clear
+        ld      a,(x86_exec_string_rep)
+        cp      2
+        jr      nz,.string_not_bios_clear
+
+        ld      hl,(x86_reg_cx)
+        add     hl,hl
+        ld      de,(x86_reg_di)
+        ld      a,(x86_reg_flags+1)
+        bit     2,a
+        jr      nz,.bios_clear_reverse
+        add     hl,de
+        jr      .bios_clear_store_di
+.bios_clear_reverse:
+        ex      de,hl
+        or      a
+        sbc     hl,de
+.bios_clear_store_di:
+        ld      (x86_reg_di),hl
+        xor     a
+        ld      (x86_reg_cx),a
+        ld      (x86_reg_cx+1),a
+        or      a
+        ret
+
+.string_not_bios_clear:
         or      a
         jr      z,.string_single
 
