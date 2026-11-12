@@ -132,8 +132,9 @@ bios_video_vga_write:
         ld      (bios_video_vga_value),a
         ld      hl,(bios_video_vga_port)
         ld      a,(bios_video_vga_value)
+        ld      b,a
         ld      a,P126_NGS_X86VGA_MODULE_ID
-        ld      ix,x86_vga_io_write8_impl
+        ld      ix,x86_vga_io_write8_gate_impl
         jp      p126_overlay_call_module
 
 bios_video_clear_page:
