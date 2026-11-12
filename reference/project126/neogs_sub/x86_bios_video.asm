@@ -10,6 +10,9 @@ BIOS_VIDEO_MODE    EQU #03
 BIOS_VIDEO_ATTR    EQU #07
 
 bios_int10_dispatch_impl:
+        ; Match Project125 diagnostics: trace the INT10 register image before
+        ; dispatch, bounded so a verbose BIOS cannot flood the #EF log.
+        call    bios_video_trace_int10
         ld      hl,(x86_reg_ax)
         ld      a,h
         cp      #00
@@ -20,6 +23,10 @@ bios_int10_dispatch_impl:
         jp      z,bios_int10_set_cursor
         cp      #03
         jp      z,bios_int10_get_cursor
+        cp      #06
+        jp      z,bios_int10_scroll_up
+        cp      #07
+        jp      z,bios_int10_scroll_down
         cp      #0E
         jp      z,bios_int10_teletype
         or      a
@@ -149,6 +156,285 @@ bios_video_clear_page:
         ld      (bios_video_row),a
         ld      (bios_video_col),a
         ret
+
+; INT 10h AH=06h/07h — Project125 text-window scrolling.
+; AL=lines (0=clear), BH=fill attribute, CH/CL=top-left, DH/DL=bottom-right.
+bios_int10_scroll_up:
+        xor     a
+        ld      (bios_scroll_direction),a
+        jr      bios_int10_scroll_common
+bios_int10_scroll_down:
+        ld      a,1
+        ld      (bios_scroll_direction),a
+bios_int10_scroll_common:
+        ld      a,(x86_reg_cx+1)
+        cp      BIOS_VIDEO_ROWS
+        ret     nc
+        ld      (bios_scroll_top),a
+        ld      a,(x86_reg_cx)
+        cp      BIOS_VIDEO_COLUMNS
+        ret     nc
+        ld      (bios_scroll_left),a
+        ld      a,(x86_reg_dx+1)
+        cp      BIOS_VIDEO_ROWS
+        ret     nc
+        ld      (bios_scroll_bottom),a
+        ld      a,(x86_reg_dx)
+        cp      BIOS_VIDEO_COLUMNS
+        ret     nc
+        ld      (bios_scroll_right),a
+        ld      a,(bios_scroll_top)
+        ld      b,a
+        ld      a,(bios_scroll_bottom)
+        cp      b
+        ret     c
+        ld      a,(bios_scroll_left)
+        ld      b,a
+        ld      a,(bios_scroll_right)
+        cp      b
+        ret     c
+        ld      a,(x86_reg_ax)
+        ld      (bios_scroll_lines),a
+        ld      a,(x86_reg_bx+1)
+        ld      (bios_scroll_attr),a
+        ld      a,(bios_scroll_bottom)
+        ld      b,a
+        ld      a,(bios_scroll_top)
+        ld      c,a
+        ld      a,b
+        sub     c
+        inc     a
+        ld      (bios_scroll_height),a
+        ld      a,(bios_scroll_lines)
+        or      a
+        jp      z,.clear_all
+        ld      b,a
+        ld      a,(bios_scroll_height)
+        cp      b
+        jr      nc,.count_valid
+        ld      a,b
+        ld      (bios_scroll_lines),a
+        jp      .clear_all
+.count_valid:
+        ld      a,(bios_scroll_lines)
+        ld      (bios_scroll_remaining),a
+        ld      a,(bios_scroll_direction)
+        or      a
+        jr      nz,.down_start
+        ld      a,(bios_scroll_top)
+        ld      (bios_scroll_row),a
+.up_copy:
+        ld      a,(bios_scroll_bottom)
+        ld      b,a
+        ld      a,(bios_scroll_remaining)
+        ld      c,a
+        ld      a,b
+        sub     c
+        ld      b,a
+        ld      a,(bios_scroll_row)
+        cp      b
+        jr      c,.up_copy_row
+        jr      z,.up_copy_row
+        jr      .up_clear_start
+.up_copy_row:
+        ld      a,(bios_scroll_row)
+        ld      b,a
+        ld      a,(bios_scroll_remaining)
+        add     a,b
+        ld      (bios_scroll_source_row),a
+        call    bios_scroll_copy_row
+        ld      a,(bios_scroll_row)
+        inc     a
+        ld      (bios_scroll_row),a
+        jr      .up_copy
+.up_clear_start:
+        ld      a,(bios_scroll_bottom)
+        ld      b,a
+        ld      a,(bios_scroll_remaining)
+        ld      c,a
+        ld      a,b
+        sub     c
+        inc     a
+        ld      (bios_scroll_row),a
+        ld      a,(bios_scroll_bottom)
+        ld      (bios_scroll_clear_limit),a
+        jr      .clear_rows
+.down_start:
+        ld      a,(bios_scroll_bottom)
+        ld      (bios_scroll_row),a
+.down_copy:
+        ld      a,(bios_scroll_top)
+        ld      b,a
+        ld      a,(bios_scroll_remaining)
+        add     a,b
+        ld      b,a
+        ld      a,(bios_scroll_row)
+        cp      b
+        jr      nc,.down_copy_row
+        jr      .down_clear_start
+.down_copy_row:
+        ld      a,(bios_scroll_row)
+        ld      b,a
+        ld      a,(bios_scroll_remaining)
+        ld      c,a
+        ld      a,b
+        sub     c
+        ld      (bios_scroll_source_row),a
+        call    bios_scroll_copy_row
+        ld      a,(bios_scroll_row)
+        dec     a
+        ld      (bios_scroll_row),a
+        jr      .down_copy
+.down_clear_start:
+        ld      a,(bios_scroll_top)
+        ld      b,a
+        ld      a,(bios_scroll_remaining)
+        add     a,b
+        dec     a
+        ld      (bios_scroll_clear_limit),a
+        ld      a,(bios_scroll_top)
+        ld      (bios_scroll_row),a
+        jr      .clear_rows
+.clear_all:
+        ld      a,(bios_scroll_bottom)
+        ld      (bios_scroll_clear_limit),a
+        ld      a,(bios_scroll_top)
+        ld      (bios_scroll_row),a
+.clear_rows:
+        ld      a,(bios_scroll_row)
+        ld      b,a
+        ld      a,(bios_scroll_clear_limit)
+        cp      b
+        jr      c,.scroll_done
+        call    bios_scroll_clear_row
+        ld      a,(bios_scroll_row)
+        inc     a
+        ld      (bios_scroll_row),a
+        jr      .clear_rows
+.scroll_done:
+        or      a
+        ret
+
+; Copy source row to destination row, preserving character and attribute.
+bios_scroll_copy_row:
+        ld      a,(bios_scroll_left)
+        ld      (bios_scroll_col),a
+.copy_cell:
+        ld      a,(bios_scroll_source_row)
+        ld      b,a
+        ld      a,(bios_scroll_col)
+        ld      c,a
+        call    bios_video_calc_cell_offset
+        call    bios_video_read_offset
+        ret     c
+        ld      (bios_scroll_char),a
+        ld      hl,(bios_scroll_guest_offset)
+        inc     hl
+        call    bios_video_read_offset
+        ret     c
+        ld      (bios_scroll_cell_attr),a
+        ld      a,(bios_scroll_row)
+        ld      b,a
+        ld      a,(bios_scroll_col)
+        ld      c,a
+        call    bios_video_calc_cell_offset
+        ld      a,(bios_scroll_char)
+        call    bios_video_write_offset
+        ret     c
+        ld      hl,(bios_scroll_guest_offset)
+        inc     hl
+        ld      a,(bios_scroll_cell_attr)
+        call    bios_video_write_offset
+        ret     c
+        ld      a,(bios_scroll_col)
+        ld      b,a
+        ld      a,(bios_scroll_right)
+        cp      b
+        ret     z
+        inc     b
+        ld      a,b
+        ld      (bios_scroll_col),a
+        jr      .copy_cell
+
+bios_scroll_clear_row:
+        ld      a,(bios_scroll_left)
+        ld      (bios_scroll_col),a
+.clear_cell:
+        ld      a,(bios_scroll_row)
+        ld      b,a
+        ld      a,(bios_scroll_col)
+        ld      c,a
+        call    bios_video_calc_cell_offset
+        ld      a,32
+        call    bios_video_write_offset
+        ret     c
+        ld      hl,(bios_scroll_guest_offset)
+        inc     hl
+        ld      a,(bios_scroll_attr)
+        call    bios_video_write_offset
+        ret     c
+        ld      a,(bios_scroll_col)
+        ld      b,a
+        ld      a,(bios_scroll_right)
+        cp      b
+        ret     z
+        inc     b
+        ld      a,b
+        ld      (bios_scroll_col),a
+        jr      .clear_cell
+
+; IN B=row, C=column. OUT HL=byte offset within B800 text aperture.
+bios_video_calc_cell_offset:
+        ld      hl,0
+        ld      de,160
+        ld      a,b
+        or      a
+        jr      z,.row_done
+        ld      b,a
+.row_loop:
+        add     hl,de
+        djnz    .row_loop
+.row_done:
+        ld      a,c
+        add     a,a
+        ld      e,a
+        ld      d,0
+        add     hl,de
+        ld      (bios_scroll_guest_offset),hl
+        ret
+
+bios_video_read_offset:
+        ld      (bios_scroll_guest_offset),hl
+        ld      hl,#B800
+        ld      de,(bios_scroll_guest_offset)
+        call    x86_cpu_calc_phys
+        jp      x86_guest_mem_read8
+
+bios_video_write_offset:
+        ld      (bios_scroll_guest_offset),hl
+        ld      (bios_video_guest_value),a
+        ld      hl,#B800
+        ld      de,(bios_scroll_guest_offset)
+        call    x86_cpu_calc_phys
+        ld      a,(bios_video_guest_value)
+        jp      x86_guest_mem_write8
+
+bios_scroll_top:          db 0
+bios_scroll_bottom:       db 0
+bios_scroll_clear_limit:  db 0
+bios_scroll_left:         db 0
+bios_scroll_right:        db 0
+bios_scroll_lines:        db 0
+bios_scroll_remaining:   db 0
+bios_scroll_height:       db 0
+bios_scroll_direction:    db 0
+bios_scroll_row:          db 0
+bios_scroll_source_row:   db 0
+bios_scroll_col:          db 0
+bios_scroll_attr:         db BIOS_VIDEO_ATTR
+bios_scroll_char:         db 0
+bios_scroll_cell_attr:    db 0
+bios_scroll_guest_offset: dw 0
 
 ; AH=0Fh — AL=mode, AH=columns, BH=active page.
 bios_int10_get_mode:
@@ -345,6 +631,95 @@ bios_video_store_cursor:
         ld      a,(bios_video_row)
         ld      d,a
         jp      bios_video_write_bda_word
+
+; Bounded Project125-style INT10 trace on NeoGS debug port #EF.
+bios_video_trace_int10:
+        ld      a,(bios_video_trace_count)
+        cp      48
+        ret     nc
+        inc     a
+        ld      (bios_video_trace_count),a
+        push    af
+        push    bc
+        push    de
+        push    hl
+        ld      hl,bios_video_trace_prefix
+        call    bios_video_trace_string
+        ld      hl,(x86_reg_ax)
+        call    bios_video_trace_hex16
+        ld      a,' '
+        out     (#EF),a
+        ld      hl,(x86_reg_bx)
+        call    bios_video_trace_hex16
+        ld      a,' '
+        out     (#EF),a
+        ld      hl,(x86_reg_cx)
+        call    bios_video_trace_hex16
+        ld      a,' '
+        out     (#EF),a
+        ld      hl,(x86_reg_dx)
+        call    bios_video_trace_hex16
+        ld      a,' '
+        out     (#EF),a
+        ld      hl,(x86_reg_cs)
+        call    bios_video_trace_hex16
+        ld      a,':'
+        out     (#EF),a
+        ld      hl,(x86_reg_ip)
+        call    bios_video_trace_hex16
+        ld      a,13
+        out     (#EF),a
+        ld      a,10
+        out     (#EF),a
+        pop     hl
+        pop     de
+        pop     bc
+        pop     af
+        ret
+
+bios_video_trace_string:
+        ld      a,(hl)
+        inc     hl
+        or      a
+        ret     z
+        out     (#EF),a
+        jr      bios_video_trace_string
+
+bios_video_trace_hex16:
+        ld      a,h
+        call    bios_video_trace_hex8
+        ld      a,l
+        jp      bios_video_trace_hex8
+
+bios_video_trace_hex8:
+        push    af
+        push    bc
+        ld      b,a
+        rrca
+        rrca
+        rrca
+        rrca
+        call    bios_video_trace_nibble
+        ld      a,b
+        and     #0F
+        call    bios_video_trace_nibble
+        pop     bc
+        pop     af
+        ret
+
+bios_video_trace_nibble:
+        and     #0F
+        add     a,'0'
+        cp      '9'+1
+        jr      c,.emit
+        add     a,7
+.emit:
+        out     (#EF),a
+        ret
+
+bios_video_trace_prefix:
+        db "[BIOS INT10] AX BX CX DX CS:IP=",0
+bios_video_trace_count: db 0
 
 bios_video_row:           db 0
 bios_video_col:           db 0
