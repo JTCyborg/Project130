@@ -5,8 +5,8 @@
 ; read modes 0/1, write modes 0/1, chain-2 odd/even text addressing,
 ; latches, set/reset, rotate, logical ops, bit mask and Sequencer Map Mask.
 ; Pending: CRTC, DAC, scanout, chain-4 and write modes 2/3.
-; Guest VRAM accesses use the Project125 four-plane layout in P126 pages #30..#3F;
-; these are the P126 physical allocation equivalents of Project125 pages 83..98.
+; Guest VRAM accesses use the original Project125 four-plane physical pages 83..98
+; decimal (#53..#62), with no remapping to a different physical allocation.
 ; No NeoGS I/O ports are used by the VGA device.
 
 x86_vga_io_read8_impl:
