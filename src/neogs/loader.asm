@@ -266,15 +266,28 @@ p130_ngs_stream_done:
         jp      c,p130_ngs_fail
         ld      a,040h
         call    p130_ngs_send_byte
+        jr      nc,p130_ngs_jump_tx_done
+        ; Project126 fallback: the #13 target byte may still be pending
+        ; while GS105a has already switched to the bootstrap receiver.
+        in      a,(P130_GSSTAT)
+        bit     7,a
+        jp      z,p130_ngs_fail
+        call    p130_ngs_receive_byte
         jp      c,p130_ngs_fail
+        jr      p130_ngs_ack_check
+p130_ngs_jump_tx_done:
+        call    p130_ngs_receive_byte
+        jp      c,p130_ngs_fail
+p130_ngs_ack_check:
+        ld      (p130_ngs_ack_value),a
         ld      a,9
         ld      (_p130_neogs_stage),a
         ld      a,'9'
         call    p130_ngs_trace
         ; One A1 acknowledgement, matching Project126. It is emitted only
         ; after DMA stop, NOROM/EXPAG and temporary memory-window setup.
-        call    p130_ngs_receive_byte
-        jp      c,p130_ngs_fail
+        ; The #13 transfer path above already read A1 in its DBIT edge case.
+        ; Otherwise receive it here, with Project126's turnaround delay.
         cp      P130_ACK_READY
         jr      nz,p130_ngs_ack_bad
         ld      a,'a'
@@ -354,6 +367,25 @@ p130_ngs_trace_nibble:
         add     a,7
 p130_ngs_trace_hex_out:
         jp      p130_ngs_trace
+
+; Receive one NeoGS byte and allow the sender to observe DBIT clear.
+; This turnaround is present in the Project126 reference implementation.
+p130_ngs_receive_byte:
+        call    p130_ngs_wait_dbit_set
+        ret     c
+        in      a,(P130_GSDAT)
+        push    af
+        push    bc
+        ld      bc,0400h
+p130_ngs_receive_turnaround:
+        dec     bc
+        ld      a,b
+        or      c
+        jr      nz,p130_ngs_receive_turnaround
+        pop     bc
+        pop     af
+        or      a
+        ret
 
 ; Long bounded CBIT wait for the GS105a cold-reset command.
 p130_ngs_send_command_long:
