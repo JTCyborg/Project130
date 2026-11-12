@@ -34,7 +34,7 @@ x86_alu_emit_version:
         ret
 
 x86_alu_version_text:
-        defb    "[P126 X86_ALU v0.2.0]",13,10,0
+        defb    "[P130 X86_ALU v0.2.0]",13,10,0
 
 x86_alu_add8_impl:
         ld      (x86_alu_lhs),a

@@ -394,23 +394,23 @@ p126_host_debug_hex_nibble:
 
 p126_host_ngs_ready: db 0
 
-p126_log_ngs_begin: db "[BOOT] NEOGS RESIDENT START BEGIN",13,10,0
-p126_log_ngs_ready: db "[BOOT] NEOGS RESIDENT READY",13,10,0
-p126_log_ngs_failed: db "[BOOT] NEOGS RESIDENT START FAILED",13,10,0
-p126_log_trdos_begin:   db "[BOOT] TRDOS DIRECTORY READ BEGIN",13,10,0
-p126_log_trdos_done:    db "[BOOT] TRDOS DIRECTORY READ RETURN",13,10,0
-p126_log_video_begin:   db "[BOOT] ATM VIDEO INIT BEGIN",13,10,0
-p126_log_video_done:    db "[BOOT] ATM VIDEO INIT DONE",13,10,0
-p126_log_rtc_done:      db "[BOOT] RTC PROBE RETURN",13,10,0
-p126_log_video_mode_sent: db "[BOOT] ATM VIDEO MODE SENT TO NEOGS",13,10,0
-p126_log_video_mode_failed: db "[BOOT] ATM VIDEO MODE SEND FAILED",13,10,0
+p126_log_ngs_begin: db "[P130 BOOT] NEOGS RESIDENT START BEGIN",13,10,0
+p126_log_ngs_ready: db "[P130 BOOT] NEOGS RESIDENT READY",13,10,0
+p126_log_ngs_failed: db "[P130 BOOT] NEOGS RESIDENT START FAILED",13,10,0
+p126_log_trdos_begin:   db "[P130 BOOT] TRDOS DIRECTORY READ BEGIN",13,10,0
+p126_log_trdos_done:    db "[P130 BOOT] TRDOS DIRECTORY READ RETURN",13,10,0
+p126_log_video_begin:   db "[P130 BOOT] ATM VIDEO INIT BEGIN",13,10,0
+p126_log_video_done:    db "[P130 BOOT] ATM VIDEO INIT DONE",13,10,0
+p126_log_rtc_done:      db "[P130 BOOT] RTC PROBE RETURN",13,10,0
+p126_log_video_mode_sent: db "[P130 BOOT] ATM VIDEO MODE SENT TO NEOGS",13,10,0
+p126_log_video_mode_failed: db "[P130 BOOT] ATM VIDEO MODE SEND FAILED",13,10,0
 p126_host_video_poll_counter: db 0
-p126_log_console_begin: db "[BOOT] CONSOLE INIT BEGIN",13,10,0
-p126_log_console_done:  db "[BOOT] CONSOLE INIT DONE",13,10,0
-p126_log_catalog_return: db "[BOOT] CATALOG INIT RETURN",13,10,0
+p126_log_console_begin: db "[P130 BOOT] CONSOLE INIT BEGIN",13,10,0
+p126_log_console_done:  db "[P130 BOOT] CONSOLE INIT DONE",13,10,0
+p126_log_catalog_return: db "[P130 BOOT] CATALOG INIT RETURN",13,10,0
 
 p126_host_version_text:
-        db "[P126 ATM HOST v0.2.0]", 13, 10, 0
+        db "[P130 ATM HOST v0.2.0]", 13, 10, 0
 
         INCLUDE "atm_host/ds12887_rtc.asm"
         INCLUDE "atm_host/neogs_ipc.asm"

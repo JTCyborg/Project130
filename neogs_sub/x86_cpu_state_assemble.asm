@@ -178,16 +178,16 @@ p126_ngs_resident_send_boot_ack:
         or      a
         ret
 
-p126_ngs_resident_banner: db "[NGS] P126 RESIDENT v0.1.0",13,10,0
-p126_ngs_resident_crc_ok: db "[NGS] ABI CRC16 PASS",13,10,0
-p126_ngs_resident_allocator_ok: db "[NGS] OVERLAY ALLOCATOR PASS",13,10,0
-p126_ngs_resident_allocator_bad: db "[NGS] OVERLAY ALLOCATOR FAIL",13,10,0
-p126_ngs_resident_module_manager_ok: db "[NGS] MODULE MANAGER PASS",13,10,0
-p126_ngs_resident_module_manager_bad: db "[NGS] MODULE MANAGER FAIL",13,10,0
-p126_ngs_resident_crc_bad: db "[NGS] ABI CRC16 FAIL",13,10,0
-p126_ngs_resident_ack_bad: db "[NGS] HOST READY ACK TIMEOUT",13,10,0
-p126_ngs_resident_frame_ok: db "[NGS] RX OK",13,10,0
-p126_ngs_resident_frame_bad: db "[NGS] RX BAD",13,10,0
+p126_ngs_resident_banner: db "[P130 NGS] RESIDENT v0.1.0",13,10,0
+p126_ngs_resident_crc_ok: db "[P130 NGS] ABI CRC16 PASS",13,10,0
+p126_ngs_resident_allocator_ok: db "[P130 NGS] OVERLAY ALLOCATOR PASS",13,10,0
+p126_ngs_resident_allocator_bad: db "[P130 NGS] OVERLAY ALLOCATOR FAIL",13,10,0
+p126_ngs_resident_module_manager_ok: db "[P130 NGS] MODULE MANAGER PASS",13,10,0
+p126_ngs_resident_module_manager_bad: db "[P130 NGS] MODULE MANAGER FAIL",13,10,0
+p126_ngs_resident_crc_bad: db "[P130 NGS] ABI CRC16 FAIL",13,10,0
+p126_ngs_resident_ack_bad: db "[P130 NGS] HOST READY ACK TIMEOUT",13,10,0
+p126_ngs_resident_frame_ok: db "[P130 NGS] RX OK",13,10,0
+p126_ngs_resident_frame_bad: db "[P130 NGS] RX BAD",13,10,0
 p126_ngs_resident_tx: db 0
 
 x86_cpu_state_module_start:

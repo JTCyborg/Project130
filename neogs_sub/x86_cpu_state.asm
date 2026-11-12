@@ -1133,8 +1133,8 @@ x86_bios_trace_far_target_none:
         db "NONE",0
 x86_bios_trace_slice_remaining: db 0
 x86_bios_trace_stop_kind: db 0
-x86_bios_trace_start_log: db "[NGS] X86 BIOS CONTINUOUS EXECUTION START",13,10,0
-x86_bios_trace_cs_ip_prefix: db "[X86] CS:IP=",0
+x86_bios_trace_start_log: db "[P130 NGS] X86 BIOS CONTINUOUS EXECUTION START",13,10,0
+x86_bios_trace_cs_ip_prefix: db "[P130 X86] CS:IP=",0
 x86_bios_trace_progress_prefix: db "[X86 CPU] BX=",0
 x86_bios_trace_progress_cx: db " CX=",0
 x86_bios_trace_progress_di: db " DI=",0
@@ -1146,9 +1146,9 @@ x86_bios_trace_checksum_entry_log: db "[X86 TRACE] CHECKSUM ROUTINE ENTRY F000:F
 x86_bios_trace_low_ip_log: db "[X86 TRACE] FIRST EXECUTION BELOW BIOS WINDOW",13,10,0
 x86_bios_trace_stack_prefix: db "[X86 STACK] SS:OFF=WORD ",0
 x86_bios_trace_stack_fault: db "[X86 STACK] READ FAULT",0
-x86_bios_trace_fault_log: db "[NGS] X86 BIOS TRACE STOP: OPCODE OR MEMORY FAULT",13,10,0
-x86_bios_trace_halted_log: db "[NGS] X86 BIOS EXECUTION HALTED BY GUEST",13,10,0
-x86_bios_trace_watchdog_log: db "[NGS] X86 BIOS DIAGNOSTIC STOP",13,10,0
+x86_bios_trace_fault_log: db "[P130 NGS] X86 BIOS TRACE STOP: OPCODE OR MEMORY FAULT",13,10,0
+x86_bios_trace_halted_log: db "[P130 NGS] X86 BIOS EXECUTION HALTED BY GUEST",13,10,0
+x86_bios_trace_watchdog_log: db "[P130 NGS] X86 BIOS DIAGNOSTIC STOP",13,10,0
 x86_bios_trace_regs_ax:    db "[X86 REG] AX=",0
 x86_bios_trace_regs_bx:    db " BX=",0
 x86_bios_trace_regs_cx:    db " CX=",0
@@ -1560,7 +1560,7 @@ x86_cpu_emit_version:
         ret
 
 x86_cpu_version_text:
-        defb    "[P126 X86_CPU_STATE v0.3.0]",13,10,0
+        defb    "[P130 X86_CPU_STATE v0.3.0]",13,10,0
 
 ; Executable target-side test vectors. Does not require BIOS, VGA or a
 ; selected memory-region map. It must be run before marking BUILD/HARDWARE PASS.
@@ -1762,13 +1762,13 @@ x86_bios_probe_remaining: db 0
 x86_bios_reset_vector_bytes: db 0,0,0,0,0
 x86_bios_reset_vector_expected: db #EA,#5B,#E0,#00,#F0
 x86_bios_reset_vector_pass_log:
-        db "[NGS] X86 BIOS RESET VECTOR FETCH PASS",13,10,0
+        db "[P130 NGS] X86 BIOS RESET VECTOR FETCH PASS",13,10,0
 x86_bios_reset_target_log:
-        db "[NGS] X86 FAR JMP DECODED F000:E05B",13,10,0
+        db "[P130 NGS] X86 FAR JMP DECODED F000:E05B",13,10,0
 x86_bios_reset_read_fail_log:
-        db "[NGS] X86 BIOS RESET VECTOR READ FAILED",13,10,0
+        db "[P130 NGS] X86 BIOS RESET VECTOR READ FAILED",13,10,0
 x86_bios_reset_vector_bad_log:
-        db "[NGS] X86 BIOS RESET VECTOR MISMATCH",13,10,0
+        db "[P130 NGS] X86 BIOS RESET VECTOR MISMATCH",13,10,0
 
 x86_expected_zero:  db 0,0,0
 x86_expected_fffff: db #FF,#FF,#0F

@@ -1246,18 +1246,18 @@ p126_neogs_overlay_max_size: dw 0
 p126_neogs_overlay_kind: db 0
 p126_neogs_overlay_page: db 0
 p126_neogs_overlay_data_ptr: dw #C11C
-p126_neogs_io_log_begin: db "[NGS HOST] X86IO IMAGE BEGIN",13,10,0
-p126_neogs_io_log_ready: db "[NGS HOST] X86IO IMAGE TX COMPLETE",13,10,0
-p126_neogs_alu_log_begin: db "[NGS HOST] X86ALU IMAGE BEGIN",13,10,0
-p126_neogs_alu_log_ready: db "[NGS HOST] X86ALU IMAGE TX COMPLETE",13,10,0
-p126_neogs_dev_log_begin: db "[NGS HOST] X86DEV IMAGE BEGIN",13,10,0
-p126_neogs_dev_log_ready: db "[NGS HOST] X86DEV IMAGE TX COMPLETE",13,10,0
-p126_neogs_exec_log_begin: db "[NGS HOST] X86EXEC IMAGE BEGIN",13,10,0
-p126_neogs_exec_log_ready: db "[NGS HOST] X86EXEC IMAGE TX COMPLETE",13,10,0
-p126_neogs_vga_log_begin: db "[NGS HOST] X86VGA IMAGE BEGIN",13,10,0
-p126_neogs_vga_log_ready: db "[NGS HOST] X86VGA IMAGE TX COMPLETE",13,10,0
-p126_neogs_vid_log_begin: db "[NGS HOST] X86VID IMAGE BEGIN",13,10,0
-p126_neogs_vid_log_ready: db "[NGS HOST] X86VID IMAGE TX COMPLETE",13,10,0
+p126_neogs_io_log_begin: db "[P130 NGS HOST] X86IO IMAGE BEGIN",13,10,0
+p126_neogs_io_log_ready: db "[P130 NGS HOST] X86IO IMAGE TX COMPLETE",13,10,0
+p126_neogs_alu_log_begin: db "[P130 NGS HOST] X86ALU IMAGE BEGIN",13,10,0
+p126_neogs_alu_log_ready: db "[P130 NGS HOST] X86ALU IMAGE TX COMPLETE",13,10,0
+p126_neogs_dev_log_begin: db "[P130 NGS HOST] X86DEV IMAGE BEGIN",13,10,0
+p126_neogs_dev_log_ready: db "[P130 NGS HOST] X86DEV IMAGE TX COMPLETE",13,10,0
+p126_neogs_exec_log_begin: db "[P130 NGS HOST] X86EXEC IMAGE BEGIN",13,10,0
+p126_neogs_exec_log_ready: db "[P130 NGS HOST] X86EXEC IMAGE TX COMPLETE",13,10,0
+p126_neogs_vga_log_begin: db "[P130 NGS HOST] X86VGA IMAGE BEGIN",13,10,0
+p126_neogs_vga_log_ready: db "[P130 NGS HOST] X86VGA IMAGE TX COMPLETE",13,10,0
+p126_neogs_vid_log_begin: db "[P130 NGS HOST] X86VID IMAGE BEGIN",13,10,0
+p126_neogs_vid_log_ready: db "[P130 NGS HOST] X86VID IMAGE TX COMPLETE",13,10,0
 p126_neogs_name_ptr: dw 0
 p126_neogs_file_length: dw 0
 p126_neogs_core_length: dw 0
@@ -1266,7 +1266,7 @@ p126_neogs_buffer_ptr: dw #C000
 p126_neogs_buffer_remaining: dw 0
 p126_neogs_saved_sp: dw 0
 p126_neogs_ram_size: db 0,0,0
-p126_neogs_ram_log_text: db "[NGS ROM] RAM24=",0
+p126_neogs_ram_log_text: db "[P130 NGS ROM] RAM24=",0
 p126_neogs_file_sectors_left: db 0
 p126_neogs_file_sector: db 0
 p126_neogs_file_track: db 0
