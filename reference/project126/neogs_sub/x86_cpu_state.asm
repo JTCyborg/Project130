@@ -894,19 +894,24 @@ x86_bios_trace_event_status: db 0
 x86_bios_trace_event_cs:     dw 0
 x86_bios_trace_event_ip:     dw 0
 
-; One compact snapshot after the first completed 64-instruction BIOS slice.
-; This proves that the virtual 8086 advanced beyond the reset-vector probe.
+; Emit only the first eight completed 64-instruction slices. This bounded
+; sequence shows whether the resident scheduler re-enters BIOS execution,
+; without turning the serial log into a per-instruction trace.
 x86_bios_trace_log_first_slice:
         push    af
         push    bc
         push    de
         push    hl
         ld      a,(x86_bios_trace_first_slice_once)
-        or      a
-        jr      nz,.first_slice_done
+        cp      8
+        jr      nc,.first_slice_done
         inc     a
         ld      (x86_bios_trace_first_slice_once),a
         ld      hl,x86_bios_trace_first_slice_prefix
+        call    p126_ngs_resident_log
+        ld      a,(x86_bios_trace_first_slice_once)
+        call    x86_bios_trace_emit_hex8
+        ld      hl,x86_bios_trace_first_slice_csip
         call    p126_ngs_resident_log
         ld      hl,(x86_reg_cs)
         call    x86_bios_trace_emit_hex16
@@ -1187,7 +1192,8 @@ x86_bios_trace_progress_di: db " DI=",0
 x86_bios_trace_progress_es: db " ES=",0
 x86_bios_trace_progress_flags: db " FLAGS=",0
 x86_bios_trace_progress_opcode: db " OP=",0
-x86_bios_trace_first_slice_prefix: db "[X86 CPU] FIRST 64-INSTRUCTION SLICE CS:IP=",0
+x86_bios_trace_first_slice_prefix: db "[X86 CPU] SLICE #",0
+x86_bios_trace_first_slice_csip: db " CS:IP=",0
 x86_bios_trace_first_slice_opcode: db " OP=",0
 x86_bios_trace_eebf_log: db "[X86 TRACE] FIRST F000:EEBF SNAPSHOT",13,10,0
 x86_bios_trace_checksum_entry_log: db "[X86 TRACE] CHECKSUM ROUTINE ENTRY F000:F9E1",13,10,0
