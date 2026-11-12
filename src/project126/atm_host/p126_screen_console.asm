@@ -34,6 +34,7 @@ p126_screen_frame_row:      db 0
 p126_screen_frame_col:      db 0
 p126_screen_trace_renderer_enter: db "[SCREEN DBG] RENDERER ENTER",13,10,0
 p126_screen_trace_renderer_done: db "[SCREEN DBG] RENDERER DONE 25X80",13,10,0
+p126_screen_trace_row: db "[SCREEN DBG] ROW=",0
 p126_screen_trace_first_cell: db 0
 p126_screen_trace_first: db "[SCREEN DBG] FIRST ROW=",0
 p126_screen_trace_col: db " COL=",0
@@ -743,6 +744,18 @@ p126_screen_apply_text_frame::
         ld      (p126_screen_frame_col),a
         ld      b,P126_ATM_TEXT_HEIGHT
 .apply_text_row:
+        ; Progress every four rows proves how far the 25x80 writer gets.
+        ld      a,(p126_screen_frame_row)
+        and     3
+        jr      nz,.apply_row_trace_done
+        push    hl
+        ld      hl,p126_screen_trace_row
+        call    p126_ipc_debug_string
+        ld      a,(p126_screen_frame_row)
+        call    p126_ipc_debug_hex_byte
+        call    p126_ipc_debug_crlf
+        pop     hl
+.apply_row_trace_done:
         ld      c,P126_ATM_TEXT_WIDTH
 .apply_text_col:
         ld      a,(de)
