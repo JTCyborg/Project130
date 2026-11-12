@@ -16,8 +16,8 @@ P130_CMD_RESET   EQU 0F4h
 P130_ACK_READY   EQU 0A1h
 
 _p130_neogs_startup:
-        ; TR-DOS ROM calls require the Project127 ATM bank/port transition.
-; Current Project130 RG6 80x25 mode is #C3 (set by ui.asm via #3D2F).
+        ; Run the Project126 pre-video TR-DOS ROM call path directly.
+; The host has not enabled ATM shadow/video paging at this startup stage.
         push    af
         push    bc
         push    de
@@ -489,4 +489,5 @@ p130_ngs_name_ptr: dw 0
 p130_ngs_file_sectors_left: db 0
 p130_ngs_file_sector: db 0
 p130_ngs_file_track: db 0
+p130_ngs_trdos_a: db 0
 
