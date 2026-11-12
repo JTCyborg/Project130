@@ -571,8 +571,17 @@ p130_neogs_verify_overlay_manifest__manifest_verify_bad:
 p130_neogs_load_fixed_overlay:
         ld      (p130_neogs_overlay_kind),a
         ld      (p130_neogs_overlay_max_size),de
+        ; Diagnostic boundary: distinguish TR-DOS open entry from return.
+        ld      hl,p130_neogs_overlay_open_begin
+        call    p130_neogs_log_text
         call    p130_neogs_open_file
-        jr      nc,p130_neogs_load_fixed_overlay__fixed_overlay_open
+        jr      c,p130_neogs_load_fixed_overlay__fixed_overlay_open_failed
+        ld      hl,p130_neogs_overlay_open_ok
+        call    p130_neogs_log_text
+        jr      p130_neogs_load_fixed_overlay__fixed_overlay_open
+p130_neogs_load_fixed_overlay__fixed_overlay_open_failed:
+        ld      hl,p130_neogs_overlay_open_failed
+        call    p130_neogs_log_text
         ld      a,5
         jp      p130_neogs_store_error
 
@@ -1309,6 +1318,9 @@ p130_neogs_overlay_max_size: dw 0
 p130_neogs_overlay_kind: db 0
 p130_neogs_overlay_page: db 0
 p130_neogs_overlay_data_ptr: dw 0C11Ch
+p130_neogs_overlay_open_begin: db "[NGS HOST] OVERLAY OPEN BEGIN",13,10,0
+p130_neogs_overlay_open_ok:    db "[NGS HOST] OVERLAY OPEN OK",13,10,0
+p130_neogs_overlay_open_failed: db "[NGS HOST] OVERLAY OPEN FAILED",13,10,0
 p130_neogs_io_log_begin: db "[NGS HOST] X86IO IMAGE BEGIN",13,10,0
 p130_neogs_io_log_ready: db "[NGS HOST] X86IO IMAGE TX COMPLETE",13,10,0
 p130_neogs_alu_log_begin: db "[NGS HOST] X86ALU IMAGE BEGIN",13,10,0
