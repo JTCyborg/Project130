@@ -18,7 +18,7 @@ The GS105a `#14/#13` exchange is the only legacy byte-channel exception in Proje
 
 ## 1.1 Bootstrap diagnostics
 
-The ATM launcher emits progress characters `1` through `9` on the existing debug channel `#EF` and console output. The corresponding stage codes are:
+The ATM launcher emits progress characters `1` through `9` plus the `P` pre-jump marker on the existing debug channel `#EF` and console output. The corresponding stage codes are:
 
 1. TR-DOS catalogue lookup of `NEOBOOT.C`.
 2. Bootstrap file descriptor validation.
@@ -28,8 +28,7 @@ The ATM launcher emits progress characters `1` through `9` on the existing debug
 6. GS105a receive command `#14` and its header.
 7. Transfer the bootstrap bytes through GSDAT.
 8. Open `P130BOOT.C` through the Project126 C=`#0A` / C=`#08` sequence and read its first sector with C=`#05`.
-9. Jump command `#13` and its target address.
-The jump target-byte handoff (`J`), then wait for and read the single bootstrap `A1` acknowledgement (`W`). A timeout prints `!` plus the last sampled `GSSTAT`; a target-byte handoff failure prints `j` plus the sampled status.
+9. Jump command `#13` and its target address, followed by the `J` target-byte handoff marker and `W` acknowledgement wait marker. The host then reads the single bootstrap `A1` acknowledgement. A timeout prints `!` plus the last sampled `GSSTAT`; a target-byte handoff failure prints `j` plus the sampled status.
 
 On a returned failure, the host also prints the last stage code as two hexadecimal digits. If execution stops without returning, the last progress character narrows the blocked operation. These markers are diagnostics only; they do not claim that the bootstrap or DMA transport has passed runtime validation.
 
