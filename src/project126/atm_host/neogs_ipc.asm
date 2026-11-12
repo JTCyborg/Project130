@@ -955,7 +955,7 @@ p126_ipc_dma_receive_video_frame::
         jr      nz,.video_remote_error
 
         ld      hl,p126_ipc_video_frame_rx_ok
-        call    p126_ipc_debug_string
+        call    p126_ipc_port_string
 
         ; Dump the first eight character and attribute bytes at the ATM
         ; receiver. This distinguishes an empty/wrong capture from a renderer
