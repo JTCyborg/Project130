@@ -1476,23 +1476,19 @@ x86_vga_capture_text_frame_impl:
         ld      hl,0
         ld      (x86_vga_capture_index),hl
 .capture_cell_loop:
-        ; Project125-compatible capture: read the guest-visible B800 aperture,
-        ; not the private physical VRAM backing-store layout. In VGA text mode
-        ; the CPU sees char/attribute bytes at B800:0000 + cell*2 + plane;
-        ; the VGA chain-2 read path selects the corresponding plane.
+        ; Read the character/attribute pair from the VGA backing planes.
+        ; The generic guest-aperture read depends on the current GDC odd/even
+        ; read state and can return plane 0 for both byte positions during
+        ; BIOS POST. The text-cell helper selects plane 0/1 explicitly.
         ld      hl,(x86_vga_capture_index)
         add     hl,hl
-        ld      de,#8000
-        add     hl,de
+        ld      a,#80
+        call    x86_vga_read_text_cell_impl
         ld      a,(x86_vga_capture_plane)
         or      a
-        jr      z,.capture_cpu_address_ready
-        inc     hl
-.capture_cpu_address_ready:
-        ld      (x86_phys_addr),hl
-        ld      a,#0B
-        ld      (x86_phys_addr+2),a
-        call    x86_vga_mem_read8_impl
+        jr      z,.capture_char_ready
+        ld      a,d
+.capture_char_ready:
         ld      (x86_vga_capture_data),a
 
         ; Write sequentially into the P126 video frame payload:
