@@ -4,6 +4,10 @@
 ; acknowledges readiness, then idles until the approved DMA/IPC runtime exists.
 
         di
+        ; Entry marker: ATM must read this before bootstrap continues.
+        ld      a,#E0
+        out     (#03),a
+
         ld      a,1
         out     (#1B),a
         xor     a
