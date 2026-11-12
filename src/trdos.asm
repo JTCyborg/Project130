@@ -50,7 +50,7 @@ p130_trdos_read_sector:
 
         ld      b,1
         ld      c,5
-        call    03D13h
+        call    p130_trdos_rom_call
 
         ld      bc,00EFh
         ld      a,'r'
@@ -110,6 +110,47 @@ p130_trdos_restore:
         ld      a,(_p130_trdos_result)
         ld      l,a
         ld      h,0
+        ret
+
+; Project127-compatible TR-DOS ROM-call trampoline.
+; A plain CALL #3D13 is not sufficient: TR-DOS returns through ERR_SP
+; (#5C3D), and its DOS/shadow mapping must be restored through #3D2F.
+; Preserve the host's W2/W3 pages around the DOS ROM mapping.
+p130_trdos_rom_call:
+        ld      a,083h
+        ld      bc,0FFF7h
+        out     (c),a
+        ld      a,0C3h
+        ld      bc,0FF77h
+        out     (c),a
+
+        ld      hl,p130_trdos_rom_return
+        push    hl
+        ld      (23613),sp
+        xor     a
+        ld      (23801),a
+        ld      (23823),a
+        ld      (23824),a
+        jp      03D13h
+
+p130_trdos_rom_return:
+        di
+        ld      bc,p130_trdos_video_restored
+        push    bc
+        ld      bc,02A53h
+        push    bc
+        ld      bc,00177h
+        ld      a,0C3h
+        jp      03D2Fh
+
+p130_trdos_video_restored:
+        ld      a,07Ah
+        ld      bc,07FF7h
+        out     (c),a
+        ld      a,07Fh
+        ld      bc,0FFF7h
+        out     (c),a
+        ei
         ret
 
 p130_trdos_saved_sp:     dw 0
