@@ -40,10 +40,11 @@ _p130_neogs_startup:
         ; the known-working C=5 sector-read entry. Do not call C=0A/C=08.
         ld      ix,0C800h
         ld      b,128
+        ld      a,128
+        ld      (p130_ngs_scan_left),a
         ld      bc,00EFh
         ld      a,'R'
         out     (c),a
-        ld      b,128
 p130_ngs_scan_entry:
         ld      a,(ix+0)
         cp      'N'
@@ -73,11 +74,12 @@ p130_ngs_scan_entry:
         cp      'C'
         jr      z,p130_ngs_scan_found
 p130_ngs_scan_next:
-        push    de
         ld      de,16
         add     ix,de
-        pop     de
-        djnz    p130_ngs_scan_entry
+        ld      a,(p130_ngs_scan_left)
+        dec     a
+        ld      (p130_ngs_scan_left),a
+        jr      nz,p130_ngs_scan_entry
         jp      p130_ngs_fail
 
 p130_ngs_scan_found:
@@ -377,3 +379,4 @@ p130_ngs_old_ext: db 0
 p130_ngs_old_status: db 0
 p130_ngs_sector: db 0
 p130_ngs_track: db 0
+p130_ngs_scan_left: db 0
