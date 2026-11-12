@@ -44,6 +44,8 @@ bios_int10_set_mode:
 .supported_mode:
         call    bios_video_set_vga_text_state
         ret     c
+        ld      a,1
+        ld      (bios_video_text_state_ready),a
         ld      hl,#0449
         ld      a,BIOS_VIDEO_MODE
         call    bios_video_write_bda
@@ -488,6 +490,18 @@ bios_int10_teletype:
         ld      a,(x86_reg_bx+1)
         or      a
         ret     nz
+        ; Some XT BIOS builds enter INT10 teletype without first requesting
+        ; mode 03h (their startup mode calls may be clone-specific).  The
+        ; text services below always target B800:0000, so establish the
+        ; matching VGA text aperture/plane state before the first character.
+        ld      a,(bios_video_text_state_ready)
+        or      a
+        jr      nz,.text_state_ready
+        call    bios_video_set_vga_text_state
+        ret     c
+        ld      a,1
+        ld      (bios_video_text_state_ready),a
+.text_state_ready:
         ld      a,(x86_reg_ax)
         ld      (bios_video_char),a
         ; Stage 1: exact BIOS INT 10h/AH=0Eh output stream to diagnostic #EF.
@@ -773,6 +787,8 @@ bios_video_trace_nibble:
 bios_video_trace_prefix:
         db "[BIOS INT10] AX BX CX DX CS:IP=",0
 bios_video_trace_count: db 0
+; Set after INT10 mode 03h or lazy text-console initialization.
+bios_video_text_state_ready: db 0
 bios_video_trace_vga_write_once: db 0
 bios_video_trace_vga_write_msg: db "[TRACE] BIOS VGA WRITE OK",13,10,0
 
