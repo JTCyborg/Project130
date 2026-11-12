@@ -39,7 +39,6 @@ _p130_neogs_startup:
         ; resident at #C800. Find NEOBOOT.C in that snapshot and use only
         ; the known-working C=5 sector-read entry. Do not call C=0A/C=08.
         ld      ix,0C800h
-        ld      b,128
         ld      a,128
         ld      (p130_ngs_scan_left),a
         ld      bc,00EFh
