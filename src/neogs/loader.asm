@@ -72,29 +72,8 @@ p130_ngs_boot_len_ok:
         call    p130_ngs_send_command_long
         jp      c,p130_ngs_fail
 
-        ; Exact Project125/126 ROM synchronization step: query GS105a total
-        ; RAM (#20) and consume all three response bytes before #14.
-        ; This is not optional: it leaves the stock ROM command/data channel
-        ; in the same state as the proven launcher before RECEIVE BLOCK.
-        ld      a,5
-        ld      (_p130_neogs_stage),a
-        ld      a,'m'
-        call    p130_ngs_trace
-        ld      a,020h
-        call    p130_ngs_send_command
-        jp      c,p130_ngs_fail
-        call    p130_ngs_receive_byte
-        jp      c,p130_ngs_fail
-        ld      (p130_ngs_ram_report),a
-        call    p130_ngs_receive_byte
-        jp      c,p130_ngs_fail
-        ld      (p130_ngs_ram_report+1),a
-        call    p130_ngs_receive_byte
-        jp      c,p130_ngs_fail
-        ld      (p130_ngs_ram_report+2),a
-        ld      a,'M'
-        call    p130_ngs_trace
-
+        ; Project126 rule: do not issue the stock-ROM #20 RAM query.
+        ; It is not part of the proven #F4 -> #14 -> #13 bootstrap sequence.
         ld      a,6
         ld      (_p130_neogs_stage),a
         ld      a,'6'
@@ -180,7 +159,14 @@ p130_ngs_core_size_low:
         jp      c,p130_ngs_fail
         ld      a,040h
         call    p130_ngs_send_byte
-        jp      c,p130_ngs_jump_tx_fail
+        ; Match Project126's special DBIT turnaround: a timeout while
+        ; sending the final address byte may mean the target has already
+        ; switched to bootstrap mode and is publishing A1.
+        jr      nc,p130_ngs_jump_tx_done
+        in      a,(P130_GSSTAT)
+        bit     7,a
+        jp      z,p130_ngs_jump_tx_fail
+p130_ngs_jump_tx_done:
         ld      a,9
         ld      (_p130_neogs_stage),a
         ld      a,'9'
