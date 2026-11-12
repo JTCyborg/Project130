@@ -39,7 +39,7 @@ if ([System.IO.Path]::GetFileName($Out) -ne "disk_A.trd") {
 
 Remove-Item -Force -ErrorAction SilentlyContinue $Resident, $MapFile, $UiImage, $NeoGsBootstrap, (Join-Path $BuildDir "P130BOOT.sym"), $Out
 
-Write-Host "[P130 BUILD] VERSION=P130-0.6.8-P126-STAGE0-EXACT"
+Write-Host "[P130 BUILD] VERSION=P130-0.6.9-P126-RESIDENT-HANDOFF"
 foreach ($Source in @("src/main.c", "src/diag.c", "src/diag.h", "src/memory.c", "src/memory.h", "src/rtc.h", "src/rtc.asm", "src/trdos.asm", "src/hdd.asm", "src/hdd_fat16.asm", "src/catalog.asm", "src/neogs/loader.asm", "src/neogs/bootstrap.asm", "src/neogs/bootstrap_assemble.asm", "reference/project126/neogs_sub/x86_cpu_state_assemble.asm", "reference/project126/neogs_sub/p126_ipc.asm", "reference/project126/shared/p126_ipc_protocol.inc", "src/entry.asm", "src/ui.asm", "src/boot/main.asm")) {
     $Hash = (Get-FileHash $Source -Algorithm SHA256).Hash.Substring(0, 8)
     Write-Host "[P130 BUILD] $Source=$Hash"
