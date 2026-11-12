@@ -218,8 +218,8 @@ x86_bios_startup_trace:
 .run_slice:
         ; 1024 instructions per pass; amortize IPC/DMA handoff overhead
         ; while keeping the resident dispatcher responsive.
-        ld      hl,1024
-        ld      (x86_bios_trace_slice_remaining),hl
+        ; 8192 instructions per pass: amortize IPC/DMA handoff overhead
+        ld      hl,8192
 .trace_loop:
         call    x86_cpu_step
         jp      c,.trace_fault
