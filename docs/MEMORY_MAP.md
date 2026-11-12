@@ -2,45 +2,58 @@
 
 ## 1. Separate address spaces
 
-Project130 has at least three distinct address spaces:
+Project130 has distinct address spaces:
+- ATM host Z80 address space and ATM physical/banked memory;
+- NeoGS Z80 logical windows and NeoGS physical RAM;
+- x86 guest physical address space (1 MiB, Intel 8086 Real Mode).
 
-- ATM host Z80 address space and its physical/banked memory;
-- NeoGS Z80 address space and its local memory;
-- x86 guest physical address space (1 MiB for the initial 8086 profile).
+They are not interchangeable. A guest address is never an ATM physical address, NeoGS hardware register address, or NeoGS physical page number.
 
-They are not interchangeable. A guest address is never an ATM physical address or a NeoGS hardware register address.
+## 2. NeoGS physical backing
 
-## 2. x86 guest memory
+APPROVED BASELINE (2026-11-12): Project130 adopts the Project126 NeoGS physical memory map.
 
-The guest has a custom 1 MiB memory configuration with a separately defined map for RAM, BIOS and device windows.
+- 4 MiB physical RAM, 256 pages of 16 KiB.
+- Resident kernel: pages 00h–0Fh.
+- SYSBIOS: pages 10h–1Fh.
+- VGA BIOS: pages 20h–2Fh.
+- VGA VRAM: pages 30h–3Fh.
+- Frame workspace: pages 40h–41h.
+- DMA staging: page 42h.
+- IPC/control: page 43h.
+- Guest RAM backing: pages 44h–83h (1 MiB).
+- Reserved: pages 84h–FFh.
 
-Do not assume the conventional IBM PC layout of 640 KiB RAM plus UMA. Do not hard-code a conventional PC memory map as a compatibility shortcut.
+The NeoGS logical window selectors and DMA rules are specified in docs/NeoGS/MEMORY_MAP.md.
 
-The exact guest ranges, BIOS placement, RAM reservations, video apertures and device windows remain **TBD** and require an explicit design decision before implementation.
+## 3. x86 guest physical memory
 
-## 3. NeoGS backing memory
+The initial guest profile is Intel 8086 Real Mode with a 20-bit, 1 MiB physical address space (00000h–FFFFFh), wrapping at 1 MiB. The Project126 guest map is adopted as the Project130 baseline:
 
-Project126 contains a proposed NeoGS page allocation for guest RAM, firmware overlays, BIOS backing and video storage. Treat it as a design reference only. Confirm the target NeoGS board's usable RAM and the actual page-mapping constraints before adopting any page numbers or capacity assertions.
+| Guest range | Size | Region |
+|---|---:|---|
+| 00000h–9FFFFh | 640 KiB | Low RAM |
+| A0000h–BFFFFh | 128 KiB | VGA aperture |
+| C0000h–C7FFFh | 32 KiB | VGA BIOS |
+| C8000h–FDFFFh | 216 KiB | High RAM |
+| FE000h–FFFFFh | 8 KiB | System BIOS |
 
-NeoGS-local memory mapping is separate from ATM's physical W3 mapper.
+The physical SYSBIOS slot is 256 KiB (pages 10h–1Fh); the initial 8 KiB BIOS image is mapped into the guest 8 KiB range at FE000h–FFFFFh. BIOS writes are rejected. The reset vector is FFFF:0000, physical FFFF0h, offset 1FF0h within the mapped BIOS image.
+
+The guest map is a software memory model backed by NeoGS RAM. It does not imply direct hardware access by the guest CPU.
 
 ## 4. ATM host memory
 
-Project129 demonstrated ATM-side physical page management and W3 mapping procedures. Project130 may reuse the design after porting and validating it in this repository.
+ATM host allocations remain separate. The existing resident image, UI, stack, TR-DOS catalogue and physical W3 mapper keep their own ATM-side ownership. The NeoGS DMA staging page is not an ATM physical page. ATM staging buffers must be allocated and mapped only through the established ATM mapper procedure.
 
-The ATM host memory layout, reserved pages, resident image span, DMA staging buffers and video buffers must be documented together before those areas are allocated. The initial bootstrap currently reserves the resident image below #B000 and uses a stack below #C000, following the Project129 boot contract; this is a bootstrap placement, not the final system memory map.
+## 5. BIOS execution gate
 
-## 5. Required map specification before x86 execution
+The 8086 must not be released from reset until:
+1. selected BIOS file is validated as exactly 8192 bytes;
+2. IMAGE_BEGIN / IMAGE_FRAGMENT / IMAGE_FINISH complete over Project130 DMA/IPC;
+3. NeoGS verifies installed bytes in the SYSBIOS physical slot;
+4. guest FE000h–FFFFFh reads back the same 8192 bytes;
+5. reset-vector bytes at FFFF0h are readable and valid;
+6. CPU state is initialized to CS:IP=FFFF:0000 and FLAGS=0002h.
 
-The map specification must define:
-
-- every guest RAM range and reserved range;
-- BIOS ROM/overlay visibility and reset-vector mapping;
-- VGA memory aperture and backing storage;
-- device register windows;
-- read/write behavior for unmapped ranges;
-- wraparound and 20-bit physical-address behavior;
-- initialization/reset values;
-- test cases at every boundary.
-
-No CPU execution milestone may silently invent these ranges.
+A TR-DOS read or a sent DMA frame alone is not BIOS execution success.
