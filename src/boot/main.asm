@@ -85,6 +85,16 @@ p130_neogs_boot_image_end:
         ASSERT  p130_neogs_boot_image_end-p130_neogs_boot_image <= 256
         SAVETRD "disk_A.trd","NEOBOOT.C",p130_neogs_boot_image,p130_neogs_boot_image_end-p130_neogs_boot_image
 
+; P126-compatible pre-JUMP open/read transaction. The host reads this file's
+; first sector before #13; the image itself is not GSDAT-streamed by P130.
+        ORG     #0000
+p130_x86core_preflight:
+        INCBIN  "build/X86CORE.C"
+p130_x86core_preflight_end:
+        ASSERT  p130_x86core_preflight_end > p130_x86core_preflight
+        ASSERT  p130_x86core_preflight_end-p130_x86core_preflight <= #4000
+        SAVETRD "disk_A.trd","X86CORE.C",p130_x86core_preflight,p130_x86core_preflight_end-p130_x86core_preflight
+
 ; Three independent 8 KiB BIOS images. bios.asm and bios.txt document Bios.bin;
 ; they are not separate BIOS payloads.
         ORG     #0000

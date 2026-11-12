@@ -6,7 +6,7 @@
 #define P130_CATALOGUE_ADDR 0xC800u
 #define P130_CATALOGUE_SIZE 2048u
 
-#define P130_BUILD_ID "P130-0.5.7-PRE-A1-CORE-DEFERRED"
+#define P130_BUILD_ID "P130-0.5.8-P126-BOOTSTRAP-PREFLIGHT"
 
 static void p130_report_memory(void)
 {

@@ -117,10 +117,32 @@ p130_ngs_stream:
         jr      p130_ngs_stream
 
 p130_ngs_stream_done:
-; Project130 deliberately does not open X86CORE before A1.
-        ; The resident core is a DMA/IPC payload and is not yet packaged or
-        ; loaded at this bootstrap-only milestone. Match P126 from NEOBOOT
-        ; transfer through #13 and A1; defer core discovery until DMA/IPC.
+        ; Match Project126's pre-JUMP disk transaction exactly: open X86CORE.C,
+        ; read its first sector into C000h and validate the 1..16 KiB length.
+        ; The image is NOT sent over GSDAT here; Project130 will hand off to
+        ; its own DMA/IPC transport after the common A1 bootstrap handshake.
+        ld      a,8
+        ld      (_p130_neogs_stage),a
+        ld      a,'8'
+        call    p130_ngs_trace
+        ld      hl,p130_ngs_core_name
+        ld      a,'C'
+        ld      (p130_ngs_file_extension),a
+        call    p130_ngs_open_file
+        jp      c,p130_ngs_fail
+        ld      hl,(p130_ngs_length)
+        ld      a,h
+        cp      040h
+        jr      c,p130_ngs_core_size_low
+        jp      nz,p130_ngs_fail
+        ld      a,l
+        or      a
+        jp      nz,p130_ngs_fail
+p130_ngs_core_size_low:
+        ld      a,h
+        or      l
+        jp      z,p130_ngs_fail
+        ld      (p130_ngs_core_length),hl
 
         ld      a,9
         ld      (_p130_neogs_stage),a
@@ -515,7 +537,9 @@ PUBLIC _p130_neogs_stage
 _p130_neogs_stage: db 0
 
 p130_ngs_boot_name: db "NEOBOOT C"
+p130_ngs_core_name: db "X86CORE "
 p130_ngs_length:    dw 0
+p130_ngs_core_length: dw 0
 p130_ngs_block_length: dw 0
 p130_ngs_tx:        db 0
 p130_ngs_saved_sp:  dw 0
