@@ -60,14 +60,14 @@ p130_entry_debug_string:
         push    af
         push    bc
         ld      bc,00EFh
-.p130_entry_debug_loop:
+p130_entry_debug_loop:
         ld      a,(hl)
         inc     hl
         or      a
-        jr      z,.p130_entry_debug_done
+        jr      z,p130_entry_debug_done
         out     (c),a
-        jr      .p130_entry_debug_loop
-.p130_entry_debug_done:
+        jr      p130_entry_debug_loop
+p130_entry_debug_done:
         pop     bc
         pop     af
         ret
