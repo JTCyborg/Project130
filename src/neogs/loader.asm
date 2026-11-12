@@ -345,7 +345,7 @@ p130_ngs_ok:
 PUBLIC _p130_neogs_stage
 _p130_neogs_stage: db 0
 
-p130_ngs_boot_name: db "NEOBOOT "
+p130_ngs_boot_name: db "NEOBOOT C"
 p130_ngs_length:    dw 0
 p130_ngs_tx:        db 0
 p130_ngs_saved_sp:  dw 0
