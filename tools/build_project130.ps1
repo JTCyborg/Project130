@@ -11,7 +11,7 @@ New-Item -ItemType Directory -Force -Path $Build|Out-Null
 $Out=[System.IO.Path]::GetFullPath($Output)
 if ([System.IO.Path]::GetFileName($Out) -ne "disk_A.trd"){throw "Output must be disk_A.trd"}
 Remove-Item -Force -ErrorAction SilentlyContinue $Out,(Join-Path $Build "disk_A.trd")
-Write-Host "[P130 BUILD] VERSION=P130-P126-EXACT-HOST-CHAIN-BIOS-INT10-TEXT"
+Write-Host "[P130 BUILD] VERSION=P130-P125-INT10-FULL-TEXT-P126-VGA"
 Write-Host "[P130 BUILD] ACTIVE ATM HOST=src/project126/atm_host/project126_main.asm"
 Write-Host "[P130 BUILD] FLOW=BOOT.B -> P130BOOT.C -> P126BOOT.C -> X86CORE/OVERLAYS -> CATALOGUE -> BIOS ENTER -> SYSBIOS PAGE10"
 
