@@ -33,7 +33,8 @@ function Add-BuildFile([string]$Path,[string]$Role,[bool]$Scan=$true){
  }
  $item=Get-Item -LiteralPath $full
  $hash=(Get-FileHash -LiteralPath $full -Algorithm SHA256).Hash
- $rel=$full.Substring($Root.Length).TrimStart('\','/')
+ $rootPrefix=$Root.TrimEnd('\','/')+[IO.Path]::DirectorySeparatorChar
+ if($full.StartsWith($rootPrefix,[StringComparison]::OrdinalIgnoreCase)){$rel=$full.Substring($rootPrefix.Length)}else{$rel=$full}
  $line="$Role|$rel|$($item.Length)|$hash"
  Add-Content -Path $BuildLog -Value $line
  Write-Host ("[P130 FILE] {0} SIZE={1} SHA256={2} PATH={3}" -f $Role,$item.Length,$hash,$rel)
