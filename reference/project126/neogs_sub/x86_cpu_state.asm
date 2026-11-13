@@ -1488,6 +1488,98 @@ x86_guest_ram_write8:
         scf
         ret
 
+; Write a 16-bit guest value. For two bytes in the same ordinary RAM
+; region and 16 KiB backing page, select WIN3 once and perform both stores.
+; VGA, ROM, region edges and 16 KiB page crossings use the byte path so the
+; device decoder and 20-bit address wrapping remain authoritative.
+; IN: x86_phys_addr = physical address, HL = little-endian value.
+; OUT: carry clear on success, carry set on guest-memory fault.
+x86_guest_mem_write16:
+        ld      (x86_mem_word_data),hl
+        ld      a,(x86_phys_addr)
+        ld      (x86_mem_word_addr),a
+        ld      a,(x86_phys_addr+1)
+        ld      (x86_mem_word_addr+1),a
+        ld      a,(x86_phys_addr+2)
+        ld      (x86_mem_word_addr+2),a
+
+        call    x86_mem_classify
+        cp      P126_X86_MEM_RAM_LOW
+        jr      z,.write16_first_ram
+        cp      P126_X86_MEM_RAM_HIGH
+        jr      nz,.write16_fallback
+.write16_first_ram:
+        ld      (x86_mem_word_region),a
+        ; A word at the final byte of a 16 KiB page needs two mappings.
+        ld      a,(x86_mem_word_addr+1)
+        and     #3F
+        cp      #3F
+        jr      nz,.write16_check_second_region
+        ld      a,(x86_mem_word_addr)
+        cp      #FF
+        jr      z,.write16_fallback
+.write16_check_second_region:
+        ; Classify address+1 before taking the fast path. This protects
+        ; RAM/ROM and RAM/VGA aperture boundaries such as FDFFF/FE000.
+        ld      a,(x86_mem_word_addr)
+        inc     a
+        ld      (x86_phys_addr),a
+        ld      a,(x86_mem_word_addr+1)
+        jr      nz,.write16_second_ready
+        inc     a
+        ld      (x86_phys_addr+1),a
+        jr      nz,.write16_second_ready
+        ld      a,(x86_mem_word_addr+2)
+        inc     a
+        and     #0F
+        ld      (x86_phys_addr+2),a
+.write16_second_ready:
+        call    x86_mem_classify
+        ld      b,a
+        ld      a,(x86_mem_word_region)
+        cp      b
+        jr      nz,.write16_fallback
+        ; Restore first address and map the page exactly once.
+        ld      a,(x86_mem_word_addr)
+        ld      (x86_phys_addr),a
+        ld      a,(x86_mem_word_addr+1)
+        ld      (x86_phys_addr+1),a
+        ld      a,(x86_mem_word_addr+2)
+        ld      (x86_phys_addr+2),a
+        call    x86_guest_ram_select_page
+        ld      a,(x86_mem_word_data)
+        ld      (hl),a
+        inc     hl
+        ld      a,(x86_mem_word_data+1)
+        ld      (hl),a
+        or      a
+        ret
+
+.write16_fallback:
+        ld      a,(x86_mem_word_addr)
+        ld      (x86_phys_addr),a
+        ld      a,(x86_mem_word_addr+1)
+        ld      (x86_phys_addr+1),a
+        ld      a,(x86_mem_word_addr+2)
+        ld      (x86_phys_addr+2),a
+        ld      a,(x86_mem_word_data)
+        call    x86_guest_mem_write8
+        ret     c
+        ld      hl,x86_phys_addr
+        inc     (hl)
+        jr      nz,.write16_second_byte
+        inc     hl
+        inc     (hl)
+        jr      nz,.write16_second_byte
+        inc     hl
+        ld      a,(hl)
+        inc     a
+        and     #0F
+        ld      (hl),a
+.write16_second_byte:
+        ld      a,(x86_mem_word_data+1)
+        jp      x86_guest_mem_write8
+
 ; Select WIN3 physical page and return HL=C000h|(guest_address&3FFFh).
 ; Physical page = 63h + guest_address[19:14].
 ; Clobbers AF, BC, HL; does not touch DE or guest CPU registers.
@@ -1978,6 +2070,9 @@ x86_phys_addr: db 0,0,0
 ; Resident copy of GC6; VGA state itself resides in the X86VGA overlay.
 x86_vga_gc6_shadow: db #0E
 x86_mem_data:  db 0
+x86_mem_word_data: dw 0
+x86_mem_word_addr: db 0,0,0
+x86_mem_word_region: db 0
 
 x86_bios_probe_remaining: db 0
 x86_bios_reset_vector_bytes: db 0,0,0,0,0
