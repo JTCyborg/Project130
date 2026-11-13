@@ -161,7 +161,7 @@ x86_vga_io_write8_impl:
 .seq_data:
         ld      a,(x86_vga_seq_index)
         cp      5
-        jr      nc,.done
+        jp      nc,.done
         ld      e,a
         ld      d,0
         ld      hl,x86_vga_seq_regs
@@ -179,7 +179,7 @@ x86_vga_io_write8_impl:
 .gc_data:
         ld      a,(x86_vga_gc_index)
         cp      9
-        jr      nc,.done
+        jp      nc,.done
         ld      e,a
         ld      d,0
         ld      hl,x86_vga_gc_regs
@@ -1019,7 +1019,7 @@ x86_vga_log_access:
 .text_write_limit:
         ld      a,(x86_vga_log_text_write_count)
         cp      16
-        jr      nc,.done
+        jp      nc,.done
         inc     a
         ld      (x86_vga_log_text_write_count),a
         ld      hl,x86_vga_log_write_prefix
@@ -1030,7 +1030,7 @@ x86_vga_log_access:
         jr      z,.write_limit
         ld      a,(x86_vga_log_read_count)
         cp      16
-        jr      nc,.done
+        jp      nc,.done
         inc     a
         ld      (x86_vga_log_read_count),a
         ld      hl,x86_vga_log_read_prefix
@@ -1038,7 +1038,7 @@ x86_vga_log_access:
 .write_limit:
         ld      a,(x86_vga_log_write_count)
         cp      16
-        jr      nc,.done
+        jp      nc,.done
         inc     a
         ld      (x86_vga_log_write_count),a
         ld      hl,x86_vga_log_write_prefix
