@@ -518,6 +518,11 @@ x86_vga_mem_write8_impl:
         call    x86_vga_map_plane
         ld      a,(x86_vga_write_byte)
         ld      (hl),a
+        ; Do not report a successful VGA bus write until the selected
+        ; physical plane actually retains the byte. This catches bad
+        ; MPAGEX/page selection at the point of failure, before frame DMA.
+        cp      (hl)
+        jr      nz,.write_verify_failed
 .next_plane:
         ld      a,(x86_vga_plane)
         inc     a
@@ -547,6 +552,8 @@ x86_vga_mem_write8_impl:
         call    x86_vga_map_plane
         ld      a,(x86_vga_write_byte)
         ld      (hl),a
+        cp      (hl)
+        jr      nz,.write_verify_failed
 .mode1_next:
         ld      a,(x86_vga_plane)
         inc     a
@@ -554,6 +561,10 @@ x86_vga_mem_write8_impl:
         cp      4
         jr      c,.mode1_loop
         or      a
+        ret
+.write_verify_failed:
+        ; Carry is the existing x86 guest-memory write fault ABI.
+        scf
         ret
 .unsupported:
         or      a
