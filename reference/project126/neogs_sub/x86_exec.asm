@@ -3715,7 +3715,7 @@ x86_exec_string:
         ; Execute every REP STOSW element through the normal memory path.
         ; BIOS RAM tests must really write the guest RAM; no synthetic skip.
         or      a
-        jp      z,.string_single
+        jr      z,.string_single
 
         ; PCem sets the initial ZF state for REPE/REPNE even when CX=0.
         ; The first comparison then replaces it with the actual compare result.
@@ -3747,12 +3747,8 @@ x86_exec_string:
         or      l
         ret     z
 
-.string_batch_again:
-        ; Run up to 256 elements inside this REP instruction. Returning to
-        ; x86_cpu_step after every element made BIOS memory sweeps pay the
-        ; complete prefix/decode/interrupt-boundary cost thousands of times.
-        ; Yield at each 256-element boundary so pending IRQ/NMI and host input
-        ; are still serviced between bounded batches.
+        ; Execute one iteration per interpreter boundary. This gives the
+        ; normal IRQ/NMI boundary logic a chance to interrupt a REP string.
         call    x86_exec_string_iteration
         ret     c
         ld      hl,(x86_reg_cx)
@@ -3771,7 +3767,7 @@ x86_exec_string:
         cp      #AE
         jr      z,.string_compare_repeat
         cp      #AF
-        jr      nz,.string_batch_yield_check
+        jr      nz,.string_repeat_again
 .string_compare_repeat:
         ld      a,(x86_exec_string_rep)
         cp      2
@@ -3779,34 +3775,15 @@ x86_exec_string:
         ld      hl,(x86_reg_flags)
         bit     6,l
         ret     z
-        jr      .string_batch_yield_check
+        jr      .string_repeat_again
 .string_repne:
         ld      hl,(x86_reg_flags)
         bit     6,l
         ret     nz
 
-.string_batch_yield_check:
-        ; Keep CMPS/SCAS at one element per CPU boundary. Their initial ZF
-        ; setup belongs to the first decode only; batching across a re-decode
-        ; would incorrectly reset the comparison result.
-        ld      a,(x86_exec_string_opcode)
-        cp      #A6
-        jr      z,.string_batch_yield
-        cp      #A7
-        jr      z,.string_batch_yield
-        cp      #AE
-        jr      z,.string_batch_yield
-        cp      #AF
-        jr      z,.string_batch_yield
-
-        ; CX low byte wraps once per 256 completed elements. At that point
-        ; rewind IP to the prefix so the normal CPU boundary can service IRQs.
-        ld      hl,(x86_reg_cx)
-        ld      a,l
-        or      a
-        jp      nz,.string_batch_again
-
-.string_batch_yield:
+.string_repeat_again:
+        ; Re-enter from the first prefix byte. The next x86_cpu_step checks
+        ; pending interrupts before decoding the next string iteration.
         ld      hl,(x86_exec_instruction_start_ip)
         ld      (x86_reg_ip),hl
         or      a
