@@ -756,6 +756,11 @@ x86_vga_capture_text_frame_gate_impl:
         ld      de,X86_VGA_CAPTURE_STAGE
         ld      bc,#07D0
         ldir
+        ; Inspect the actual staging bytes before changing the bank mapping.
+        ld      hl,x86_vga_trace_chars
+        call    p126_ngs_resident_log
+        ld      hl,X86_VGA_CAPTURE_STAGE
+        call    x86_vga_trace_dump8
 
         ; Gather the complete attribute plane immediately after the chars.
         ld      a,VGA_PLANE1_FIRST_PAGE
@@ -765,6 +770,10 @@ x86_vga_capture_text_frame_gate_impl:
         ld      de,X86_VGA_CAPTURE_STAGE+#07D0
         ld      bc,#07D0
         ldir
+        ld      hl,x86_vga_trace_attrs
+        call    p126_ngs_resident_log
+        ld      hl,X86_VGA_CAPTURE_STAGE+#07D0
+        call    x86_vga_trace_dump8
 
         ; Restore the normal page-42 DMA producer mapping and publish the
         ; exact Project125 payload layout at the P126 frame payload offset.
@@ -775,6 +784,15 @@ x86_vga_capture_text_frame_gate_impl:
         ld      de,#C000+P126_IPC_HEADER_SIZE
         ld      bc,#0FA0
         ldir
+        ; Verify the final DMA payload independently of the staging buffer.
+        ld      hl,x86_vga_trace_dma_chars
+        call    p126_ngs_resident_log
+        ld      hl,#C000+P126_IPC_HEADER_SIZE
+        call    x86_vga_trace_dump8
+        ld      hl,x86_vga_trace_dma_attrs
+        call    p126_ngs_resident_log
+        ld      hl,#C000+P126_IPC_HEADER_SIZE+#07D0
+        call    x86_vga_trace_dump8
 
         pop     hl
         pop     de
@@ -783,6 +801,52 @@ x86_vga_capture_text_frame_gate_impl:
         ld      hl,#0FA0
         xor     a
         ret
+
+; One-shot capture diagnostics: dump eight bytes from the supplied
+; WIN1/WIN3 pointer without changing the caller's register state.
+x86_vga_trace_dump8:
+        push    af
+        push    bc
+        push    hl
+        ld      b,8
+.dump_loop:
+        ld      a,(hl)
+        inc     hl
+        push    hl
+        ld      c,a
+        rrca
+        rrca
+        rrca
+        rrca
+        and     #0F
+        call    x86_vga_trace_hex_nibble
+        ld      a,c
+        and     #0F
+        call    x86_vga_trace_hex_nibble
+        pop     hl
+        djnz    .dump_loop
+        ld      a,13
+        out     (#EF),a
+        ld      a,10
+        out     (#EF),a
+        pop     hl
+        pop     bc
+        pop     af
+        ret
+
+x86_vga_trace_hex_nibble:
+        add     a,'0'
+        cp      '9'+1
+        jr      c,.hex_emit
+        add     a,7
+.hex_emit:
+        out     (#EF),a
+        ret
+
+x86_vga_trace_chars:     db "[VGA CAP] PLANE0 STAGE=",0
+x86_vga_trace_attrs:     db "[VGA CAP] PLANE1 STAGE=",0
+x86_vga_trace_dma_chars: db "[VGA CAP] DMA CHARS=",0
+x86_vga_trace_dma_attrs: db "[VGA CAP] DMA ATTRS=",0
 
 ; Project130 dynamic-overlay ABI.
 x86_vga_overlay_probe:
