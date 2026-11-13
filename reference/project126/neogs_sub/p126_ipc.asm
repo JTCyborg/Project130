@@ -742,6 +742,9 @@ p126_ngs_ipc_dispatch_once::
         ret
 
 .p126_ngs_dispatch_video_frame:
+        ; Confirms the NeoGS command dispatcher actually accepted E4.
+        ld      hl,p126_ngs_ipc_log_video_dispatch
+        call    p126_ngs_ipc_log
         ld      a,(p126_ngs_vid_overlay_ready)
         or      a
         jr      nz,.video_dispatch_mode_check
@@ -1780,6 +1783,7 @@ p126_ngs_ipc_log_dma_rx_addr:    db "[P130 NGS] RX ADDR=",0
 p126_ngs_ipc_log_dma_rx_timeout: db "[P130 NGS] DMA RX TIMEOUT",13,10,0
 p126_ngs_ipc_log_dma_rx_length_bad: db "[P130 NGS] RX LEN BAD",13,10,0
 p126_ngs_ipc_log_video_convert_ok: db "[TRACE] NGS VIDEO CONVERT OK / TX",13,10,0
+p126_ngs_ipc_log_video_dispatch: db "[P130 NGS] VIDEO CMD DISPATCH",13,10,0
 
 ; Emit CR/LF on NeoGS's independent #EF diagnostic channel.
 p126_ngs_ipc_log_crlf:
