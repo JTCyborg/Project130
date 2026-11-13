@@ -3752,13 +3752,13 @@ x86_exec_string:
         ; original prefix address so the normal IRQ/NMI boundary is checked.
         ld      a,(x86_exec_string_opcode)
         cp      #A6
-        jr      z,.string_compare_single
+        jr      z,.string_compare_batch
         cp      #A7
-        jr      z,.string_compare_single
+        jr      z,.string_compare_batch
         cp      #AE
-        jr      z,.string_compare_single
+        jr      z,.string_compare_batch
         cp      #AF
-        jr      z,.string_compare_single
+        jr      z,.string_compare_batch
 
 .string_batch:
         xor     a
@@ -3783,7 +3783,10 @@ x86_exec_string:
         or      a
         ret
 
-.string_compare_single:
+.string_compare_batch:
+        xor     a
+        ld      (x86_exec_string_remaining),a
+.string_compare_loop:
         call    x86_exec_string_iteration
         ret     c
         ld      hl,(x86_reg_cx)
@@ -3793,32 +3796,28 @@ x86_exec_string:
         or      l
         ret     z
 
-        ; CMPS/SCAS continue only while the selected ZF condition holds.
-        ld      a,(x86_exec_string_opcode)
-        cp      #A6
-        jr      z,.string_compare_repeat
-        cp      #A7
-        jr      z,.string_compare_repeat
-        cp      #AE
-        jr      z,.string_compare_repeat
-        cp      #AF
-        jr      nz,.string_repeat_again
-.string_compare_repeat:
+        ; Test REPE/REPNE after each comparison, exactly as the 8086 does.
+        ; Keep the comparisons inside this handler to avoid a full decode /
+        ; dispatch for every SCASB/CMPSB byte.
         ld      a,(x86_exec_string_rep)
         cp      2
-        jr      nz,.string_repne
+        jr      nz,.string_compare_repne
         ld      hl,(x86_reg_flags)
         bit     6,l
         ret     z
-        jr      .string_repeat_again
-.string_repne:
+        jr      .string_compare_continue
+.string_compare_repne:
         ld      hl,(x86_reg_flags)
         bit     6,l
         ret     nz
 
-.string_repeat_again:
-        ; Re-enter from the first prefix byte. The next x86_cpu_step checks
-        ; pending interrupts before decoding the next string iteration.
+.string_compare_continue:
+        ld      a,(x86_exec_string_remaining)
+        inc     a
+        ld      (x86_exec_string_remaining),a
+        jr      nz,.string_compare_loop
+
+        ; Yield every 256 comparisons so pending IRQ/NMI is observed.
         ld      hl,(x86_exec_instruction_start_ip)
         ld      (x86_reg_ip),hl
         or      a
