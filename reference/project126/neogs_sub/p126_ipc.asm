@@ -644,11 +644,40 @@ p126_ngs_ipc_dispatch_once::
         jr      z,.p126_ngs_dispatch_video
         cp      P126_SERVICE_INPUT
         jr      z,.p126_ngs_dispatch_input
-        ; Diagnostics currently has no additional side effects.
+        ; Diagnostic operation 01h runs the Project125-derived BIOS INT10
+        ; regression through the production X86EXEC/X86VID overlays.
+        ld      a,(#C008)
+        cp      P126_OP_DIAGNOSTIC
+        jr      nz,.p126_ngs_diagnostic_bad
+        ld      hl,(#C00C)
+        ld      a,h
+        or      l
+        jr      nz,.p126_ngs_diagnostic_bad
+        ld      a,(#C008)
+        cp      1
+        jr      nz,.p126_ngs_diagnostic_ack
+        ld      a,P126_NGS_X86VID_MODULE_ID
+        ld      ix,bios_int10_video_regression_test_impl
+        call    p126_overlay_call_module
+        jr      c,.p126_ngs_diagnostic_failed
+.p126_ngs_diagnostic_ack:
         xor     a
         out     (P126_NGS_CLRCBIT),a
         ld      a,1
         or      a
+        ret
+.p126_ngs_diagnostic_failed:
+        push    af
+        xor     a
+        out     (P126_NGS_CLRCBIT),a
+        pop     af
+        scf
+        ret
+.p126_ngs_diagnostic_bad:
+        xor     a
+        out     (P126_NGS_CLRCBIT),a
+        ld      a,P126_STATUS_NO_OPERATION
+        scf
         ret
 
 .p126_ngs_dispatch_input:
