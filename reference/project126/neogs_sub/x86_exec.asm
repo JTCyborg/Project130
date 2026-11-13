@@ -3713,7 +3713,7 @@ x86_exec_string:
         ld      (x86_exec_string_rep),a
 
         or      a
-        jr      z,.string_single
+        jp      z,.string_single
 
         ; Preserve the architectural initial ZF handling for REPE/REPNE.
         ld      a,(x86_exec_string_opcode)
