@@ -4055,6 +4055,7 @@ x86_exec_string_read_dest16:
         ret
 
 x86_exec_string_write_dest16:
+        ld      (x86_exec_string_word),hl
         call    x86_exec_string_make_dest_address
         ld      hl,(x86_exec_string_word)
         jp      x86_guest_mem_write16
