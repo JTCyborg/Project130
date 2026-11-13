@@ -3747,8 +3747,43 @@ x86_exec_string:
         or      l
         ret     z
 
-        ; Execute one iteration per interpreter boundary. This gives the
-        ; normal IRQ/NMI boundary logic a chance to interrupt a REP string.
+        ; CMPS/SCAS evaluate ZF after every element. Unconditional
+        ; MOVS/STOS/LODS execute in 256-element quanta, then yield at the
+        ; original prefix address so the normal IRQ/NMI boundary is checked.
+        ld      a,(x86_exec_string_opcode)
+        cp      #A6
+        jr      z,.string_compare_single
+        cp      #A7
+        jr      z,.string_compare_single
+        cp      #AE
+        jr      z,.string_compare_single
+        cp      #AF
+        jr      z,.string_compare_single
+
+.string_batch:
+        xor     a
+        ld      (x86_exec_string_remaining),a
+.string_batch_loop:
+        call    x86_exec_string_iteration
+        ret     c
+        ld      hl,(x86_reg_cx)
+        dec     hl
+        ld      (x86_reg_cx),hl
+        ld      a,h
+        or      l
+        ret     z
+        ld      a,(x86_exec_string_remaining)
+        inc     a
+        ld      (x86_exec_string_remaining),a
+        jr      nz,.string_batch_loop
+        ; CX/SI/DI contain partial progress; restarting at the prefix is
+        ; the architectural REP restart state used when an interrupt lands.
+        ld      hl,(x86_exec_instruction_start_ip)
+        ld      (x86_reg_ip),hl
+        or      a
+        ret
+
+.string_compare_single:
         call    x86_exec_string_iteration
         ret     c
         ld      hl,(x86_reg_cx)
