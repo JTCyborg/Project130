@@ -22,7 +22,7 @@
 ;   x86_cpu_state_selftest Carry clear=pass, set=fail. Destructive reset test.
 
 X86_FLAGS_RESET EQU #0002
-X86_BIOS_DIAGNOSTICS EQU 1
+X86_BIOS_DIAGNOSTICS EQU 0
 
 x86_cpu_reset:
         ld      hl,0
@@ -223,6 +223,7 @@ x86_bios_startup_trace:
 .trace_loop:
         call    x86_cpu_step
         jp      c,.trace_fault
+        IF      X86_BIOS_DIAGNOSTICS
         ; The 16-entry history is diagnostic only. Sample every 16th guest
         ; instruction instead of writing a 13-byte record on every step.
         ld      hl,(x86_bios_trace_executed)
@@ -351,10 +352,31 @@ x86_bios_startup_trace:
         call    x86_bios_trace_log_cs_ip
         call    x86_bios_trace_log_registers
         pop     hl
+        ENDIF
+
 .trace_cs_expected:
-        ; Live progress for the BIOS REP STOSW RAM-clear phase. Emit one
-        ; update per 256 words and a final 100% line when CX reaches zero.
+        ; REP STOSW progress is diagnostic only. Do not call the tracker
+        ; for every guest instruction: that added several Z80 instructions
+        ; to the hottest path, including every RAM-test instruction. Enter
+        ; it only for BIOS STOSW, once at start and then every 256 words.
+        ld      a,(x86_exec_opcode)
+        cp      #AB
+        jr      nz,.rep_progress_done
+        ld      a,(x86_reg_cs)
+        or      a
+        jr      nz,.rep_progress_done
+        ld      a,(x86_reg_cs+1)
+        cp      #F0
+        jr      nz,.rep_progress_done
+        ld      a,(x86_bios_rep_stosw_active)
+        or      a
+        jr      z,.rep_progress_call
+        ld      a,(x86_reg_cx)
+        or      a
+        jr      nz,.rep_progress_done
+.rep_progress_call:
         call    x86_bios_rep_stosw_progress
+.rep_progress_done:
         ld      hl,(x86_bios_trace_executed)
         inc     hl
         ld      (x86_bios_trace_executed),hl
