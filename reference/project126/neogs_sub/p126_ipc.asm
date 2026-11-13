@@ -792,6 +792,12 @@ p126_ngs_ipc_dispatch_once::
         jr      .video_dispatch_error
 .video_dispatch_convert:
         call    x86_video_convert
+        ; First instruction after the converter wrapper: distinguish a bad
+        ; wrapper RET/stack from a failure in the IPC logger itself.
+        push    af
+        ld      a,'D'
+        out     (#EF),a
+        pop     af
         push    af
         ld      hl,p126_ngs_ipc_log_video_convert_return
         call    p126_ngs_ipc_log
