@@ -223,6 +223,14 @@ x86_vga_io_write8_impl:
         add     hl,de
         ld      a,(x86_io_value)
         ld      (hl),a
+        ; Publish GC6 in resident memory: X86CORE's address classifier and
+        ; X86VID must not dereference data in this separate X86VGA overlay.
+        ld      a,(x86_vga_gc_index)
+        cp      6
+        jr      nz,.gc_shadow_done
+        ld      a,(x86_io_value)
+        ld      (x86_vga_gc6_shadow),a
+.gc_shadow_done:
         ; Trace read-map, mode and memory-map register writes.
         ld      a,(x86_vga_gc_index)
         cp      4
