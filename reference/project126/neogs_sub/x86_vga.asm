@@ -858,6 +858,7 @@ x86_vga_reset_impl:
         ld      (x86_vga_gc_regs+5),a
         ld      a,#0E
         ld      (x86_vga_gc_regs+6),a
+        ld      (x86_vga_gc6_shadow),a
         ld      a,#FF
         ld      (x86_vga_gc_regs+8),a
         ld      hl,x86_vga_attr_regs
