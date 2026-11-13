@@ -3712,13 +3712,10 @@ x86_exec_string:
         ld      a,(x86_exec_prefix_rep)
         ld      (x86_exec_string_rep),a
 
-        ; Execute every REP STOSW element through the normal memory path.
-        ; BIOS RAM tests must really write the guest RAM; no synthetic skip.
         or      a
         jr      z,.string_single
 
-        ; PCem sets the initial ZF state for REPE/REPNE even when CX=0.
-        ; The first comparison then replaces it with the actual compare result.
+        ; Preserve the architectural initial ZF handling for REPE/REPNE.
         ld      a,(x86_exec_string_opcode)
         cp      #A6
         jr      z,.string_compare_initial
@@ -3747,8 +3744,18 @@ x86_exec_string:
         or      l
         ret     z
 
-        ; Execute one iteration per interpreter boundary. This gives the
-        ; normal IRQ/NMI boundary logic a chance to interrupt a REP string.
+        ; Run REP in bounded batches. This removes a full interpreter
+        ; dispatch for every element while retaining interrupt/host service
+        ; opportunities at least every 256 elements. TF remains single-step.
+        ld      hl,256
+        ld      (x86_exec_string_batch_remaining),hl
+        ld      hl,(x86_reg_flags)
+        bit     0,h
+        jr      z,.string_batch_next
+        ld      hl,1
+        ld      (x86_exec_string_batch_remaining),hl
+
+.string_batch_next:
         call    x86_exec_string_iteration
         ret     c
         ld      hl,(x86_reg_cx)
@@ -3758,7 +3765,7 @@ x86_exec_string:
         or      l
         ret     z
 
-        ; CMPS/SCAS continue only while the selected ZF condition holds.
+        ; CMPS/SCAS stop when the selected ZF condition is no longer met.
         ld      a,(x86_exec_string_opcode)
         cp      #A6
         jr      z,.string_compare_repeat
@@ -3767,7 +3774,7 @@ x86_exec_string:
         cp      #AE
         jr      z,.string_compare_repeat
         cp      #AF
-        jr      nz,.string_repeat_again
+        jr      nz,.string_batch_continue
 .string_compare_repeat:
         ld      a,(x86_exec_string_rep)
         cp      2
@@ -3775,15 +3782,22 @@ x86_exec_string:
         ld      hl,(x86_reg_flags)
         bit     6,l
         ret     z
-        jr      .string_repeat_again
+        jr      .string_batch_continue
 .string_repne:
         ld      hl,(x86_reg_flags)
         bit     6,l
         ret     nz
 
-.string_repeat_again:
-        ; Re-enter from the first prefix byte. The next x86_cpu_step checks
-        ; pending interrupts before decoding the next string iteration.
+.string_batch_continue:
+        ld      hl,(x86_exec_string_batch_remaining)
+        dec     hl
+        ld      (x86_exec_string_batch_remaining),hl
+        ld      a,h
+        or      l
+        jr      nz,.string_batch_next
+
+        ; Yield at a complete element boundary. The next CPU step checks
+        ; TF/NMI/IRQ before restarting from the first REP prefix byte.
         ld      hl,(x86_exec_instruction_start_ip)
         ld      (x86_reg_ip),hl
         or      a
@@ -4837,3 +4851,4 @@ x86_exec_far_jmp_target_cs: dw 0
 x86_exec_far_jmp_target_valid: db 0
 x86_exec_build_id_emitted: db 0
 x86_exec_build_id_text: db "[P130 X86EXEC BUILD=FEDEC-20261112-A]",13,10,0
+x86_exec_string_batch_remaining: dw 0
