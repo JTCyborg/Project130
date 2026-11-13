@@ -130,9 +130,11 @@ bios_video_vga_index_data:
         jp      bios_video_vga_write
 
 bios_video_vga_write:
-        ; Use the resident VGA API, which performs the X86VGA overlay switch.
-        ; This is the Project130 transport equivalent of Project125's direct
-        ; write to the resident VGA register model.
+        ; X86VGA's resident gate ABI is HL=port, B=value (not A=value).
+        ; Keep the BIOS byte in B while entering the X86VGA overlay; otherwise
+        ; the gate writes the caller's stale B register into the VGA register
+        ; file and mode-03 never configures the text aperture.
+        ld      b,a
         jp      x86_vga_io_write8
 
 bios_video_clear_page:
