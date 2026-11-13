@@ -1011,7 +1011,7 @@ x86_vga_log_access:
         jr      z,.text_write_limit
         ld      a,(x86_vga_log_text_read_count)
         cp      16
-        jr      nc,.done
+        jp      nc,.done
         inc     a
         ld      (x86_vga_log_text_read_count),a
         ld      hl,x86_vga_log_read_prefix
