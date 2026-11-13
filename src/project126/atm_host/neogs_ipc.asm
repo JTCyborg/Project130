@@ -949,6 +949,13 @@ p126_ipc_dma_receive_video_frame::
         ld      a,#01
         jr      .video_report_failure
 .video_command_timeout:
+        ; Report the exact IPC status sampled when E4 command acknowledgement
+        ; timed out. This distinguishes a stuck CBIT from a handler error.
+        ld      hl,p126_ipc_video_trace_command_timeout
+        call    p126_ipc_port_string
+        ld      a,(p126_ipc_last_status)
+        call    p126_ipc_port_hex_byte
+        call    p126_ipc_port_crlf
         ld      a,#02
         jr      .video_report_failure
 .video_dma_end_timeout:
@@ -1012,6 +1019,7 @@ p126_ipc_video_failure_code: db 0
 p126_ipc_video_trace_request:    db "[VIDEO] E4 REQUEST",13,10,0
 p126_ipc_video_trace_command_ok: db "[VIDEO] E4 COMMAND ACK",13,10,0
 p126_ipc_video_trace_dma_ok:     db "[VIDEO] E4 DMA COMPLETE",13,10,0
+p126_ipc_video_trace_command_timeout: db "[VIDEO] E4 COMMAND TIMEOUT GSSTAT=",0
 
 ; IPC status text belongs to the boot console only. Once BIOS is
 ; installed, keep the ATM text page exclusively owned by the guest VGA frame.
