@@ -3786,6 +3786,19 @@ x86_exec_string:
         ret     nz
 
 .string_batch_yield_check:
+        ; Keep CMPS/SCAS at one element per CPU boundary. Their initial ZF
+        ; setup belongs to the first decode only; batching across a re-decode
+        ; would incorrectly reset the comparison result.
+        ld      a,(x86_exec_string_opcode)
+        cp      #A6
+        jr      z,.string_batch_yield
+        cp      #A7
+        jr      z,.string_batch_yield
+        cp      #AE
+        jr      z,.string_batch_yield
+        cp      #AF
+        jr      z,.string_batch_yield
+
         ; CX low byte wraps once per 256 completed elements. At that point
         ; rewind IP to the prefix so the normal CPU boundary can service IRQs.
         ld      hl,(x86_reg_cx)
@@ -3793,6 +3806,7 @@ x86_exec_string:
         or      a
         jp      nz,.string_batch_again
 
+.string_batch_yield:
         ld      hl,(x86_exec_instruction_start_ip)
         ld      (x86_reg_ip),hl
         or      a
