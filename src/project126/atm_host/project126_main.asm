@@ -233,7 +233,10 @@ p126_host_video_mode_done:
 p126_host_idle:
         call    p126_catalog_poll_keyboard
         call    p126_host_poll_x86_keyboard
-        ld      a,(p126_atm_video_enabled)
+        ; BIOS execution polling is independent of video-frame delivery.
+        ; A failed E4 frame must not stop E1, because E1 schedules the next
+        ; bounded 8086 instruction slice.
+        ld      a,(p126_atm_x86_poll_enabled)
         or      a
         jr      z,.host_idle_continue
         ld      a,(p126_host_video_poll_counter)
@@ -250,12 +253,16 @@ p126_host_idle:
         call    p126_ipc_dma_receive_debug_frame
         jr      c,.host_idle_draw_status
 
-        ; E4 converts the current VGA state. F2 ("not in a supported text
-        ; mode yet") is a normal pending state. Once a frame is applied,
-        ; redraw the ATM-owned diagnostic strip over its final two rows.
+        ; E4 must be retried even when the first frame was not ready.
+        ; In particular F2 (BIOS has not selected a supported text mode yet)
+        ; is a pending state, not a permanent disable. Keep retrying after
+        ; each E1 slice; a successful frame marks video active.
         call    p126_ipc_dma_receive_video_frame
-        jr      nc,.host_idle_draw_status
-        ; A transport/validation failure disables further video polling.
+        jr      c,.host_idle_video_not_ready
+        ld      a,1
+        ld      (p126_atm_video_enabled),a
+        jr      .host_idle_draw_status
+.host_idle_video_not_ready:
         xor     a
         ld      (p126_atm_video_enabled),a
 .host_idle_draw_status:
@@ -409,6 +416,7 @@ p126_log_video_done:    db "[BOOT] ATM VIDEO INIT DONE",13,10,0
 p126_log_rtc_done:      db "[BOOT] RTC PROBE RETURN",13,10,0
 p126_log_video_mode_sent: db "[BOOT] ATM VIDEO MODE SENT TO NEOGS",13,10,0
 p126_log_video_mode_failed: db "[BOOT] ATM VIDEO MODE SEND FAILED",13,10,0
+p126_atm_x86_poll_enabled: db 0
 p126_host_video_poll_counter: db 0
 p126_log_console_begin: db "[BOOT] CONSOLE INIT BEGIN",13,10,0
 p126_log_console_done:  db "[BOOT] CONSOLE INIT DONE",13,10,0
