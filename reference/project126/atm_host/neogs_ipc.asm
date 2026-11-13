@@ -1257,7 +1257,7 @@ p126_ipc_run_int10_regression::
 
 p126_ipc_int10_test_sequence: dw 0
 p126_ipc_int10_test_begin_log: db "[P130 TEST] REQUEST INT10 REGRESSION",13,10,0
-p126_ipc_int10_test_sent_log: db "[P130 TEST] INT10 REGRESSION SERVICE COMPLETE",13,10,0
+p126_ipc_int10_test_sent_log: db "[P130 TEST] INT10 REGRESSION REQUEST ACKNOWLEDGED",13,10,0
 
 ; Send one XT keyboard scan-code event to the NeoGS software device model.
 ; A=make/break scan code. The guest keyboard FIFO raises virtual IRQ1.
