@@ -128,9 +128,14 @@ bios_video_set_vga_text_state:
         ret
 
 bios_video_vga_index_data:
+        ; A=index, D=data, HL=index port. Preserve both independently:
+        ; the previous implementation loaded D into A before writing the
+        ; index port, so it sent the data byte as the register index.
+        ld      (bios_video_vga_index),a
         ld      a,d
         ld      (bios_video_vga_data),a
         ld      (bios_video_vga_port),hl
+        ld      a,(bios_video_vga_index)
         call    bios_video_vga_write
         ret     c
         ld      hl,(bios_video_vga_port)
@@ -857,6 +862,7 @@ bios_video_attr:          db BIOS_VIDEO_ATTR
 bios_video_guest_offset:  dw 0
 bios_video_guest_value:   db 0
 bios_video_bda_word:      dw 0
+bios_video_vga_index: db 0
 bios_video_vga_data:      db 0
 bios_video_vga_port:      dw 0
 bios_video_vga_value:     db 0
