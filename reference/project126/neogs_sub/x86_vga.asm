@@ -828,11 +828,15 @@ x86_vga_reset_impl:
         ld      (x86_vga_seq_regs),a
         xor     a
         ld      (x86_vga_seq_regs+1),a
-        ld      a,#0F
+        ; Start in VGA-compatible 80x25 text addressing (mode 3 layout).
+        ; The BIOS writes B8000 text cells and may only change Map Mask;
+        ; starting in planar mode (SEQ4=06, GC5=00) routes both bytes to
+        ; one plane and makes the character/attribute pair inaccessible.
+        ld      a,3
         ld      (x86_vga_seq_regs+2),a
         xor     a
         ld      (x86_vga_seq_regs+3),a
-        ld      a,6
+        ld      a,2
         ld      (x86_vga_seq_regs+4),a
         ld      hl,x86_vga_gc_regs
         ld      b,8
@@ -841,6 +845,11 @@ x86_vga_reset_impl:
         ld      (hl),a
         inc     hl
         djnz    .reset_gc
+        ; Odd/even text reads and B8000 memory-map selection.
+        ld      a,#10
+        ld      (x86_vga_gc_regs+5),a
+        ld      a,#0E
+        ld      (x86_vga_gc_regs+6),a
         ld      a,#FF
         ld      (x86_vga_gc_regs+8),a
         ld      hl,x86_vga_attr_regs
