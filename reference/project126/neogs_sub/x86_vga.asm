@@ -16,37 +16,37 @@ x86_vga_io_read8_impl:
         or      a
         sbc     hl,de
         jp      z,.seq_index
-        ld      hl,(x86_io_port)
+        ld      hl,(x86_vga_io_port)
         ld      de,#03C5
         or      a
         sbc     hl,de
         jp      z,.seq_data
-        ld      hl,(x86_io_port)
+        ld      hl,(x86_vga_io_port)
         ld      de,#03CE
         or      a
         sbc     hl,de
         jp      z,.gc_index
-        ld      hl,(x86_io_port)
+        ld      hl,(x86_vga_io_port)
         ld      de,#03CF
         or      a
         sbc     hl,de
         jp      z,.gc_data
-        ld      hl,(x86_io_port)
+        ld      hl,(x86_vga_io_port)
         ld      de,#03CC
         or      a
         sbc     hl,de
         jp      z,.misc
-        ld      hl,(x86_io_port)
+        ld      hl,(x86_vga_io_port)
         ld      de,#03C0
         or      a
         sbc     hl,de
         jp      z,.attr_index_read
-        ld      hl,(x86_io_port)
+        ld      hl,(x86_vga_io_port)
         ld      de,#03C1
         or      a
         sbc     hl,de
         jp      z,.attr_data
-        ld      hl,(x86_io_port)
+        ld      hl,(x86_vga_io_port)
         ld      de,#03DA
         or      a
         sbc     hl,de
@@ -120,32 +120,32 @@ x86_vga_io_read8_impl:
 x86_vga_io_write8_impl:
         ld      (x86_vga_io_port),hl
         ld      (x86_io_value),a
-        ld      hl,(x86_io_port)
+        ld      hl,(x86_vga_io_port)
         ld      de,#03C4
         or      a
         sbc     hl,de
         jp      z,.seq_index
-        ld      hl,(x86_io_port)
+        ld      hl,(x86_vga_io_port)
         ld      de,#03C5
         or      a
         sbc     hl,de
         jp      z,.seq_data
-        ld      hl,(x86_io_port)
+        ld      hl,(x86_vga_io_port)
         ld      de,#03CE
         or      a
         sbc     hl,de
         jp      z,.gc_index
-        ld      hl,(x86_io_port)
+        ld      hl,(x86_vga_io_port)
         ld      de,#03CF
         or      a
         sbc     hl,de
         jp      z,.gc_data
-        ld      hl,(x86_io_port)
+        ld      hl,(x86_vga_io_port)
         ld      de,#03C2
         or      a
         sbc     hl,de
         jp      z,.misc
-        ld      hl,(x86_io_port)
+        ld      hl,(x86_vga_io_port)
         ld      de,#03C0
         or      a
         sbc     hl,de
