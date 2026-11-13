@@ -130,14 +130,10 @@ bios_video_vga_index_data:
         jp      bios_video_vga_write
 
 bios_video_vga_write:
-        ld      (bios_video_vga_port),hl
-        ld      (bios_video_vga_value),a
-        ld      hl,(bios_video_vga_port)
-        ld      a,(bios_video_vga_value)
-        ld      b,a
-        ld      a,P126_NGS_X86VGA_MODULE_ID
-        ld      ix,x86_vga_io_write8_gate_impl
-        jp      p126_overlay_call_module
+        ; Use the resident VGA API, which performs the X86VGA overlay switch.
+        ; This is the Project130 transport equivalent of Project125's direct
+        ; write to the resident VGA register model.
+        jp      x86_vga_io_write8
 
 bios_video_clear_page:
         xor     a
@@ -670,13 +666,11 @@ bios_video_write_guest_byte:
         ld      hl,#B800
         ld      de,(bios_video_guest_offset)
         call    x86_cpu_calc_phys
-        ; INT10 owns VGA text output. Route B800 writes through the VGA
-        ; overlay explicitly instead of the generic guest-RAM writer.
+        ; Match Project125's x86_mem_write8 path: let the guest-memory
+        ; dispatcher recognize B8000h and enter the X86VGA overlay through
+        ; its resident public API. BIOS and guest REP STOSW now share a path.
         ld      a,(bios_video_guest_value)
-        ld      b,a
-        ld      a,P126_NGS_X86VGA_MODULE_ID
-        ld      ix,x86_vga_mem_write8_gate_impl
-        jp      p126_overlay_call_module
+        jp      x86_guest_mem_write8
 
 bios_video_write_bda:
         ld      (bios_video_guest_value),a
