@@ -883,6 +883,16 @@ x86_vga_capture_text_frame_gate_impl:
         call    x86_vga_log_hex_byte
         ld      a,(x86_vga_gc_regs+4)
         call    x86_vga_log_hex_byte
+        ; GC0/1/3/8 control set-reset, rotate/logical-op and bit mask.
+        ; These determine whether the CPU byte is actually stored as data.
+        ld      a,(x86_vga_gc_regs)
+        call    x86_vga_log_hex_byte
+        ld      a,(x86_vga_gc_regs+1)
+        call    x86_vga_log_hex_byte
+        ld      a,(x86_vga_gc_regs+3)
+        call    x86_vga_log_hex_byte
+        ld      a,(x86_vga_gc_regs+8)
+        call    x86_vga_log_hex_byte
         ld      a,(x86_vga_offset+1)
         call    x86_vga_log_hex_byte
         ld      a,(x86_vga_offset)
@@ -1125,7 +1135,7 @@ x86_vga_trace_hex_nibble:
         out     (#EF),a
         ret
 
-x86_vga_capture_state:   db "[VGA CAP] GC5/6 SEQ4/2 GC4 OFF=",0
+x86_vga_capture_state:   db "[VGA CAP] GC5/6 SEQ4/2 GC4/0138 OFF=",0
 x86_vga_trace_chars:     db "[VGA CAP] PLANE0 STAGE=",0
 x86_vga_trace_attrs:     db "[VGA CAP] PLANE1 STAGE=",0
 x86_vga_trace_dma_chars: db "[VGA CAP] DMA CHARS=",0
