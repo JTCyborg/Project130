@@ -3715,87 +3715,40 @@ x86_exec_string:
         ; Execute every REP STOSW element through the normal memory path.
         ; BIOS RAM tests must really write the guest RAM; no synthetic skip.
         or      a
-        jp      z,.string_single
+        jr      z,.string_single
 
-        ; A yielded CMPS/SCAS resumes with the flags from its last compare.
-        ; Match both opcode and original prefix IP before preserving that ZF.
+        ; PCem sets the initial ZF state for REPE/REPNE even when CX=0.
+        ; The first comparison then replaces it with the actual compare result.
         ld      a,(x86_exec_string_opcode)
         cp      #A6
-        jr      z,.string_compare_resume_check
-        cp      #A7
-        jr      z,.string_compare_resume_check
-        cp      #AE
-        jr      z,.string_compare_resume_check
-        cp      #AF
-        jr      z,.string_compare_resume_check
-        xor     a
-        ld      (x86_exec_string_resume),a
-        jr      .string_check_count
-.string_compare_resume_check:
-        ld      a,(x86_exec_string_resume)
-        or      a
         jr      z,.string_compare_initial
-        ld      hl,(x86_exec_instruction_start_ip)
-        ld      de,(x86_exec_string_resume_ip)
-        or      a
-        sbc     hl,de
-        jr      nz,.string_compare_new
-        ld      a,(x86_exec_string_opcode)
-        ld      b,a
-        ld      a,(x86_exec_string_resume_opcode)
-        cp      b
-        jr      z,.string_check_count
-.string_compare_new:
-        xor     a
-        ld      (x86_exec_string_resume),a
+        cp      #A7
+        jr      z,.string_compare_initial
+        cp      #AE
+        jr      z,.string_compare_initial
+        cp      #AF
+        jr      nz,.string_check_count
 .string_compare_initial:
-        ; PCem initializes ZF for REPE/REPNE even when CX=0.
         ld      a,(x86_exec_string_rep)
         cp      2
         jr      nz,.string_initial_repne
         ld      hl,(x86_reg_flags)
         set     6,l
         ld      (x86_reg_flags),hl
-        jr      .string_compare_mark_resume
+        jr      .string_check_count
 .string_initial_repne:
         ld      hl,(x86_reg_flags)
         res     6,l
         ld      (x86_reg_flags),hl
-.string_compare_mark_resume:
-        ld      hl,(x86_exec_instruction_start_ip)
-        ld      (x86_exec_string_resume_ip),hl
-        ld      a,(x86_exec_string_opcode)
-        ld      (x86_exec_string_resume_opcode),a
-        ld      a,1
-        ld      (x86_exec_string_resume),a
 
 .string_check_count:
         ld      hl,(x86_reg_cx)
         ld      a,h
         or      l
-        jr      nz,.string_count_nonzero
-        xor     a
-        ld      (x86_exec_string_resume),a
-        ret
-.string_count_nonzero:
+        ret     z
 
-        ; CMPS/SCAS evaluate ZF after every element. Unconditional
-        ; MOVS/STOS/LODS execute in 256-element quanta, then yield at the
-        ; original prefix address so the normal IRQ/NMI boundary is checked.
-        ld      a,(x86_exec_string_opcode)
-        cp      #A6
-        jr      z,.string_compare_batch
-        cp      #A7
-        jr      z,.string_compare_batch
-        cp      #AE
-        jr      z,.string_compare_batch
-        cp      #AF
-        jr      z,.string_compare_batch
-
-.string_batch:
-        xor     a
-        ld      (x86_exec_string_remaining),a
-.string_batch_loop:
+        ; Execute one iteration per interpreter boundary. This gives the
+        ; normal IRQ/NMI boundary logic a chance to interrupt a REP string.
         call    x86_exec_string_iteration
         ret     c
         ld      hl,(x86_reg_cx)
@@ -3804,66 +3757,33 @@ x86_exec_string:
         ld      a,h
         or      l
         ret     z
-        ld      a,(x86_exec_string_remaining)
-        inc     a
-        ld      (x86_exec_string_remaining),a
-        jr      nz,.string_batch_loop
-        ; CX/SI/DI contain partial progress; restarting at the prefix is
-        ; the architectural REP restart state used when an interrupt lands.
-        ld      hl,(x86_exec_instruction_start_ip)
-        ld      (x86_reg_ip),hl
-        or      a
-        ret
 
-.string_compare_batch:
-        xor     a
-        ld      (x86_exec_string_remaining),a
-.string_compare_loop:
-        call    x86_exec_string_iteration
-        jr      nc,.string_compare_iteration_ok
-        xor     a
-        ld      (x86_exec_string_resume),a
-        scf
-        ret
-.string_compare_iteration_ok:
-        ld      hl,(x86_reg_cx)
-        dec     hl
-        ld      (x86_reg_cx),hl
-        ld      a,h
-        or      l
-        jr      nz,.string_compare_count_nonzero
-        xor     a
-        ld      (x86_exec_string_resume),a
-        ret
-.string_compare_count_nonzero:
-
-        ; Test REPE/REPNE after each comparison, exactly as the 8086 does.
-        ; Keep the comparisons inside this handler to avoid a full decode /
-        ; dispatch for every SCASB/CMPSB byte.
+        ; CMPS/SCAS continue only while the selected ZF condition holds.
+        ld      a,(x86_exec_string_opcode)
+        cp      #A6
+        jr      z,.string_compare_repeat
+        cp      #A7
+        jr      z,.string_compare_repeat
+        cp      #AE
+        jr      z,.string_compare_repeat
+        cp      #AF
+        jr      nz,.string_repeat_again
+.string_compare_repeat:
         ld      a,(x86_exec_string_rep)
         cp      2
-        jr      nz,.string_compare_repne
+        jr      nz,.string_repne
         ld      hl,(x86_reg_flags)
         bit     6,l
-        jr      nz,.string_compare_continue
-        xor     a
-        ld      (x86_exec_string_resume),a
-        ret
-.string_compare_repne:
+        ret     z
+        jr      .string_repeat_again
+.string_repne:
         ld      hl,(x86_reg_flags)
         bit     6,l
-        jr      z,.string_compare_continue
-        xor     a
-        ld      (x86_exec_string_resume),a
-        ret
+        ret     nz
 
-.string_compare_continue:
-        ld      a,(x86_exec_string_remaining)
-        inc     a
-        ld      (x86_exec_string_remaining),a
-        jr      nz,.string_compare_loop
-
-        ; Yield every 256 comparisons so pending IRQ/NMI is observed.
+.string_repeat_again:
+        ; Re-enter from the first prefix byte. The next x86_cpu_step checks
+        ; pending interrupts before decoding the next string iteration.
         ld      hl,(x86_exec_instruction_start_ip)
         ld      (x86_reg_ip),hl
         or      a
@@ -4057,8 +3977,16 @@ x86_exec_string_read_dest16:
 x86_exec_string_write_dest16:
         ld      (x86_exec_string_word),hl
         call    x86_exec_string_make_dest_address
-        ld      hl,(x86_exec_string_word)
-        jp      x86_guest_mem_write16
+        ld      a,(x86_exec_string_word)
+        call    x86_guest_mem_write8
+        ret     c
+        ld      hl,(x86_reg_di)
+        inc     hl
+        ld      (x86_exec_string_temp_offset),hl
+        call    x86_exec_string_make_dest_next_address
+        ld      a,(x86_exec_string_word+1)
+        call    x86_guest_mem_write8
+        ret
 
 x86_exec_string_adjust_si:
         ld      hl,(x86_reg_si)
@@ -4906,9 +4834,6 @@ x86_exec_overlay_probe:
 ; Diagnostic snapshot of the last successfully decoded EA ptr16:16.
 x86_exec_far_jmp_target_ip: dw 0
 x86_exec_far_jmp_target_cs: dw 0
-x86_exec_string_resume: db 0
-x86_exec_string_resume_opcode: db 0
-x86_exec_string_resume_ip: dw 0
 x86_exec_far_jmp_target_valid: db 0
 x86_exec_build_id_emitted: db 0
-x86_exec_build_id_text: db "[P130 X86EXEC BUILD=REP-WR16-20261113-A]",13,10,0
+x86_exec_build_id_text: db "[P130 X86EXEC BUILD=FEDEC-20261112-A]",13,10,0

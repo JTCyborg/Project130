@@ -106,10 +106,10 @@ Remove-Item -Force -ErrorAction SilentlyContinue (Join-Path $Build "P130_X86CORE
 if ($LASTEXITCODE -ne 0){throw "Project126 resident/overlay assembly failed: $LASTEXITCODE"}
 [byte[]]$execImage=[IO.File]::ReadAllBytes((Join-Path $Build "X86EXEC.C"))
 $execText=[Text.Encoding]::ASCII.GetString($execImage)
-if(-not $execText.Contains("[P130 X86EXEC BUILD=REP-WR16-20261113-A]")){
+if(-not $execText.Contains("[P130 X86EXEC BUILD=FEDEC-20261112-A]")){
  throw "X86EXEC.C is missing the current FEDEC build identity; refusing to package a stale or wrong overlay"
 }
-Write-Host "[P130 BUILD] X86EXEC BUILD ID=REP-WR16-20261113-A VERIFIED"
+Write-Host "[P130 BUILD] X86EXEC BUILD ID=FEDEC-20261112-A VERIFIED"
 foreach($n in $names){Add-BuildOutput ("build/"+$n) "OUTPUT-X86-MODULE"}
 foreach ($n in $names) {
  $target=Join-Path $Build $n
