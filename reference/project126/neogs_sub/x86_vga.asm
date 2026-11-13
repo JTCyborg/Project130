@@ -529,6 +529,7 @@ x86_vga_mem_write8_impl:
         ld      (x86_vga_plane),a
         cp      4
         jr      c,.plane_loop
+        call    x86_vga_dump_full_vram_once
         or      a
         ret
 .mode1:
@@ -560,6 +561,7 @@ x86_vga_mem_write8_impl:
         ld      (x86_vga_plane),a
         cp      4
         jr      c,.mode1_loop
+        call    x86_vga_dump_full_vram_once
         or      a
         ret
 .write_verify_failed:
@@ -844,6 +846,96 @@ x86_vga_capture_text_frame_gate_impl:
         ld      hl,0
         scf
         ret
+
+
+; Dump the complete 4-plane VGA backing store once, immediately after the
+; first successful guest VGA write. Each plane is 64 KiB (four 16 KiB pages).
+; Output is intentionally raw hex on debug port #EF: 256 KiB total.
+x86_vga_dump_full_vram_once:
+        ld      a,(x86_vga_full_dump_done)
+        or      a
+        ret     nz
+        inc     a
+        ld      (x86_vga_full_dump_done),a
+        push    af
+        push    bc
+        push    de
+        push    hl
+        xor     a
+        ld      (x86_vga_full_dump_plane),a
+.plane:
+        ld      a,(x86_vga_full_dump_plane)
+        ld      hl,x86_vga_full_dump_plane_header
+        call    p126_ngs_resident_log
+        ld      a,(x86_vga_full_dump_plane)
+        call    x86_vga_trace_hex_nibble
+        ld      a,13
+        out     (#EF),a
+        ld      a,10
+        out     (#EF),a
+        xor     a
+        ld      (x86_vga_full_dump_page),a
+.page:
+        ; Map one 16 KiB physical page of this plane into WIN3.
+        ld      a,(x86_vga_full_dump_page)
+        rlca
+        rlca
+        ld      l,a
+        ld      h,0
+        ld      (x86_vga_offset),hl
+        ld      a,(x86_vga_full_dump_plane)
+        call    x86_vga_map_plane
+        ld      bc,#4000
+        ld      a,16
+        ld      (x86_vga_full_dump_line_count),a
+.byte:
+        ld      a,(hl)
+        ld      e,a
+        rrca
+        rrca
+        rrca
+        rrca
+        and     #0F
+        call    x86_vga_trace_hex_nibble
+        ld      a,e
+        and     #0F
+        call    x86_vga_trace_hex_nibble
+        inc     hl
+        dec     bc
+        ld      a,c
+        and     #0F
+        jr      nz,.no_newline
+        push    bc
+        ld      a,13
+        out     (#EF),a
+        ld      a,10
+        out     (#EF),a
+        pop     bc
+.no_newline:
+        ld      a,b
+        or      c
+        jr      nz,.byte
+        ld      a,(x86_vga_full_dump_page)
+        inc     a
+        ld      (x86_vga_full_dump_page),a
+        cp      4
+        jr      c,.page
+        ld      a,(x86_vga_full_dump_plane)
+        inc     a
+        ld      (x86_vga_full_dump_plane),a
+        cp      4
+        jr      c,.plane
+        pop     hl
+        pop     de
+        pop     bc
+        pop     af
+        ret
+
+x86_vga_full_dump_done:       db 0
+x86_vga_full_dump_plane:      db 0
+x86_vga_full_dump_page:       db 0
+x86_vga_full_dump_line_count: db 0
+x86_vga_full_dump_plane_header: db "[FULL VGA VRAM] PLANE=",0
 
 ; One-shot capture diagnostics: dump eight bytes from the supplied
 ; WIN1/WIN3 pointer without changing the caller's register state.
