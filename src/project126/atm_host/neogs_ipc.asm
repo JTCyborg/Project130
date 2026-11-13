@@ -238,9 +238,73 @@ p126_ipc_validate_frame::
         or      a
         sbc     hl,de
         jp      nz,.p126_frame_bad
-        ; Transport CRC verification is disabled for performance.
-        ; Keep structural validation (magic/version/type/flags/length) above.
-        ; CRC bytes 16..17 remain reserved in the ABI header and are ignored.
+        ; CRC header and payload in one pass.
+        ; Keep DE pointing at the frame while HL holds the CRC accumulator.
+        ; EX DE,HL here would move the frame pointer into HL and then lose it
+        ; when HL is initialized to FFFFh, causing CRC to read from address 0000h.
+        push    ix
+        pop     de
+        ld      hl,#FFFF
+        ld      b,16
+.p126_frame_crc_head:
+        ld      a,(de)
+        inc     de
+        call    p126_ipc_crc16_update
+        djnz    .p126_frame_crc_head
+        inc     de
+        inc     de
+        push    de
+        ld      ix,(p126_ipc_frame_ptr)
+        ld      e,(ix+12)
+        ld      d,(ix+13)
+        ; Restore the saved payload pointer directly into IX.
+        ; Do not pop it into HL: HL is the live CRC accumulator and must
+        ; survive the transition from header processing to payload processing.
+        pop     ix
+.p126_frame_crc_data:
+        ld      a,d
+        or      e
+        jr      z,.p126_frame_crc_compare
+        ld      a,(ix+0)
+        inc     ix
+        call    p126_ipc_crc16_update
+        dec     de
+        jr      .p126_frame_crc_data
+.p126_frame_crc_compare:
+        ; Capture both values before emitting diagnostics. This lets the next
+        ; hardware log distinguish a bad CRC calculation from a bad frame
+        ; write/byte order without involving the NeoGS DMA receiver.
+        ld      (p126_ipc_crc_work),hl
+        ld      ix,(p126_ipc_frame_ptr)
+        ld      a,(ix+16)
+        ld      e,a
+        ld      a,(ix+17)
+        ld      d,a
+        ld      (p126_ipc_crc_expected),de
+        ld      hl,p126_ipc_log_crc_calculated
+        call    p126_ipc_debug_string
+        ld      hl,(p126_ipc_crc_work)
+        ld      a,h
+        call    p126_ipc_debug_hex_byte
+        ld      a,l
+        call    p126_ipc_debug_hex_byte
+        ld      hl,p126_ipc_log_crc_expected
+        call    p126_ipc_debug_string
+        ld      hl,(p126_ipc_crc_expected)
+        ld      a,h
+        call    p126_ipc_debug_hex_byte
+        ld      a,l
+        call    p126_ipc_debug_hex_byte
+        ld      bc,#00EF
+        ld      a,13
+        out     (c),a
+        ld      a,10
+        out     (c),a
+        ld      hl,(p126_ipc_crc_work)
+        ld      de,(p126_ipc_crc_expected)
+        or      a
+        sbc     hl,de
+        jp      nz,.p126_frame_crc_bad
         xor     a
         ret
 .p126_frame_magic:
@@ -853,17 +917,12 @@ p126_ipc_debug_opcode_label: db " OP=",0
 ; to the ATM's active page7/page3 text memory. A NO_OPERATION/F2 response is
 ; a normal pending state until the BIOS programs a supported VGA text mode.
 p126_ipc_dma_receive_video_frame::
-        ; Stage markers isolate E4 command dispatch from reverse-DMA receive.
-        ld      hl,p126_ipc_video_trace_request
-        call    p126_ipc_port_string
         ld      a,(p126_atm_video_mode)
         cp      P126_ATM_VIDEO_MODE_RG6_TEXT80X25
         jp      nz,.video_bad_host_mode
         ld      a,P126_CMD_NGS_VIDEO_FRAME
         call    p126_ipc_send_command
         jp      c,.video_command_timeout
-        ld      hl,p126_ipc_video_trace_command_ok
-        call    p126_ipc_port_string
 
         di
         ld      hl,0
@@ -876,8 +935,6 @@ p126_ipc_dma_receive_video_frame::
         ld      a,P126_CMD_DMA_END
         call    p126_ipc_send_command
         jp      c,.video_dma_end_timeout
-        ld      hl,p126_ipc_video_trace_dma_ok
-        call    p126_ipc_port_string
 
         ld      hl,P126_IPC_DMA_RX_BUFFER
         ld      bc,P126_IPC_MAX_FRAME_SIZE
@@ -949,13 +1006,6 @@ p126_ipc_dma_receive_video_frame::
         ld      a,#01
         jr      .video_report_failure
 .video_command_timeout:
-        ; Report the exact IPC status sampled when E4 command acknowledgement
-        ; timed out. This distinguishes a stuck CBIT from a handler error.
-        ld      hl,p126_ipc_video_trace_command_timeout
-        call    p126_ipc_port_string
-        ld      a,(p126_ipc_last_status)
-        call    p126_ipc_port_hex_byte
-        call    p126_ipc_port_crlf
         ld      a,#02
         jr      .video_report_failure
 .video_dma_end_timeout:
@@ -1016,10 +1066,6 @@ p126_ipc_dma_receive_video_frame::
         ret
 
 p126_ipc_video_failure_code: db 0
-p126_ipc_video_trace_request:    db "[VIDEO] E4 REQUEST",13,10,0
-p126_ipc_video_trace_command_ok: db "[VIDEO] E4 COMMAND ACK",13,10,0
-p126_ipc_video_trace_dma_ok:     db "[VIDEO] E4 DMA COMPLETE",13,10,0
-p126_ipc_video_trace_command_timeout: db "[VIDEO] E4 COMMAND TIMEOUT GSSTAT=",0
 
 ; IPC status text belongs to the boot console only. Once BIOS is
 ; installed, keep the ATM text page exclusively owned by the guest VGA frame.

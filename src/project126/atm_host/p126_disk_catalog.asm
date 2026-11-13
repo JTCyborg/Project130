@@ -174,10 +174,6 @@ p126_catalog_poll_keyboard::
         ; 80x25 character/attribute cells into the ATM native text pages.
         call    BIOS_DebugConsole_Clear
         call    p126_ipc_dma_receive_debug_frame
-        ; Start the 8086 scheduler regardless of whether the first video
-        ; frame is ready. E1 is required to advance the BIOS independently.
-        ld      a,1
-        ld      (p126_atm_x86_poll_enabled),a
         call    p126_ipc_dma_receive_video_frame
         jr      c,.catalog_video_not_ready
         ld      a,1
