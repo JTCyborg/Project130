@@ -3715,7 +3715,7 @@ x86_exec_string:
         ; Execute every REP STOSW element through the normal memory path.
         ; BIOS RAM tests must really write the guest RAM; no synthetic skip.
         or      a
-        jr      z,.string_single
+        jp      z,.string_single
 
         ; PCem sets the initial ZF state for REPE/REPNE even when CX=0.
         ; The first comparison then replaces it with the actual compare result.
