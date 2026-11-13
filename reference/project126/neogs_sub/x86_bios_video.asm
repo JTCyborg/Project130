@@ -1047,7 +1047,8 @@ bios_int10_video_regression_test_impl:
         call    p126_ngs_resident_log
         pop     af
         call    x86_bios_trace_emit_hex8
-        call    x86_bios_trace_log_crlf
+        ld      hl,bios_int10_test_crlf
+        call    p126_ngs_resident_log
         pop     hl
         pop     de
         pop     bc
@@ -1092,5 +1093,6 @@ bios_int10_test_steps: dw 0
 bios_int10_test_byte:  db 0
 bios_int10_test_failure: db 0
 bios_int10_test_pass_log: db "[P130 INT10] P125 REGRESSION PASS",13,10,0
+bios_int10_test_crlf: db 13,10,0
 bios_int10_test_fail_log: db "[P130 INT10] P125 REGRESSION FAIL STAGE=",0
 
