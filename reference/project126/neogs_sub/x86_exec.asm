@@ -3747,8 +3747,12 @@ x86_exec_string:
         or      l
         ret     z
 
-        ; Execute one iteration per interpreter boundary. This gives the
-        ; normal IRQ/NMI boundary logic a chance to interrupt a REP string.
+.string_batch_again:
+        ; Run up to 256 elements inside this REP instruction. Returning to
+        ; x86_cpu_step after every element made BIOS memory sweeps pay the
+        ; complete prefix/decode/interrupt-boundary cost thousands of times.
+        ; Yield at each 256-element boundary so pending IRQ/NMI and host input
+        ; are still serviced between bounded batches.
         call    x86_exec_string_iteration
         ret     c
         ld      hl,(x86_reg_cx)
@@ -3767,7 +3771,7 @@ x86_exec_string:
         cp      #AE
         jr      z,.string_compare_repeat
         cp      #AF
-        jr      nz,.string_repeat_again
+        jr      nz,.string_batch_yield_check
 .string_compare_repeat:
         ld      a,(x86_exec_string_rep)
         cp      2
@@ -3775,15 +3779,20 @@ x86_exec_string:
         ld      hl,(x86_reg_flags)
         bit     6,l
         ret     z
-        jr      .string_repeat_again
+        jr      .string_batch_yield_check
 .string_repne:
         ld      hl,(x86_reg_flags)
         bit     6,l
         ret     nz
 
-.string_repeat_again:
-        ; Re-enter from the first prefix byte. The next x86_cpu_step checks
-        ; pending interrupts before decoding the next string iteration.
+.string_batch_yield_check:
+        ; CX low byte wraps once per 256 completed elements. At that point
+        ; rewind IP to the prefix so the normal CPU boundary can service IRQs.
+        ld      hl,(x86_reg_cx)
+        ld      a,l
+        or      a
+        jp      nz,.string_batch_again
+
         ld      hl,(x86_exec_instruction_start_ip)
         ld      (x86_reg_ip),hl
         or      a
