@@ -666,11 +666,69 @@ bios_video_write_guest_byte:
         ld      hl,#B800
         ld      de,(bios_video_guest_offset)
         call    x86_cpu_calc_phys
-        ; Match Project125's x86_mem_write8 path: let the guest-memory
-        ; dispatcher recognize B8000h and enter the X86VGA overlay through
-        ; its resident public API. BIOS and guest REP STOSW now share a path.
+        ; One-shot boundary trace: prove the exact physical B800 address and
+        ; value reaching the unified memory dispatcher, then preserve its CF.
+        ld      a,(bios_video_trace_mem_write_once)
+        or      a
+        jr      nz,.write_dispatch
+        inc     a
+        ld      (bios_video_trace_mem_write_once),a
+        push    af
+        push    bc
+        push    de
+        push    hl
+        ld      hl,bios_video_trace_mem_write_prefix
+        call    p126_ngs_resident_log
+        ld      a,(x86_phys_addr+2)
+        call    x86_bios_trace_emit_hex8
+        ld      a,(x86_phys_addr+1)
+        call    x86_bios_trace_emit_hex8
+        ld      a,(x86_phys_addr)
+        call    x86_bios_trace_emit_hex8
+        ld      a,' '
+        out     (#EF),a
         ld      a,(bios_video_guest_value)
-        jp      x86_guest_mem_write8
+        call    x86_bios_trace_emit_hex8
+        ld      a,13
+        out     (#EF),a
+        ld      a,10
+        out     (#EF),a
+        pop     hl
+        pop     de
+        pop     bc
+        pop     af
+.write_dispatch:
+        ; BIOS and guest REP STOSW share the Project125-compatible path.
+        ld      a,(bios_video_guest_value)
+        call    x86_guest_mem_write8
+        push    af
+        push    bc
+        ld      a,(bios_video_trace_mem_write_result_once)
+        or      a
+        jr      nz,.write_result_done
+        inc     a
+        ld      (bios_video_trace_mem_write_result_once),a
+        ld      hl,bios_video_trace_mem_result_prefix
+        call    p126_ngs_resident_log
+        pop     bc
+        pop     af
+        push    af
+        push    bc
+        ld      a,0
+        adc     a,0
+        add     a,'0'
+        out     (#EF),a
+        ld      a,13
+        out     (#EF),a
+        ld      a,10
+        out     (#EF),a
+        pop     bc
+        pop     af
+        ret
+.write_result_done:
+        pop     bc
+        pop     af
+        ret
 
 bios_video_write_bda:
         ld      (bios_video_guest_value),a
@@ -808,6 +866,12 @@ bios_video_trace_nibble:
 
 bios_video_trace_prefix:
         db "[BIOS INT10] AX BX CX DX CS:IP=",0
+bios_video_trace_mem_write_prefix:
+        db "[BIOS VGA WRITE] PHYS/DATA=",0
+bios_video_trace_mem_result_prefix:
+        db "[BIOS VGA WRITE] CF=",0
+bios_video_trace_mem_write_once: db 0
+bios_video_trace_mem_write_result_once: db 0
 bios_video_trace_count: db 0
 ; Set after INT10 mode 03h or lazy text-console initialization.
 bios_video_text_state_ready: db 0
