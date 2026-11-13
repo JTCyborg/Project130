@@ -1975,6 +1975,8 @@ x86_irq_inhibit: db 0
 x86_tf_pending: db 0
 x86_irq_vector: db 8
 x86_phys_addr: db 0,0,0
+; Resident copy of GC6; VGA state itself resides in the X86VGA overlay.
+x86_vga_gc6_shadow: db #0E
 x86_mem_data:  db 0
 
 x86_bios_probe_remaining: db 0
