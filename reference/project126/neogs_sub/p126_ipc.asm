@@ -664,6 +664,20 @@ p126_ngs_ipc_dispatch_once::
         ld      a,h
         or      l
         jr      nz,.p126_ngs_diagnostic_bad
+        ; Do not replace a live BIOS instruction stream. The test is valid
+        ; only after BIOS execution has left its active trace state.
+        ld      a,(p126_ngs_bios_image_ready)
+        cp      2
+        jr      nz,.p126_ngs_diagnostic_busy
+        ld      a,(x86_bios_trace_active)
+        or      a
+        jr      nz,.p126_ngs_diagnostic_busy
+        ld      a,(p126_ngs_exec_overlay_ready)
+        or      a
+        jr      z,.p126_ngs_diagnostic_bad
+        ld      a,(p126_ngs_vid_overlay_ready)
+        or      a
+        jr      z,.p126_ngs_diagnostic_bad
         ld      a,P126_NGS_X86VID_MODULE_ID
         ld      ix,bios_int10_video_regression_test_impl
         call    p126_overlay_call_module
@@ -678,6 +692,12 @@ p126_ngs_ipc_dispatch_once::
         xor     a
         out     (P126_NGS_CLRCBIT),a
         pop     af
+        scf
+        ret
+.p126_ngs_diagnostic_busy:
+        xor     a
+        out     (P126_NGS_CLRCBIT),a
+        ld      a,P126_STATUS_BUSY
         scf
         ret
 .p126_ngs_diagnostic_bad:
