@@ -35,7 +35,7 @@ The Project130 implementation has additional code absent in Project125: explicit
 
 Project125-only items not present in the Project130 module:
 - `bios_int10_install_vector_impl`: not copied because Project130 interrupt dispatch/IVT ownership is handled by its X86EXEC/BIOS integration, not by the video overlay.
-- `bios_int10_video_test_impl` and its embedded real-mode test image: not yet ported. This is a missing automated regression test, not evidence that the production service logic is equivalent.
+- `bios_int10_video_test_impl` and its embedded real-mode test image were absent during the initial audit. They are now ported as `bios_int10_video_regression_test_impl` with a P130-native runner and DMA/IPC trigger; see Stage 6. Runtime execution is still pending.
 - P125's generic `bios_video_write_byte/word` helpers: replaced by Project130's guest physical mapper adapters.
 
 **Stage 1 status: partially ported, not complete.** The core text-service behavior is recognizable and mostly retained, but several routines are architecture-adapted rather than source-identical, and the P125 executable regression test is still missing.
@@ -194,7 +194,7 @@ The success contract is:
 - B8000h cell `#8141` = `BIOS_VIDEO_ATTR`;
 - saved result = `1A10h`; failure result uses high byte `1Ch` and a stage code 1..7.
 
-### Why the test has not been copied verbatim into Project130
+### Why the P125 runner was not copied verbatim into Project130
 
 The Project125 command runner depends on `bank_call_bios_int10_video_test`,
 `bank_call_x86_real_execute`, `bank69_copy_image_to_guest`,
@@ -216,7 +216,7 @@ BIOS overlay itself. Its adapter must:
    overlay gates to run;
 4. validate AX, DX, BDA and B800 readback through the public memory/VGA gates;
 5. report stage-specific failure codes without direct NeoGS external I/O;
-6. restore the normal BIOS execution state after the test.
+6. only run after BIOS execution is inactive; place the guest image and test stack in the custom high-RAM region so conventional low-memory state is not overwritten.
 
 **Stage 6 status: test specification and expected values are verified against
 Project125; Project130 execution harness is not yet implemented.** No fake
