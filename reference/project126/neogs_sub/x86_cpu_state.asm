@@ -1377,7 +1377,10 @@ x86_mem_classify:
         ; one of four apertures: A0000-BFFFF, A0000-AFFFF,
         ; B0000-B7FFF or B8000-BFFFF. Everything outside the
         ; selected aperture remains ordinary guest RAM.
-        ld      a,(x86_vga_gc_regs+6)
+        ; GC6 lives in the X86VGA overlay. The resident classifier must
+        ; never read that overlay's logical address while X86VID/X86EXEC
+        ; is mapped; use the resident shadow maintained by the VGA port path.
+        ld      a,(x86_vga_gc6_shadow)
         and     #0C
         jr      z,.vga_aperture
         cp      #04
