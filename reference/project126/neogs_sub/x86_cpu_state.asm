@@ -1372,7 +1372,40 @@ x86_mem_classify:
         cp      #0A
         jr      c,.ram_low
         cp      #0C
-        jr      c,.vga_aperture
+        jr      nc,.classify_upper
+        ; A0000-BFFFF is not unconditionally VGA memory. GC6 selects
+        ; one of four apertures: A0000-BFFFF, A0000-AFFFF,
+        ; B0000-B7FFF or B8000-BFFFF. Everything outside the
+        ; selected aperture remains ordinary guest RAM.
+        ld      a,(x86_vga_gc_regs+6)
+        and     #0C
+        jr      z,.vga_aperture
+        cp      #04
+        jr      z,.classify_a000
+        cp      #08
+        jr      z,.classify_b000
+        ; GC6 map 3: B8000-BFFFF only.
+        ld      a,(x86_phys_addr+2)
+        cp      #0B
+        jr      nz,.ram_low
+        ld      a,(x86_phys_addr+1)
+        bit     7,a
+        jr      z,.ram_low
+        jr      .vga_aperture
+.classify_a000:
+        ld      a,(x86_phys_addr+2)
+        cp      #0A
+        jr      nz,.ram_low
+        jr      .vga_aperture
+.classify_b000:
+        ld      a,(x86_phys_addr+2)
+        cp      #0B
+        jr      nz,.ram_low
+        ld      a,(x86_phys_addr+1)
+        bit     7,a
+        jr      nz,.ram_low
+        jr      .vga_aperture
+.classify_upper:
         cp      #0D
         jr      z,.segment_c
         cp      #0F
