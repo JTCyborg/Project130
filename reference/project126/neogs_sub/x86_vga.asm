@@ -287,6 +287,7 @@ x86_vga_map_plane:
         and     3
         add     a,c
         rrca
+        ld      (x86_vga_last_page),a
         out     (MPAGEX),a
         ld      a,(x86_vga_offset+1)
         and     #3F
@@ -294,6 +295,7 @@ x86_vga_map_plane:
         ld      h,a
         ld      a,(x86_vga_offset)
         ld      l,a
+        ld      (x86_vga_last_hl),hl
         ret
 
 x86_vga_mem_read8_impl:
@@ -725,6 +727,8 @@ x86_vga_gc_regs:         db 0,0,0,0,0,0,0,0,#FF
 x86_vga_attr_regs:       defs 32,0
 x86_vga_bit_table:       db 1,2,4,8
 x86_vga_offset:          dw 0
+x86_vga_last_page:       db 0
+x86_vga_last_hl:         dw 0
 x86_vga_plane:           db 0
 x86_vga_read_plane:       db 0
 x86_vga_effective_mask:   db #0F
@@ -1052,6 +1056,19 @@ x86_vga_log_access:
         call    p126_ngs_resident_log
         ld      a,(x86_vga_log_data)
         call    x86_vga_log_hex_byte
+        ld      hl,x86_vga_log_map_prefix
+        call    p126_ngs_resident_log
+        ld      a,(x86_vga_last_page)
+        call    x86_vga_log_hex_byte
+        ld      a,' '
+        out     (#EF),a
+        ld      hl,x86_vga_log_off_prefix
+        call    p126_ngs_resident_log
+        ld      hl,(x86_vga_last_hl)
+        ld      a,h
+        call    x86_vga_log_hex_byte
+        ld      a,l
+        call    x86_vga_log_hex_byte
         ld      a,13
         out     (#EF),a
         ld      a,10
@@ -1084,6 +1101,8 @@ x86_vga_log_text_write_count: db 0
 x86_vga_log_read_prefix:  db "[VGA READ] ADDR=",0
 x86_vga_log_write_prefix: db "[VGA WRITE] ADDR=",0
 x86_vga_log_data_prefix:  db " DATA=",0
+x86_vga_log_map_prefix:   db " MAP=",0
+x86_vga_log_off_prefix:   db " OFF=",0
 
 x86_vga_write_diag_enter:        db "[VGA WTRACE] ENTER P=",0
 x86_vga_write_diag_gc:           db " GC5/6/SEQ4=",0
