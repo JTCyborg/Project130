@@ -104,6 +104,49 @@ The ATM presenter converts IBM VGA attribute bits to ATM RG6 attributes and writ
 
 **Stage 5 status: not yet proven end-to-end equivalent.** The exact Project125 reverse-DMA capture/command handler still needs a complete side-by-side comparison with Project130's plane capture and IPC payload assembly. The staging workspace safety and exact DMA payload offsets also need a final audit.
 
+
+### Stage 5A — Exact Project125 reverse-DMA contract
+
+The Project125 host implementation was fetched and compared directly from
+`0/zx_main/video_transfer.asm` (blob
+`82682ed6f664e6ce43629259f2a4e4f03f6c16c0`).
+
+Its `p125_video_pull_and_present` sequence is:
+1. Issue `CMD_VIDEO_PULL`.
+2. Wait until GSSTAT CBIT clears.
+3. Disable host interrupts.
+4. Perform the mandatory dummy read from address zero.
+5. Copy exactly `0x0FA0` bytes from reverse-DMA address zero to host `#C000`.
+6. Send `#FF` to GSCOM and wait for transfer completion.
+7. Present chars from `#C000..#C7CF` and attrs from `#C7D0..#CFAF`.
+
+The Project130 capture routine has the same logical byte order and count:
+- read 2000 bytes from plane 0 to staging offset 0;
+- read 2000 bytes from plane 1 to staging offset `0x07D0`;
+- copy `0x0FA0` bytes to the page-42 producer buffer at `#C000 + P126_IPC_HEADER_SIZE`.
+
+This is the correct transport adaptation: Project125's raw reverse-DMA payload begins at host address zero; Project130 wraps the same 4000-byte payload in the 18-byte ABI header and stages it at page42:`#C012`. The host-facing character/attribute offsets therefore remain 0 and 2000 relative to the payload, not relative to the IPC frame start.
+
+### Stage 5B — Presenter contract
+
+Project125's `p125_video_present_text` consumes:
+- character pointer starting at `#C000`;
+- attribute pointer starting at `#C7D0`;
+- 25 rows × 80 columns.
+
+Project130's converter advertises the same 80×25 text payload size (`0x0FA0`) and its ATM presenter consumes the ABI payload after the 18-byte header. This confirms the logical frame layout, but does not by itself prove the complete reverse-DMA sender/receiver handshake or screen contents. The presenter also includes the Project125-compatible attribute conversion and cell mapping previously compared; runtime acceptance remains pending.
+
+### Stage 5C — Remaining transport verification
+
+The source-level checks now establish the byte-layout equivalence. They do not establish runtime correctness. The remaining source/runtime boundary checks are:
+- verify the command dispatcher selects the video-frame response path after capture;
+- verify the staged IPC header declares exactly `0x0FA0` payload bytes and total frame size `18 + 0x0FA0`;
+- verify the sender DMA starts at physical page42 base and transfers the declared complete frame;
+- verify the ATM receiver strips the header and presents payload offsets 0 and `0x07D0`;
+- verify the host's reverse-DMA dummy-read/interrupt/CBIT sequencing is correctly represented by the Project130 transport implementation;
+- run the fresh emulator and confirm nonzero character and attribute data at both ends.
+
+
 ## Runtime evidence and remaining acceptance tests
 
 The last supplied runtime log (SHA `b5e07186ede2b7f6db90f76453a8e84e3def795f`) showed:
