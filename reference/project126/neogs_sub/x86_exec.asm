@@ -3727,7 +3727,10 @@ x86_exec_string:
         cp      #AE
         jr      z,.string_compare_resume_check
         cp      #AF
-        jr      nz,.string_check_count
+        jr      z,.string_compare_resume_check
+        xor     a
+        ld      (x86_exec_string_resume),a
+        jr      .string_check_count
 .string_compare_resume_check:
         ld      a,(x86_exec_string_resume)
         or      a
