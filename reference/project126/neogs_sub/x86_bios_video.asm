@@ -497,16 +497,6 @@ bios_int10_teletype:
         ld      a,(x86_reg_bx+1)
         or      a
         ret     nz
-        ; Project125 BIOS teletype state machine, adapted only for the
-        ; Project130 VGA overlay and guest-memory write interface.
-        ld      a,(bios_video_text_state_ready)
-        or      a
-        jr      nz,.text_state_ready
-        call    bios_video_set_vga_text_state
-        ret     c
-        ld      a,1
-        ld      (bios_video_text_state_ready),a
-.text_state_ready:
         ld      a,(x86_reg_ax)
         ld      (bios_video_char),a
         or      a
@@ -524,7 +514,6 @@ bios_int10_teletype:
         ld      a,BIOS_VIDEO_ATTR
         ld      (bios_video_attr),a
         call    bios_video_write_cell
-        ret     c
         ld      a,(bios_video_col)
         inc     a
         ld      (bios_video_col),a
@@ -548,7 +537,6 @@ bios_int10_teletype:
         ld      a,BIOS_VIDEO_ATTR
         ld      (bios_video_attr),a
         call    bios_video_write_cell
-        ret     c
         jr      .store
 .lf:
         ld      a,(bios_video_row)
@@ -565,7 +553,6 @@ bios_int10_teletype:
         or      a
         ret
 
-; Project125 BIOS cell writer, using Project130's guest physical-memory API.
 bios_video_write_cell:
         push    bc
         push    de
@@ -718,7 +705,6 @@ bios_video_store_cursor:
         ld      d,a
         jp      bios_video_write_bda_word
 
-; Bounded Project125-style INT10 trace on NeoGS debug port #EF.
 bios_video_trace_int10:
         ld      a,(bios_video_trace_count)
         cp      48
