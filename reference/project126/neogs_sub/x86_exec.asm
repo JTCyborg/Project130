@@ -4911,4 +4911,4 @@ x86_exec_string_resume_opcode: db 0
 x86_exec_string_resume_ip: dw 0
 x86_exec_far_jmp_target_valid: db 0
 x86_exec_build_id_emitted: db 0
-x86_exec_build_id_text: db "[P130 X86EXEC BUILD=FEDEC-20261112-A]",13,10,0
+x86_exec_build_id_text: db "[P130 X86EXEC BUILD=REP-WR16-20261113-A]",13,10,0
