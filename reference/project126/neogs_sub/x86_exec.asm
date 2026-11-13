@@ -4055,18 +4055,9 @@ x86_exec_string_read_dest16:
         ret
 
 x86_exec_string_write_dest16:
-        ld      (x86_exec_string_word),hl
         call    x86_exec_string_make_dest_address
-        ld      a,(x86_exec_string_word)
-        call    x86_guest_mem_write8
-        ret     c
-        ld      hl,(x86_reg_di)
-        inc     hl
-        ld      (x86_exec_string_temp_offset),hl
-        call    x86_exec_string_make_dest_next_address
-        ld      a,(x86_exec_string_word+1)
-        call    x86_guest_mem_write8
-        ret
+        ld      hl,(x86_exec_string_word)
+        jp      x86_guest_mem_write16
 
 x86_exec_string_adjust_si:
         ld      hl,(x86_reg_si)
