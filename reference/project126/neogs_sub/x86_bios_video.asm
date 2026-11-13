@@ -892,3 +892,201 @@ bios_video_bda_word:      dw 0
 bios_video_vga_data:      db 0
 bios_video_vga_port:      dw 0
 bios_video_vga_value:     db 0
+
+
+; -------------------------------------------------------------------------
+; Project125-derived INT10 runtime regression for the Project130 execution
+; path. Invoked by a DIAGNOSTICS/INT10_TEST ABI request after BIOS POST.
+; Unlike the P125 Stage-3A runner, P130 uses x86_cpu_step and the resident
+; X86EXEC gate; INT 10h is dispatched by X86EXEC into this X86VID overlay.
+; -------------------------------------------------------------------------
+bios_int10_video_regression_test_impl:
+        push    ix
+        push    bc
+        push    de
+        push    hl
+        xor     a
+        ld      (bios_video_text_state_ready),a
+        ld      hl,bios_int10_test_image
+        ld      (bios_int10_test_src),hl
+        ld      hl,#5002
+        ld      (bios_int10_test_dst),hl
+        ld      hl,bios_int10_test_image_end-bios_int10_test_image
+        ld      (bios_int10_test_size),hl
+.copy_guest:
+        ld      hl,(bios_int10_test_size)
+        ld      a,h
+        or      l
+        jr      z,.guest_ready
+        ld      hl,(bios_int10_test_src)
+        ld      a,(hl)
+        ld      (bios_int10_test_byte),a
+        inc     hl
+        ld      (bios_int10_test_src),hl
+        ld      hl,0
+        ld      de,(bios_int10_test_dst)
+        call    x86_cpu_calc_phys
+        ld      a,(bios_int10_test_byte)
+        call    x86_guest_mem_write8
+        jr      c,.fail_copy
+        ld      hl,(bios_int10_test_dst)
+        inc     hl
+        ld      (bios_int10_test_dst),hl
+        ld      hl,(bios_int10_test_size)
+        dec     hl
+        ld      (bios_int10_test_size),hl
+        jr      .copy_guest
+.guest_ready:
+        ; Start the test program in 0000:5002 with an isolated real-mode stack.
+        ld      hl,0
+        ld      (x86_reg_ax),hl
+        ld      (x86_reg_bx),hl
+        ld      (x86_reg_cx),hl
+        ld      (x86_reg_dx),hl
+        ld      (x86_reg_bp),hl
+        ld      (x86_reg_si),hl
+        ld      (x86_reg_di),hl
+        ld      (x86_reg_es),hl
+        ld      (x86_reg_ds),hl
+        ld      (x86_reg_cs),hl
+        ld      hl,#5002
+        ld      (x86_reg_ip),hl
+        ld      hl,#7000
+        ld      (x86_reg_ss),hl
+        ld      hl,#0100
+        ld      (x86_reg_sp),hl
+        ld      hl,#0202
+        ld      (x86_reg_flags),hl
+        xor     a
+        ld      (x86_halted),a
+        ld      hl,#FFFF
+        ld      (bios_int10_test_steps),hl
+.execute:
+        call    x86_cpu_step
+        jr      c,.fail_execute
+        ld      a,(x86_halted)
+        or      a
+        jr      nz,.verify
+        ld      hl,(bios_int10_test_steps)
+        dec     hl
+        ld      (bios_int10_test_steps),hl
+        ld      a,h
+        or      l
+        jr      nz,.execute
+        jr      .fail_watchdog
+.verify:
+        ld      hl,(x86_reg_ax)
+        ld      de,#5003
+        or      a
+        sbc     hl,de
+        jr      nz,.fail_mode
+        ld      hl,(x86_reg_dx)
+        ld      de,#020F
+        or      a
+        sbc     hl,de
+        jr      nz,.fail_cursor
+        ld      hl,#0450
+        call    bios_video_read_bda_word
+        jr      c,.fail_bda
+        ld      de,#020F
+        or      a
+        sbc     hl,de
+        jr      nz,.fail_bda
+        ; Verify B8000h cell at row 2, column 0 through the same guest-memory
+        ; mapper used by BIOS writes and VGA capture.
+        ld      hl,#B800
+        ld      de,#0140
+        call    x86_cpu_calc_phys
+        call    x86_guest_mem_read8
+        jr      c,.fail_vga
+        cp      'P'
+        jr      nz,.fail_vga
+        ld      hl,#B800
+        ld      de,#0141
+        call    x86_cpu_calc_phys
+        call    x86_guest_mem_read8
+        jr      c,.fail_vga
+        cp      BIOS_VIDEO_ATTR
+        jr      nz,.fail_vga
+        ld      hl,bios_int10_test_pass_log
+        call    p126_ngs_resident_log
+        pop     hl
+        pop     de
+        pop     bc
+        pop     ix
+        xor     a
+        ret
+.fail_copy:
+        ld      a,1
+        jr      .failed
+.fail_execute:
+        ld      a,2
+        jr      .failed
+.fail_watchdog:
+        ld      a,3
+        jr      .failed
+.fail_mode:
+        ld      a,4
+        jr      .failed
+.fail_cursor:
+        ld      a,5
+        jr      .failed
+.fail_bda:
+        ld      a,6
+        jr      .failed
+.fail_vga:
+        ld      a,7
+.failed:
+        ld      (bios_int10_test_failure),a
+        push    af
+        ld      hl,bios_int10_test_fail_log
+        call    p126_ngs_resident_log
+        pop     af
+        call    x86_bios_trace_emit_hex8
+        call    x86_bios_trace_log_crlf
+        pop     hl
+        pop     de
+        pop     bc
+        pop     ix
+        ld      a,(bios_int10_test_failure)
+        scf
+        ret
+
+bios_int10_test_image:
+        db #B8,#03,#00,#CD,#10
+        db #B8,#00,#02,#BB,#00,#00,#BA,#05,#01,#CD,#10
+        db #B4,#0E,#B0,#58,#CD,#10
+        db #B8,#00,#02,#BB,#00,#00,#BA,#00,#00,#CD,#10
+        REPT 83
+        db #B4,#0E,#B0,#41,#CD,#10
+        ENDR
+        db #B4,#0E,#B0,#0D,#CD,#10
+        db #B4,#0E,#B0,#0A,#CD,#10
+        db #B4,#0E,#B0,#50,#CD,#10
+        db #B4,#0E,#B0,#31,#CD,#10
+        db #B4,#0E,#B0,#32,#CD,#10
+        db #B4,#0E,#B0,#34,#CD,#10
+        db #B4,#0E,#B0,#20,#CD,#10
+        db #B4,#0E,#B0,#49,#CD,#10
+        db #B4,#0E,#B0,#4E,#CD,#10
+        db #B4,#0E,#B0,#54,#CD,#10
+        db #B4,#0E,#B0,#31,#CD,#10
+        db #B4,#0E,#B0,#30,#CD,#10
+        db #B4,#0E,#B0,#20,#CD,#10
+        db #B4,#0E,#B0,#50,#CD,#10
+        db #B4,#0E,#B0,#41,#CD,#10
+        db #B4,#0E,#B0,#53,#CD,#10
+        db #B4,#0E,#B0,#53,#CD,#10
+        db #B4,#03,#B0,#00,#BB,#00,#00,#CD,#10
+        db #B4,#0F,#B0,#00,#CD,#10
+        db #F4
+bios_int10_test_image_end:
+bios_int10_test_src:   dw 0
+bios_int10_test_dst:   dw 0
+bios_int10_test_size:  dw 0
+bios_int10_test_steps: dw 0
+bios_int10_test_byte:  db 0
+bios_int10_test_failure: db 0
+bios_int10_test_pass_log: db "[P130 INT10] P125 REGRESSION PASS",13,10,0
+bios_int10_test_fail_log: db "[P130 INT10] P125 REGRESSION FAIL STAGE=",0
+
