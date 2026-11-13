@@ -646,6 +646,9 @@ p126_ngs_ipc_dispatch_once::
         jr      z,.p126_ngs_dispatch_input
         ; Diagnostics op00 remains the no-op health probe. Op01 executes the
         ; Project125-derived INT10 test inside the installed X86VID overlay.
+        ld      a,(#C007)
+        cp      P126_SERVICE_DIAGNOSTICS
+        jr      nz,.p126_ngs_diagnostic_bad
         ld      a,(#C008)
         cp      P126_OP_DIAGNOSTIC_INT10_TEST
         jr      z,.p126_ngs_diagnostic_int10
