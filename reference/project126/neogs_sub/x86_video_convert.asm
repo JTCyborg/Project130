@@ -75,12 +75,6 @@ x86_video_convert_impl:
         ld      a,1
         ld      (x86_video_frame_ready),a
         ld      hl,P126_VIDEO_TEXT80_FRAME_SIZE
-        push    af
-        push    hl
-        ld      hl,x86_video_trace_return
-        call    x86_video_trace_string
-        pop     hl
-        pop     af
         xor     a
         ret
 
@@ -138,7 +132,6 @@ x86_video_frame_data:    db 0
 x86_video_frame_ready:   db 0
 x86_video_trace_capture_msg: db "[TRACE] VGA CAPTURE RETURNED",13,10,0
 x86_video_trace_capture_ok: db "[VGA DBG] CAPTURE STATUS OK",13,10,0
-x86_video_trace_return: db "[TRACE] X86VID CONVERT RETURN",13,10,0
 x86_video_trace_capture_failed: db "[VGA DBG] CAPTURE FAILED CODE=",0
 x86_video_trace_chars: db "[VGA DBG] FRAME CHARS[0..7]=",0
 x86_video_trace_attrs: db "[VGA DBG] FRAME ATTRS[0..7]=",0

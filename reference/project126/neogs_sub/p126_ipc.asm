@@ -792,16 +792,6 @@ p126_ngs_ipc_dispatch_once::
         jr      .video_dispatch_error
 .video_dispatch_convert:
         call    x86_video_convert
-        ; First instruction after the converter wrapper: distinguish a bad
-        ; wrapper RET/stack from a failure in the IPC logger itself.
-        push    af
-        ld      a,'D'
-        out     (#EF),a
-        pop     af
-        push    af
-        ld      hl,p126_ngs_ipc_log_video_convert_return
-        call    p126_ngs_ipc_log
-        pop     af
         jr      nc,.video_dispatch_success
         ; Preserve the converter's F1/F2/F3 reason in the error payload.
 .video_dispatch_error:
@@ -1827,7 +1817,6 @@ p126_ngs_ipc_log_dma_rx_addr:    db "[P130 NGS] RX ADDR=",0
 p126_ngs_ipc_log_dma_rx_timeout: db "[P130 NGS] DMA RX TIMEOUT",13,10,0
 p126_ngs_ipc_log_dma_rx_length_bad: db "[P130 NGS] RX LEN BAD",13,10,0
 p126_ngs_ipc_log_video_convert_ok: db "[TRACE] NGS VIDEO CONVERT OK / TX",13,10,0
-p126_ngs_ipc_log_video_convert_return: db "[TRACE] NGS VIDEO CONVERT RETURNED",13,10,0
 
 ; Emit CR/LF on NeoGS's independent #EF diagnostic channel.
 p126_ngs_ipc_log_crlf:

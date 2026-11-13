@@ -1020,12 +1020,6 @@ x86_vga_capture_text_frame_gate_impl:
         call    p126_ngs_resident_log
         ld      hl,X86_VGA_CAPTURE_STAGE
         call    x86_vga_trace_dump8
-        ; BIOS boot text starts at row4/column26 (cell 346 = 015Ah).
-        ; Dump that actual text location, not only the blank top-left cells.
-        ld      hl,x86_vga_trace_bios_chars
-        call    p126_ngs_resident_log
-        ld      hl,X86_VGA_CAPTURE_STAGE+#015A
-        call    x86_vga_trace_dump8
 
         ; Plane 1: same decoded aperture offset, attribute bytes.
         ld      a,1
@@ -1036,10 +1030,6 @@ x86_vga_capture_text_frame_gate_impl:
         ld      hl,x86_vga_trace_attrs
         call    p126_ngs_resident_log
         ld      hl,X86_VGA_CAPTURE_STAGE+#07D0
-        call    x86_vga_trace_dump8
-        ld      hl,x86_vga_trace_bios_attrs
-        call    p126_ngs_resident_log
-        ld      hl,X86_VGA_CAPTURE_STAGE+#07D0+#015A
         call    x86_vga_trace_dump8
 
         ; Publish the captured text planes in the page-42 DMA frame.
@@ -1060,14 +1050,6 @@ x86_vga_capture_text_frame_gate_impl:
         ld      hl,x86_vga_trace_dma_attrs
         call    p126_ngs_resident_log
         ld      hl,#C000+P126_IPC_HEADER_SIZE+#07D0
-        call    x86_vga_trace_dump8
-        ld      hl,x86_vga_trace_dma_bios_chars
-        call    p126_ngs_resident_log
-        ld      hl,#C000+P126_IPC_HEADER_SIZE+#015A
-        call    x86_vga_trace_dump8
-        ld      hl,x86_vga_trace_dma_bios_attrs
-        call    p126_ngs_resident_log
-        ld      hl,#C000+P126_IPC_HEADER_SIZE+#07D0+#015A
         call    x86_vga_trace_dump8
 
         ld      a,(x86_vga_capture_saved_addr)
@@ -1276,10 +1258,6 @@ x86_vga_trace_chars:     db "[VGA CAP] PLANE0 STAGE=",0
 x86_vga_trace_attrs:     db "[VGA CAP] PLANE1 STAGE=",0
 x86_vga_trace_dma_chars: db "[VGA CAP] DMA CHARS=",0
 x86_vga_trace_dma_attrs: db "[VGA CAP] DMA ATTRS=",0
-x86_vga_trace_bios_chars: db "[VGA CAP] BIOS ROW4 COL26 CHARS=",0
-x86_vga_trace_bios_attrs: db "[VGA CAP] BIOS ROW4 COL26 ATTRS=",0
-x86_vga_trace_dma_bios_chars: db "[VGA CAP] DMA BIOS ROW4 COL26 CHARS=",0
-x86_vga_trace_dma_bios_attrs: db "[VGA CAP] DMA BIOS ROW4 COL26 ATTRS=",0
 
 ; Project130 dynamic-overlay ABI.
 x86_vga_overlay_probe:

@@ -50,15 +50,6 @@ p126_overlay_call:
         jp      (ix)
 
 p126_overlay_gate_return:
-        ; Narrow trace for the X86VID page09 return path (ROR8(09h)=84h).
-        push    af
-        ld      a,(p126_overlay_current_selector)
-        cp      #84
-        jr      nz,.gate_return_trace_done
-        ld      a,'G'
-        out     (#EF),a
-.gate_return_trace_done:
-        pop     af
         ex      af,af'                   ; preserve module return AF
         pop     af                       ; restore previous WIN2 selector
         ld      (p126_overlay_current_selector),a
@@ -726,11 +717,6 @@ x86_video_convert:
         push    ix
         ld      ix,x86_video_convert_impl
         call    p126_overlay_call
-        ; W confirms control returned from the resident overlay gate.
-        push    af
-        ld      a,'W'
-        out     (#EF),a
-        pop     af
         pop     ix
         ret
 
