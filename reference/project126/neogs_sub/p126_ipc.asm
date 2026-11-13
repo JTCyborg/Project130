@@ -639,9 +639,9 @@ p126_ngs_ipc_dispatch_once::
         ; Service dispatch happens only after full frame/CRC validation.
         ld      a,(#C007)
         cp      P126_SERVICE_IMAGE
-        jr      z,.p126_ngs_dispatch_image
+        jp      z,.p126_ngs_dispatch_image
         cp      P126_SERVICE_VIDEO
-        jr      z,.p126_ngs_dispatch_video
+        jp      z,.p126_ngs_dispatch_video
         cp      P126_SERVICE_INPUT
         jr      z,.p126_ngs_dispatch_input
         ; Diagnostics op00 remains the no-op health probe. Op01 executes the
