@@ -614,7 +614,8 @@ bios_video_write_guest_byte:
         call    x86_bios_trace_emit_hex8
         ld      a,' '
         out     (#EF),a
-        ld      a,(x86_vga_gc_regs+6)
+        ; X86VGA is a different physical overlay; use the X86CORE shadow.
+        ld      a,(x86_vga_gc6_shadow)
         call    x86_bios_trace_emit_hex8
         ld      a,13
         out     (#EF),a
