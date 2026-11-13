@@ -909,7 +909,8 @@ bios_int10_video_regression_test_impl:
         ld      (bios_video_text_state_ready),a
         ld      hl,bios_int10_test_image
         ld      (bios_int10_test_src),hl
-        ld      hl,#5002
+        ; Store the guest test image in custom high RAM, not conventional RAM.
+        ld      hl,0
         ld      (bios_int10_test_dst),hl
         ld      hl,bios_int10_test_image_end-bios_int10_test_image
         ld      (bios_int10_test_size),hl
@@ -937,7 +938,7 @@ bios_int10_video_regression_test_impl:
         ld      (bios_int10_test_size),hl
         jr      .copy_guest
 .guest_ready:
-        ; Start the test program in 0000:5002 with an isolated real-mode stack.
+        ; Execute from custom high RAM C8000h with an isolated D0000h stack.
         ld      hl,0
         ld      (x86_reg_ax),hl
         ld      (x86_reg_bx),hl
@@ -948,10 +949,11 @@ bios_int10_video_regression_test_impl:
         ld      (x86_reg_di),hl
         ld      (x86_reg_es),hl
         ld      (x86_reg_ds),hl
+        ld      hl,#C800
         ld      (x86_reg_cs),hl
-        ld      hl,#5002
+        ld      hl,0
         ld      (x86_reg_ip),hl
-        ld      hl,#7000
+        ld      hl,#D000
         ld      (x86_reg_ss),hl
         ld      hl,#0100
         ld      (x86_reg_sp),hl
