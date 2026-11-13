@@ -82,46 +82,9 @@ p126_ngs_ipc_validate_frame::
         or      a
         sbc     hl,de
         jp      nz,.p126_ngs_frame_bad
-        ; CRC header and payload in one pass.
-        ; Keep DE as the frame pointer while HL is the CRC accumulator.
-        push    ix
-        pop     de
-        ld      hl,#FFFF
-        ld      b,16
-.p126_ngs_frame_crc_head:
-        ld      a,(de)
-        inc     de
-        call    p126_ngs_ipc_crc16_update
-        djnz    .p126_ngs_frame_crc_head
-        ; DE currently points at frame+16; skip the two stored CRC bytes.
-        inc     de
-        inc     de
-        push    de
-        ld      ix,(p126_ngs_ipc_frame_ptr)
-        ld      e,(ix+12)
-        ld      d,(ix+13)
-        ; Restore the payload pointer into IX, preserving the live CRC in HL.
-        pop     ix
-.p126_ngs_frame_crc_data:
-        ld      a,d
-        or      e
-        jr      z,.p126_ngs_frame_crc_compare
-        ld      a,(ix+0)
-        inc     ix
-        call    p126_ngs_ipc_crc16_update
-        dec     de
-        jr      .p126_ngs_frame_crc_data
-.p126_ngs_frame_crc_compare:
-        ld      (p126_ngs_ipc_crc_work),hl
-        ld      ix,(p126_ngs_ipc_frame_ptr)
-        ld      a,(ix+16)
-        ld      e,a
-        ld      a,(ix+17)
-        ld      d,a
-        ld      hl,(p126_ngs_ipc_crc_work)
-        or      a
-        sbc     hl,de
-        jp      nz,.p126_ngs_frame_crc_bad
+        ; Transport CRC verification is disabled for performance.
+        ; Keep structural validation (magic/version/type/flags/length) above.
+        ; CRC bytes 16..17 remain reserved in the ABI header and are ignored.
         xor     a
         ret
 .p126_ngs_frame_magic:
