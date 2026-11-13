@@ -675,6 +675,12 @@ p126_ngs_ipc_dispatch_once::
         ld      a,(p126_ngs_exec_overlay_ready)
         or      a
         jr      z,.p126_ngs_diagnostic_bad
+        ld      a,(p126_ngs_dev_overlay_ready)
+        or      a
+        jr      z,.p126_ngs_diagnostic_bad
+        ld      a,(p126_ngs_vga_overlay_ready)
+        or      a
+        jr      z,.p126_ngs_diagnostic_bad
         ld      a,(p126_ngs_vid_overlay_ready)
         or      a
         jr      z,.p126_ngs_diagnostic_bad
