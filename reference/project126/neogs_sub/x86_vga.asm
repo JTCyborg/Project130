@@ -739,6 +739,7 @@ x86_vga_text_attr: db 0
 ; Project130 executes this overlay from WIN2 and uses WIN3 for banked RAM.
 ; WIN1 stack ends below #5000; host input mailbox starts at #7000.
 X86_VGA_CAPTURE_STAGE EQU #5000
+x86_vga_capture_saved_addr: db 0,0,0
 
 x86_vga_capture_text_frame_gate_impl:
         push    af
@@ -746,30 +747,49 @@ x86_vga_capture_text_frame_gate_impl:
         push    de
         push    hl
 
-        ; Gather the complete character plane from the Project125-compatible
-        ; physical plane allocation. Keep the VGA plane page mapped only while
-        ; reading it; the staging buffer is in the independent WIN1 window.
-        ld      a,VGA_PLANE0_FIRST_PAGE
-        rrca
-        out     (P126_NGS_BANK_WINDOW_PORT),a
-        ld      hl,#C000
+        ; Resolve the actual B8000 aperture offset through the same VGA
+        ; decoder used by guest CPU writes. In a 128 KiB GC6 mapping B8000
+        ; is offset 8000h into each plane (page + 2); in the 32 KiB B8000
+        ; mapping it is offset zero. Capturing plane base pages unconditionally
+        ; silently returned blank text even though guest writes succeeded.
+        ld      a,(x86_mem_addr)
+        ld      (x86_vga_capture_saved_addr),a
+        ld      a,(x86_mem_addr+1)
+        ld      (x86_vga_capture_saved_addr+1),a
+        ld      a,(x86_mem_addr+2)
+        ld      (x86_vga_capture_saved_addr+2),a
+        xor     a
+        ld      (x86_mem_addr),a
+        ld      a,#80
+        ld      (x86_mem_addr+1),a
+        ld      a,#0B
+        ld      (x86_mem_addr+2),a
+        call    x86_vga_decode_aperture
+        jr      c,.capture_restore_fail
+
+        ; Plane 0: exactly the B8000 character bytes selected by GC6.
+        xor     a
+        call    x86_vga_map_plane
         ld      de,X86_VGA_CAPTURE_STAGE
         ld      bc,#07D0
         ldir
-        ; Inspect the actual staging bytes before changing the bank mapping.
         ld      hl,x86_vga_trace_chars
         call    p126_ngs_resident_log
         ld      hl,X86_VGA_CAPTURE_STAGE
         call    x86_vga_trace_dump8
 
-        ; Gather the complete attribute plane immediately after the chars.
-        ld      a,VGA_PLANE1_FIRST_PAGE
-        rrca
-        out     (P126_NGS_BANK_WINDOW_PORT),a
-        ld      hl,#C000
+        ; Plane 1: same decoded aperture offset, attribute bytes.
+        ld      a,1
+        call    x86_vga_map_plane
         ld      de,X86_VGA_CAPTURE_STAGE+#07D0
         ld      bc,#07D0
         ldir
+        ld      hl,x86_vga_trace_attrs
+        call    p126_ngs_resident_log
+        ld      hl,X86_VGA_CAPTURE_STAGE+#07D0
+        call    x86_vga_trace_dump8
+
+        ; Restore the guest memory address before returning to the CPU.
         ld      hl,x86_vga_trace_attrs
         call    p126_ngs_resident_log
         ld      hl,X86_VGA_CAPTURE_STAGE+#07D0
@@ -794,12 +814,33 @@ x86_vga_capture_text_frame_gate_impl:
         ld      hl,#C000+P126_IPC_HEADER_SIZE+#07D0
         call    x86_vga_trace_dump8
 
+        ld      a,(x86_vga_capture_saved_addr)
+        ld      (x86_mem_addr),a
+        ld      a,(x86_vga_capture_saved_addr+1)
+        ld      (x86_mem_addr+1),a
+        ld      a,(x86_vga_capture_saved_addr+2)
+        ld      (x86_mem_addr+2),a
         pop     hl
         pop     de
         pop     bc
         pop     af
         ld      hl,#0FA0
         xor     a
+        ret
+
+.capture_restore_fail:
+        ld      a,(x86_vga_capture_saved_addr)
+        ld      (x86_mem_addr),a
+        ld      a,(x86_vga_capture_saved_addr+1)
+        ld      (x86_mem_addr+1),a
+        ld      a,(x86_vga_capture_saved_addr+2)
+        ld      (x86_mem_addr+2),a
+        pop     hl
+        pop     de
+        pop     bc
+        pop     af
+        ld      hl,0
+        scf
         ret
 
 ; One-shot capture diagnostics: dump eight bytes from the supplied
