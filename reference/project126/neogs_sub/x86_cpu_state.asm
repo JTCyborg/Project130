@@ -22,7 +22,7 @@
 ;   x86_cpu_state_selftest Carry clear=pass, set=fail. Destructive reset test.
 
 X86_FLAGS_RESET EQU #0002
-X86_BIOS_DIAGNOSTICS EQU 1
+X86_BIOS_DIAGNOSTICS EQU 0
 
 x86_cpu_reset:
         ld      hl,0
@@ -223,6 +223,7 @@ x86_bios_startup_trace:
 .trace_loop:
         call    x86_cpu_step
         jp      c,.trace_fault
+        IF      X86_BIOS_DIAGNOSTICS
         ; The 16-entry history is diagnostic only. Sample every 16th guest
         ; instruction instead of writing a 13-byte record on every step.
         ld      hl,(x86_bios_trace_executed)
@@ -351,6 +352,8 @@ x86_bios_startup_trace:
         call    x86_bios_trace_log_cs_ip
         call    x86_bios_trace_log_registers
         pop     hl
+        ENDIF
+
 .trace_cs_expected:
         ; REP STOSW progress is diagnostic only. Do not call the tracker
         ; for every guest instruction: that added several Z80 instructions
