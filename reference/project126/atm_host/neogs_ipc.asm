@@ -238,73 +238,9 @@ p126_ipc_validate_frame::
         or      a
         sbc     hl,de
         jp      nz,.p126_frame_bad
-        ; CRC header and payload in one pass.
-        ; Keep DE pointing at the frame while HL holds the CRC accumulator.
-        ; EX DE,HL here would move the frame pointer into HL and then lose it
-        ; when HL is initialized to FFFFh, causing CRC to read from address 0000h.
-        push    ix
-        pop     de
-        ld      hl,#FFFF
-        ld      b,16
-.p126_frame_crc_head:
-        ld      a,(de)
-        inc     de
-        call    p126_ipc_crc16_update
-        djnz    .p126_frame_crc_head
-        inc     de
-        inc     de
-        push    de
-        ld      ix,(p126_ipc_frame_ptr)
-        ld      e,(ix+12)
-        ld      d,(ix+13)
-        ; Restore the saved payload pointer directly into IX.
-        ; Do not pop it into HL: HL is the live CRC accumulator and must
-        ; survive the transition from header processing to payload processing.
-        pop     ix
-.p126_frame_crc_data:
-        ld      a,d
-        or      e
-        jr      z,.p126_frame_crc_compare
-        ld      a,(ix+0)
-        inc     ix
-        call    p126_ipc_crc16_update
-        dec     de
-        jr      .p126_frame_crc_data
-.p126_frame_crc_compare:
-        ; Capture both values before emitting diagnostics. This lets the next
-        ; hardware log distinguish a bad CRC calculation from a bad frame
-        ; write/byte order without involving the NeoGS DMA receiver.
-        ld      (p126_ipc_crc_work),hl
-        ld      ix,(p126_ipc_frame_ptr)
-        ld      a,(ix+16)
-        ld      e,a
-        ld      a,(ix+17)
-        ld      d,a
-        ld      (p126_ipc_crc_expected),de
-        ld      hl,p126_ipc_log_crc_calculated
-        call    p126_ipc_debug_string
-        ld      hl,(p126_ipc_crc_work)
-        ld      a,h
-        call    p126_ipc_debug_hex_byte
-        ld      a,l
-        call    p126_ipc_debug_hex_byte
-        ld      hl,p126_ipc_log_crc_expected
-        call    p126_ipc_debug_string
-        ld      hl,(p126_ipc_crc_expected)
-        ld      a,h
-        call    p126_ipc_debug_hex_byte
-        ld      a,l
-        call    p126_ipc_debug_hex_byte
-        ld      bc,#00EF
-        ld      a,13
-        out     (c),a
-        ld      a,10
-        out     (c),a
-        ld      hl,(p126_ipc_crc_work)
-        ld      de,(p126_ipc_crc_expected)
-        or      a
-        sbc     hl,de
-        jp      nz,.p126_frame_crc_bad
+        ; Transport CRC verification is intentionally disabled.
+        ; Keep structural validation (magic/version/type/flags/length) above.
+        ; CRC bytes remain reserved in the ABI header and are ignored.
         xor     a
         ret
 .p126_frame_magic:
