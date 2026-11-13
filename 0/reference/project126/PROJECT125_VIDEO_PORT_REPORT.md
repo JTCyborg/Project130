@@ -1,0 +1,249 @@
+# Project125 -> Project130 BIOS/VGA video port report
+
+Date: 2026-11-13
+
+## Scope and acceptance contract
+
+The required port is the Project125 BIOS INT 10h + VGA text pipeline, preserving only the Project130 architecture boundary: resident overlay gates, the Project126 guest-memory mapper, IPC/DMA transport, and the ATM host presenter. The functional rules (BIOS text operations, VGA register semantics, planar addressing, character/attribute capture, and frame interpretation) must remain Project125-derived.
+
+This report records source-level comparisons against:
+- Project125 `0/neogs_sub/bios/bios_video.asm` (blob `467dd5fe7d9c95b28c944d0729389227d688775a`)
+- Project125 `0/neogs_sub/x86_vga.asm` (blob `aa9be1c5343beb55d7a7dba6a760f764e027ff0e`)
+- Project125 `0/shared/vga_memory.inc` (blob `b6848662e6a1bfd25ad11d122c326b0386dfc9f1`)
+- Project130 `reference/project126/neogs_sub/x86_bios_video.asm` (blob `444a1843607e892830ac194356ac9e692c086cbc`)
+- Project130 `reference/project126/neogs_sub/x86_vga.asm` (blob `08285b30d983973f37be8f87db5183fa4460c5ab`)
+- Project130 `reference/project126/neogs_sub/x86_video_convert.asm` (blob `0db5e98168f1aed50b7a57a8b2cd1ceb6258bd54`)
+
+## Stage 1 — BIOS INT 10h service logic
+
+The Project130 BIOS module is not a byte-for-byte copy of Project125. The following functional routines were compared:
+
+| Routine | Source comparison | Project130 adaptation |
+|---|---|---|
+| INT 10h dispatch | same dispatch decisions | bounded #EF trace added |
+| AH=00 mode set | adapted | VGA indexed-register writes go through resident X86VGA API; BDA writes go through guest-memory mapper |
+| clear page | same 80x25 cell iteration | per-cell writes use the mapped guest-memory API |
+| AH=06/07 scroll entry | same | none |
+| scroll common/copy/clear | adapted | P125's direct x86_mem_read8/write8 calls replaced with physical-address calculation plus x86_guest_mem_read8/write8 |
+| AH=0F get mode | same result | none |
+| AH=02 set cursor | same validation and state update | BDA cursor store uses mapped guest-memory API |
+| AH=03 get cursor | adapted | BDA read uses mapped guest-memory API |
+| AH=0E teletype | adapted | P125 cursor/CR/LF/backspace/write behavior retained, with lazy VGA state setup and diagnostics |
+| cell writer | adapted | P125 row*160 + column*2 calculation retained; actual writes go through x86_cpu_calc_phys + x86_guest_mem_write8 |
+
+The Project130 implementation has additional code absent in Project125: explicit VGA I/O adapters, guest physical-address adapters, BDA byte/word helpers, a teletype byte trace, and a one-shot VGA readback trace.
+
+Project125-only items not present in the Project130 module:
+- `bios_int10_install_vector_impl`: not copied because Project130 interrupt dispatch/IVT ownership is handled by its X86EXEC/BIOS integration, not by the video overlay.
+- `bios_int10_video_test_impl` and its embedded real-mode test image were absent during the initial audit. They are now ported as `bios_int10_video_regression_test_impl` with a P130-native runner and DMA/IPC trigger; see Stage 6. Runtime execution is still pending.
+- P125's generic `bios_video_write_byte/word` helpers: replaced by Project130's guest physical mapper adapters.
+
+**Stage 1 status: partially ported, not complete.** The core text-service behavior is recognizable and mostly retained, but several routines are architecture-adapted rather than source-identical, and the P125 executable regression test is still missing.
+
+## Stage 2 — VGA register model and port access
+
+Project125's VGA core is resident and reads the shared `x86_io_port` / `x86_io_value` state established by the common I/O dispatcher.
+
+Project130 moves the core into dynamic overlay X86VGA (module ID 05, overlay page 08). Its public entry points stage the port/value in overlay-local state and then enter implementation routines. This is a necessary architecture adaptation, but the decoder must consume the staged values rather than stale dispatcher globals.
+
+A concrete defect was found and fixed:
+- BIOS called the Project130 resident VGA API with port in HL.
+- The wrapper stored HL in `x86_vga_io_port`.
+- The VGA port decoder still compared `x86_io_port`, which was not updated by this direct overlay call.
+- Consequently BIOS register writes did not reliably update Sequencer/Graphics Controller state, including the B800 aperture configuration.
+
+Fix committed:
+- `872d4ab12af8229f1e68b4335c9d64011b20021f`
+- `Fix VGA overlay port decode for BIOS register writes`
+- All 13 stale `ld hl,(x86_io_port)` reads in the X86VGA register decoder were redirected to `x86_vga_io_port`. The public read/write implementations stage HL before decoding.
+
+The fix was source-verified on main: no remaining VGA decoder reads of `x86_io_port` via that pattern, and the public read/write paths stage the port into `x86_vga_io_port`.
+
+## Stage 3 — VGA memory aperture, planes, and addressing
+
+Source comparison found exact normalized instruction-body matches for:
+- `x86_vga_decode_aperture`
+- `x86_vga_map_plane`
+- `x86_vga_offset_even`
+- `x86_vga_get_latch`
+- `x86_vga_compare_one`
+- `x86_vga_mem_read8` vs Project130 `x86_vga_mem_read8_impl`
+
+Project130 renames the four memory/I/O entry points with `_impl` and adds overlay wrappers/gates. The memory-write entry also has an input-staging instruction at entry; after accounting for this adapter and the input variable naming, its main write-mode/plane loop is based on the Project125 routine. A final instruction-by-instruction audit of every write-path staging reference remains required before declaring full equivalence.
+
+Physical plane allocation is deliberately preserved from Project125:
+- plane 0: pages #53–#56
+- plane 1: pages #57–#5A
+- plane 2: pages #5B–#5E
+- plane 3: pages #5F–#62
+
+Project130's map additionally allocates frame workspace #40–#41, DMA #42, IPC #43, and guest RAM #63–#A2. These are transport/runtime allocations and do not change the four VGA plane page ranges.
+
+## Stage 4 — BIOS guest-memory adapter
+
+Project125 writes B8000h and BDA addresses through its x86 memory API. Project130 cannot call those resident Project125 memory routines directly because its guest memory is banked and VGA is an overlay.
+
+Project130 therefore translates:
+- segment:offset / B800 text offset -> 20-bit physical address using `x86_cpu_calc_phys`
+- guest read/write -> `x86_guest_mem_read8` / `x86_guest_mem_write8`
+- B800 aperture -> X86VGA public memory gate through the common guest-memory dispatcher
+
+The previous commit `22aa92fe74fcf03ece02242e21db01d4d814cea4` routes BIOS memory writes through the resident guest-memory API. Commit `1c1d89c82296ffcbcadad6ff573350b4c6257985` routes BIOS text readback through the resident X86VGA wrapper rather than calling a non-resident overlay implementation directly.
+
+These are integration adapters, not permission to change the P125 VGA semantics.
+
+## Stage 5 — Character/attribute capture and frame transport
+
+Project130 adds `x86_vga_capture_text_frame_gate_impl` and the X86VID conversion overlay. The current text-frame contract is:
+- 2000 character bytes
+- followed by 2000 attribute bytes
+- total payload: 4000 bytes (0x0FA0)
+- DMA frame is staged in physical page #42 after the IPC header.
+
+The ATM presenter converts IBM VGA attribute bits to ATM RG6 attributes and writes the received 80x25 cells. Its attribute mapping was previously compared against the Project125 `video_transfer.asm` mapping and found equivalent; the ATM cell writer was also found equivalent at the algorithm level.
+
+**Stage 5 status: logical payload layout is source-verified; runtime remains unverified.** The exact Project125 reverse-DMA and presenter contracts are compared below. Project130 intentionally changes the transport envelope and transfers a fixed 16 KiB IPC frame rather than the raw 4000-byte Project125 payload.
+
+
+### Stage 5A — Exact Project125 reverse-DMA contract
+
+The Project125 host implementation was fetched and compared directly from
+`0/zx_main/video_transfer.asm` (blob
+`82682ed6f664e6ce43629259f2a4e4f03f6c16c0`).
+
+Its `p125_video_pull_and_present` sequence is:
+1. Issue `CMD_VIDEO_PULL`.
+2. Wait until GSSTAT CBIT clears.
+3. Disable host interrupts.
+4. Perform the mandatory dummy read from address zero.
+5. Copy exactly `0x0FA0` bytes from reverse-DMA address zero to host `#C000`.
+6. Send `#FF` to GSCOM and wait for transfer completion.
+7. Present chars from `#C000..#C7CF` and attrs from `#C7D0..#CFAF`.
+
+The Project130 capture routine has the same logical byte order and count:
+- read 2000 bytes from plane 0 to staging offset 0;
+- read 2000 bytes from plane 1 to staging offset `0x07D0`;
+- copy `0x0FA0` bytes to the page-42 producer buffer at `#C000 + P126_IPC_HEADER_SIZE`.
+
+This is the correct transport adaptation: Project125's raw reverse-DMA payload begins at host address zero; Project130 wraps the same 4000-byte payload in the 18-byte ABI header and stages it at page42:`#C012`. The host-facing character/attribute offsets therefore remain 0 and 2000 relative to the payload, not relative to the IPC frame start.
+
+### Stage 5B — Presenter contract
+
+Project125's `p125_video_present_text` consumes:
+- character pointer starting at `#C000`;
+- attribute pointer starting at `#C7D0`;
+- 25 rows × 80 columns.
+
+Project130's converter advertises the same 80×25 text payload size (`0x0FA0`) and its ATM presenter consumes the ABI payload after the 18-byte header. This confirms the logical frame layout, but does not by itself prove the complete reverse-DMA sender/receiver handshake or screen contents. The presenter also includes the Project125-compatible attribute conversion and cell mapping previously compared; runtime acceptance remains pending.
+
+
+### Stage 5D — Project130 IPC sender/receiver and ATM renderer
+
+The Project130 sender was inspected in `reference/project126/neogs_sub/p126_ipc.asm`:
+- `p126_ngs_ipc_dma_send_video_frame` writes the VIDEO response header at page42:`#C000`.
+- The header declares payload length `#3FEE` (16,366 bytes); the first 4,000 payload bytes are the captured text frame at `#C012..#CFB1`.
+- It zero-fills the remainder of the payload, computes CRC-16/CCITT-FALSE over header bytes 0..15 plus the complete declared payload, and stores the CRC in header bytes 16..17.
+- `p126_ngs_ipc_dma_send_staged_frame` arms DMA from physical `108000h`, clears CBIT, waits for the ATM host to finish, then verifies the final DMA address is `10C001h`: one dummy aperture read plus exactly `4000h` frame bytes.
+
+The ATM receiver was inspected in `reference/project126/atm_host/neogs_ipc.asm`:
+- `p126_ipc_dma_receive_video_frame` issues `P126_CMD_NGS_VIDEO_FRAME`, disables interrupts, performs the discarded read at address zero, copies exactly `P126_IPC_MAX_FRAME_SIZE` (16 KiB) to `#C000`, and sends `P126_CMD_DMA_END`.
+- It validates the complete IPC frame CRC, then checks VIDEO service, VIDEO_FRAME operation, and zero response status before rendering.
+- Deferred `NO_OPERATION`/F2 responses are treated as pending while the BIOS has not initialized a supported VGA text state.
+
+The ATM renderer was inspected in `reference/project126/atm_host/p126_screen_console.asm`:
+- character pointer = receive buffer + 18-byte IPC header;
+- attribute pointer = receive buffer + 18 + 2000;
+- loops exactly 25 × 80 cells;
+- maps IBM VGA attributes using the same bit conversion as Project125;
+- writes each character/attribute pair through the ATM page7/page3 text-plane writer;
+- restores the host page mapping after every cell write.
+
+**Source-level conclusion:** the Project130 IPC envelope and fixed 16 KiB DMA exchange preserve the Project125 4000-byte character/attribute payload layout. The dummy-read and interrupt-disable handshake is also retained. The remaining unknown is runtime behavior, not an identified source-level payload-offset mismatch.
+
+### Stage 5C — Remaining transport verification
+
+The source-level checks now establish the byte-layout equivalence. They do not establish runtime correctness. The remaining source/runtime boundary checks are:
+- verify the BIOS-triggered video command reaches `p126_ngs_ipc_dma_send_video_frame` in runtime;
+- verify the capture bytes at page42:`#C012` are nonzero and correspond to the BIOS writes;
+- verify the ATM receiver trace prints the same 80×25 text before screen application;
+- run the fresh emulator and confirm the final ATM text screen and attributes.
+
+
+
+## Stage 6 — BIOS INT 10h regression-test port audit
+
+The Project125 executable test was fetched from
+`0/neogs_sub/bios/bios_video.asm` and its dispatch was checked in
+`0/neogs_sub/main.asm` (`command_bios_video_test` →
+`bank_call_bios_int10_video_test`).
+
+The guest-side test image exercises:
+- INT 10h/AH=00h mode 03h initialization;
+- AH=02h cursor placement and AH=0Eh teletype;
+- 83 printable characters to force 80-column wrapping;
+- CR/LF handling;
+- a visible `P124 INT10 PASS` marker at row 2, column 0;
+- AH=03h cursor readback and AH=0Fh mode/column readback;
+- direct B8000h character and attribute readback at physical `000B:8140` and `000B:8141`.
+
+The success contract is:
+- guest AX after AH=0Fh = `5003h`;
+- guest DX after AH=03h = `020Fh`;
+- BDA cursor word at 0000:0450 = `020Fh`;
+- B8000h cell `#8140` = ASCII `P`;
+- B8000h cell `#8141` = `BIOS_VIDEO_ATTR`;
+- saved result = `1A10h`; failure result uses high byte `1Ch` and a stage code 1..7.
+
+### Why the P125 runner was not copied verbatim into Project130
+
+The Project125 command runner depends on `bank_call_bios_int10_video_test`,
+`bank_call_x86_real_execute`, `bank69_copy_image_to_guest`,
+`x86_real_bounds_enable`, and the resident result/status variables.
+The current Project130 `reference/project126/neogs_sub` source set has no
+matching Stage-3A command dispatcher or test-runner ABI exposed by its
+resident/overlay gate. The P125 test is therefore not a self-contained BIOS
+routine: copying its body into X86VID would introduce unresolved symbols and
+would bypass the Project130 overlay ownership model.
+
+### Porting contract for the Project130 test harness
+
+The test must be invoked by a Project130 resident test command, not by the
+BIOS overlay itself. Its adapter must:
+1. copy the same guest byte image to the same guest physical address using the
+   Project130 guest-memory API;
+2. initialize the 8086 register/stack state through the current CPU-state ABI;
+3. execute through the resident X86EXEC entry, allowing normal X86VID/X86VGA
+   overlay gates to run;
+4. validate AX, DX, BDA and B800 readback through the public memory/VGA gates;
+5. report stage-specific failure codes without direct NeoGS external I/O;
+6. only run after BIOS execution is inactive; place the guest image and test stack in the custom high-RAM region so conventional low-memory state is not overwritten.
+
+**Stage 6 status: test specification and expected values are verified against
+Project125; Project130 execution harness is not yet implemented.** No fake
+pass marker or disconnected test stub was added.
+
+## Runtime evidence and remaining acceptance tests
+
+The last supplied runtime log (SHA `b5e07186ede2b7f6db90f76453a8e84e3def795f`) showed:
+- BIOS INT 10h calls and teletype output were reached.
+- CPU writes to B800-family addresses occurred.
+- the captured character/attribute arrays were still zero.
+- the transported frame CRC matched, which only proved that the zero frame was transported intact.
+
+That log predates commit `872d4ab`, so it cannot validate the register-port fix.
+
+Required fresh runtime checks after rebuilding:
+1. BIOS VGA Sequencer and GC indexed writes update the expected register model.
+2. GC6 aperture selection resolves B8000h to the text aperture.
+3. First written character and attribute read back nonzero through the VGA read-text-cell API.
+4. Plane 0 and plane 1 capture each contain the expected 2000 bytes.
+5. DMA payload length is exactly 0x0FA0, with nonzero character and attribute regions.
+6. ATM presenter displays the expected characters and converted attributes.
+7. Scroll, cursor, CR/LF, wrap, and backspace behavior match Project125.
+8. A P125-derived executable BIOS regression test is added to Project130's native test harness.
+
+No build or runtime test is claimed by this source audit. A fresh `spectrum_out.txt` after the port-decode fix is required for runtime acceptance.
+
+## Overall status
+
+The VGA plane mapping and the bulk of the VGA read/addressing algorithms are carried over from Project125. Project130 has the necessary overlay and guest-memory adapters, and the BIOS VGA port-state bug was corrected. However, this is **not yet a completed full transfer**: the BIOS regression test is absent, some BIOS routines are adapted rather than line-identical, and the capture-to-DMA path still needs exact P125 comparison plus fresh runtime validation.

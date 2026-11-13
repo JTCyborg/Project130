@@ -1,0 +1,9 @@
+build/
+disk_A.trd
+*.map
+*.sym
+*.lst
+*.o
+*.rel
+*.ihx
+*.lk

@@ -1,0 +1,364 @@
+; ============================================================================
+; Project130 Nemo IDE / SMUC ATA PIO driver
+; Version 0.1.0 - read-only bring-up.
+; Port map and LBA28 transfer sequence follow Project127 p127_hdd.asm.
+; Host Z80 owns the physical IDE controller. No DMA, IRQ or paging changes.
+;
+; Public C API: p130_hdd_probe()
+; Public state: p130_hdd_present, p130_hdd_error, p130_hdd_last_status
+; Capacity: p130_hdd_capacity[4], ATA IDENTIFY words 60-61 little-endian.
+;
+; Select Master -> READY -> IDENTIFY DEVICE (ECh) -> 256 words
+; -> READ SECTORS (20h), LBA 63 -> validate BPB and 55AA.
+; This version never issues WRITE SECTORS or FLUSH.
+; ============================================================================
+
+SECTION CODE
+PUBLIC _p130_hdd_probe
+PUBLIC _p130_hdd_present
+PUBLIC _p130_hdd_sector_valid
+PUBLIC _p130_hdd_error
+PUBLIC _p130_hdd_last_status
+PUBLIC _p130_hdd_capacity
+PUBLIC _p130_hdd_read_sector_lba28
+PUBLIC _p130_hdd_read_sector_c
+PUBLIC _p130_hdd_lba
+PUBLIC _p130_hdd_sector
+
+P130_HDD_PORT_DATA_LO  EQU 00010h
+P130_HDD_PORT_DATA_HI  EQU 00011h
+P130_HDD_PORT_COUNT    EQU 00050h
+P130_HDD_PORT_LBA_LOW  EQU 00070h
+P130_HDD_PORT_LBA_MID  EQU 00090h
+P130_HDD_PORT_LBA_HIGH EQU 000B0h
+P130_HDD_PORT_DRIVE    EQU 000D0h
+P130_HDD_PORT_STATUS   EQU 000F0h
+P130_HDD_PORT_COMMAND  EQU 000F0h
+P130_HDD_PARTITION_LBA EQU 63
+
+_p130_hdd_probe:
+        push    af
+        push    bc
+        push    de
+        push    hl
+        push    ix
+        xor     a
+        ld      (_p130_hdd_present),a
+        ld      (_p130_hdd_sector_valid),a
+        ld      (_p130_hdd_error),a
+        ld      (_p130_hdd_last_status),a
+
+        ; Floating IDE bus reads FFh.
+        ld      bc,P130_HDD_PORT_STATUS
+        in      a,(c)
+        ld      (_p130_hdd_last_status),a
+        cp      0FFh
+        jp      z,p130_hdd_no_device
+
+        ; Select Master and wait for BSY=0, ERR=0, DRDY=1.
+        ld      a,0E0h
+        ld      bc,P130_HDD_PORT_DRIVE
+        out     (c),a
+        call    p130_hdd_wait_ready
+        jp      c,p130_hdd_not_ready
+
+        ; ATA IDENTIFY DEVICE.
+        xor     a
+        ld      bc,P130_HDD_PORT_COUNT
+        out     (c),a
+        ld      bc,P130_HDD_PORT_LBA_LOW
+        out     (c),a
+        ld      bc,P130_HDD_PORT_LBA_MID
+        out     (c),a
+        ld      bc,P130_HDD_PORT_LBA_HIGH
+        out     (c),a
+        ld      a,0E0h
+        ld      bc,P130_HDD_PORT_DRIVE
+        out     (c),a
+        ld      a,0ECh
+        ld      bc,P130_HDD_PORT_COMMAND
+        out     (c),a
+        call    p130_hdd_wait_drq
+        jp      c,p130_hdd_identify_failed
+
+        ; Non-zero LBA mid/high signatures indicate ATAPI, not ATA HDD.
+        ld      bc,P130_HDD_PORT_LBA_MID
+        in      a,(c)
+        or      a
+        jp      nz,p130_hdd_not_ata
+        ld      bc,P130_HDD_PORT_LBA_HIGH
+        in      a,(c)
+        or      a
+        jp      nz,p130_hdd_not_ata
+
+        ; Read 256 IDENTIFY words using the split low/high data ports.
+        ld      ix,p130_hdd_identify
+        ld      de,256
+p130_hdd_identify_loop:
+        ld      bc,P130_HDD_PORT_DATA_LO
+        in      a,(c)
+        ld      (ix+0),a
+        inc     ix
+        ld      bc,P130_HDD_PORT_DATA_HI
+        in      a,(c)
+        ld      (ix+0),a
+        inc     ix
+        dec     de
+        ld      a,d
+        or      e
+        jr      nz,p130_hdd_identify_loop
+        call    p130_hdd_wait_complete
+        jr      c,p130_hdd_identify_failed
+
+        ; LBA28 sector count = IDENTIFY words 60-61 (byte offsets 120..123).
+        ld      hl,p130_hdd_identify+120
+        ld      de,_p130_hdd_capacity
+        ld      bc,4
+        ldir
+
+        ; IDENTIFY succeeded: the ATA device is present even if no BPB exists.
+        ld      a,1
+        ld      (_p130_hdd_present),a
+
+        ; Read the first legacy partition boot sector (absolute LBA 63).
+        ld      hl,63
+        ld      (_p130_hdd_lba),hl
+        ld      hl,0
+        ld      (_p130_hdd_lba+2),hl
+        call    _p130_hdd_read_sector_lba28
+        jr      nc,p130_hdd_sector_read_ok
+        ld      a,7
+        ld      (_p130_hdd_error),a
+        jr      p130_hdd_probe_done
+p130_hdd_sector_read_ok:
+        ld      a,(_p130_hdd_sector+11)
+        or      a
+        jr      nz,p130_hdd_bad_bpb
+        ld      a,(_p130_hdd_sector+12)
+        cp      2
+        jr      nz,p130_hdd_bad_bpb
+        ld      a,(_p130_hdd_sector+510)
+        cp      055h
+        jr      nz,p130_hdd_bad_signature
+        ld      a,(_p130_hdd_sector+511)
+        cp      0AAh
+        jr      nz,p130_hdd_bad_signature
+        ld      a,1
+        ld      (_p130_hdd_sector_valid),a
+        xor     a
+        ld      (_p130_hdd_error),a
+        jr      p130_hdd_probe_done
+
+p130_hdd_no_device:
+        ld      a,1
+        ld      (_p130_hdd_error),a
+        jr      p130_hdd_probe_done
+p130_hdd_not_ready:
+        ld      a,2
+        ld      (_p130_hdd_error),a
+        jr      p130_hdd_probe_done
+p130_hdd_identify_failed:
+        ld      a,3
+        ld      (_p130_hdd_error),a
+        jr      p130_hdd_probe_done
+p130_hdd_not_ata:
+        ld      a,4
+        ld      (_p130_hdd_error),a
+        jr      p130_hdd_probe_done
+p130_hdd_bad_bpb:
+        ld      a,5
+        ld      (_p130_hdd_error),a
+        jr      p130_hdd_probe_done
+p130_hdd_bad_signature:
+        ld      a,6
+        ld      (_p130_hdd_error),a
+
+p130_hdd_probe_done:
+        pop     ix
+        pop     hl
+        pop     de
+        pop     bc
+        pop     af
+        ret
+
+; Read one 512-byte sector at the 28-bit LBA in _p130_hdd_lba.
+_p130_hdd_read_sector_lba28:
+        push    af
+        push    bc
+        push    de
+        push    hl
+        push    ix
+        ld      a,(_p130_hdd_lba+3)
+        and     0F0h
+        jr      nz,p130_hdd_read_lba_bad
+        call    p130_hdd_wait_ready
+        jr      c,p130_hdd_read_lba_error
+        ld      a,1
+        ld      bc,P130_HDD_PORT_COUNT
+        out     (c),a
+        ld      a,(_p130_hdd_lba)
+        ld      bc,P130_HDD_PORT_LBA_LOW
+        out     (c),a
+        ld      a,(_p130_hdd_lba+1)
+        ld      bc,P130_HDD_PORT_LBA_MID
+        out     (c),a
+        ld      a,(_p130_hdd_lba+2)
+        ld      bc,P130_HDD_PORT_LBA_HIGH
+        out     (c),a
+        ld      a,(_p130_hdd_lba+3)
+        and     00Fh
+        or      0E0h
+        ld      bc,P130_HDD_PORT_DRIVE
+        out     (c),a
+        ld      a,020h
+        ld      bc,P130_HDD_PORT_COMMAND
+        out     (c),a
+        call    p130_hdd_wait_drq
+        jr      c,p130_hdd_read_lba_error
+        ld      ix,_p130_hdd_sector
+        ld      de,256
+p130_hdd_sector_loop:
+        ld      bc,P130_HDD_PORT_DATA_LO
+        in      a,(c)
+        ld      (ix+0),a
+        inc     ix
+        ld      bc,P130_HDD_PORT_DATA_HI
+        in      a,(c)
+        ld      (ix+0),a
+        inc     ix
+        dec     de
+        ld      a,d
+        or      e
+        jr      nz,p130_hdd_sector_loop
+        call    p130_hdd_wait_complete
+        jr      c,p130_hdd_read_lba_error
+        xor     a
+        jr      p130_hdd_read_lba_done
+p130_hdd_read_lba_bad:
+        ld      a,2
+        jr      p130_hdd_read_lba_done
+p130_hdd_read_lba_error:
+        ld      a,3
+p130_hdd_read_lba_done:
+        ld      (_p130_hdd_error),a
+        pop     ix
+        pop     hl
+        pop     de
+        pop     bc
+        pop     af
+        ld      a,(_p130_hdd_error)
+        or      a
+        ret     z
+        scf
+        ret
+
+_p130_hdd_read_sector_c:
+        call    _p130_hdd_read_sector_lba28
+        ld      l,a
+        ld      h,0
+        ret
+
+; Bounded wait for DRDY=1, BSY=0, ERR=0.
+p130_hdd_wait_ready:
+        push    de
+        ld      de,0FFFFh
+p130_hdd_ready_loop:
+        ld      bc,P130_HDD_PORT_STATUS
+        in      a,(c)
+        ld      (_p130_hdd_last_status),a
+        cp      0FFh
+        jr      z,p130_hdd_ready_fail
+        or      a
+        jr      z,p130_hdd_ready_tick
+        bit     7,a
+        jr      nz,p130_hdd_ready_tick
+        bit     0,a
+        jr      nz,p130_hdd_ready_fail
+        bit     6,a
+        jr      nz,p130_hdd_ready_ok
+p130_hdd_ready_tick:
+        dec     de
+        ld      a,d
+        or      e
+        jr      nz,p130_hdd_ready_loop
+p130_hdd_ready_fail:
+        pop     de
+        scf
+        ret
+p130_hdd_ready_ok:
+        pop     de
+        or      a
+        ret
+
+; Bounded wait for BSY=0, ERR=0, DRQ=1.
+p130_hdd_wait_drq:
+        push    de
+        ld      de,0FFFFh
+p130_hdd_drq_loop:
+        ld      bc,P130_HDD_PORT_STATUS
+        in      a,(c)
+        ld      (_p130_hdd_last_status),a
+        cp      0FFh
+        jr      z,p130_hdd_drq_fail
+        or      a
+        jr      z,p130_hdd_drq_tick
+        bit     7,a
+        jr      nz,p130_hdd_drq_tick
+        bit     0,a
+        jr      nz,p130_hdd_drq_fail
+        bit     3,a
+        jr      nz,p130_hdd_drq_ok
+p130_hdd_drq_tick:
+        dec     de
+        ld      a,d
+        or      e
+        jr      nz,p130_hdd_drq_loop
+p130_hdd_drq_fail:
+        pop     de
+        scf
+        ret
+p130_hdd_drq_ok:
+        pop     de
+        or      a
+        ret
+
+; Bounded wait for BSY=0, ERR=0, DRQ=0 after data transfer.
+p130_hdd_wait_complete:
+        push    de
+        ld      de,0FFFFh
+p130_hdd_complete_loop:
+        ld      bc,P130_HDD_PORT_STATUS
+        in      a,(c)
+        ld      (_p130_hdd_last_status),a
+        cp      0FFh
+        jr      z,p130_hdd_complete_fail
+        or      a
+        jr      z,p130_hdd_complete_tick
+        bit     7,a
+        jr      nz,p130_hdd_complete_tick
+        bit     0,a
+        jr      nz,p130_hdd_complete_fail
+        bit     3,a
+        jr      z,p130_hdd_complete_ok
+p130_hdd_complete_tick:
+        dec     de
+        ld      a,d
+        or      e
+        jr      nz,p130_hdd_complete_loop
+p130_hdd_complete_fail:
+        pop     de
+        scf
+        ret
+p130_hdd_complete_ok:
+        pop     de
+        or      a
+        ret
+
+_p130_hdd_present:     db 0
+_p130_hdd_sector_valid: db 0
+_p130_hdd_error:       db 0
+_p130_hdd_last_status: db 0
+_p130_hdd_capacity:    db 0,0,0,0
+_p130_hdd_lba:         db 0,0,0,0
+p130_hdd_identify:     ds 512,0
+_p130_hdd_sector:      ds 512,0
