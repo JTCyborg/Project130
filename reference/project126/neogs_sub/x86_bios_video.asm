@@ -519,6 +519,7 @@ bios_int10_teletype:
         ld      a,BIOS_VIDEO_ATTR
         ld      (bios_video_attr),a
         call    bios_video_write_cell
+        call    bios_video_trace_teletype_cell
         ld      a,(bios_video_col)
         inc     a
         ld      (bios_video_col),a
@@ -556,6 +557,51 @@ bios_int10_teletype:
         ret
 .cursor_done:
         or      a
+        ret
+
+; Bounded proof that INT10 teletype stores reach the same VGA read path
+; used by the frame capture. Sample only the first eight printable chars.
+bios_video_trace_teletype_cell:
+        ld      a,(bios_video_trace_teletype_count)
+        cp      8
+        ret     nc
+        inc     a
+        ld      (bios_video_trace_teletype_count),a
+        push    af
+        push    bc
+        push    de
+        push    hl
+        ld      hl,bios_video_trace_teletype_prefix
+        call    p126_ngs_resident_log
+        ld      a,(bios_video_row)
+        call    x86_bios_trace_emit_hex8
+        ld      a,(bios_video_col)
+        call    x86_bios_trace_emit_hex8
+        ld      a,(bios_video_char)
+        call    x86_bios_trace_emit_hex8
+        ld      a,' '
+        out     (#EF),a
+        ld      a,(bios_video_row)
+        ld      b,a
+        ld      a,(bios_video_col)
+        ld      c,a
+        call    bios_video_calc_cell_offset
+        call    bios_video_read_offset
+        jr      c,.read_failed
+        call    x86_bios_trace_emit_hex8
+        jr      .trace_done
+.read_failed:
+        ld      a,'!'
+        out     (#EF),a
+.trace_done:
+        ld      a,13
+        out     (#EF),a
+        ld      a,10
+        out     (#EF),a
+        pop     hl
+        pop     de
+        pop     bc
+        pop     af
         ret
 
 bios_video_write_cell:
@@ -852,6 +898,8 @@ bios_video_trace_count: db 0
 bios_video_text_state_ready: db 0
 bios_video_trace_vga_write_once: db 0
 bios_video_trace_vga_write_msg: db "[BIOS VGA READBACK] CHAR/ATTR=",0
+bios_video_trace_teletype_prefix: db "[BIOS TTY] ROW/COL/WR/RD=",0
+bios_video_trace_teletype_count: db 0
 bios_video_readback_char: db 0
 bios_video_readback_attr: db 0
 
