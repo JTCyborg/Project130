@@ -880,8 +880,8 @@ x86_vga_dump_full_vram_once:
         ld      a,(x86_vga_full_dump_page)
         rlca
         rlca
-        ld      l,a
-        ld      h,0
+        ld      h,a
+        ld      l,0
         ld      (x86_vga_offset),hl
         ld      a,(x86_vga_full_dump_plane)
         call    x86_vga_map_plane
