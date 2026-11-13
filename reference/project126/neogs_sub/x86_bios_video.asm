@@ -589,6 +589,10 @@ bios_video_write_cell:
         ret
 
 bios_video_write_guest_byte:
+        ; Preserve the BIOS character/attribute before address translation.
+        ; x86_cpu_calc_phys clobbers A; without this save every B800 write
+        ; reached x86_guest_mem_write8 with stale bios_video_guest_value.
+        ld      (bios_video_guest_value),a
         ld      hl,#B800
         ld      de,(bios_video_guest_offset)
         call    x86_cpu_calc_phys
