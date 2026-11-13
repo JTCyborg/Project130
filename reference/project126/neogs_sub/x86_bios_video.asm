@@ -955,7 +955,9 @@ bios_int10_video_regression_test_impl:
         ld      (x86_reg_ss),hl
         ld      hl,#0100
         ld      (x86_reg_sp),hl
-        ld      hl,#0202
+        ; Keep IF clear during the deterministic regression so a pending
+        ; virtual PIC/PIT interrupt cannot divert the test program.
+        ld      hl,#0002
         ld      (x86_reg_flags),hl
         xor     a
         ld      (x86_halted),a
