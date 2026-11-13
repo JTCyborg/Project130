@@ -929,7 +929,7 @@ bios_int10_video_regression_test_impl:
         call    x86_cpu_calc_phys
         ld      a,(bios_int10_test_byte)
         call    x86_guest_mem_write8
-        jr      c,.fail_copy
+        jp      c,.fail_copy
         ld      hl,(bios_int10_test_dst)
         inc     hl
         ld      (bios_int10_test_dst),hl
