@@ -35,10 +35,19 @@ bios_int10_dispatch_impl:
 ; AH=00h, AL=03h.
 bios_int10_set_mode:
         ld      a,l
+        ; The XT BIOS in the current Project130 boot image requests mode 01h
+        ; (40-column color text). Project130's ATM presenter is 80x25, so
+        ; normalize both color-text BIOS modes 01h and 03h to the same
+        ; Project125-compatible 80x25 VGA text state and publish BDA mode 03h.
+        ; This is an explicit compatibility mapping, not an unsupported-mode
+        ; no-op: it ensures Sequencer odd/even and GC aperture registers are
+        ; initialized before the first B800 memory write.
+        cp      #01
+        jr      z,.supported_mode
         cp      BIOS_VIDEO_MODE
         jr      z,.supported_mode
-        ; Project125 treats unsupported mode requests as successful no-ops;
-        ; never leak CP's carry flag into the x86 execution fault path.
+        ; Other unsupported mode requests remain successful no-ops; never
+        ; leak CP's carry flag into the x86 execution fault path.
         or      a
         ret
 .supported_mode:
