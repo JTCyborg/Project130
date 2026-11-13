@@ -853,12 +853,17 @@ p126_ipc_debug_opcode_label: db " OP=",0
 ; to the ATM's active page7/page3 text memory. A NO_OPERATION/F2 response is
 ; a normal pending state until the BIOS programs a supported VGA text mode.
 p126_ipc_dma_receive_video_frame::
+        ; Stage markers isolate E4 command dispatch from reverse-DMA receive.
+        ld      hl,p126_ipc_video_trace_request
+        call    p126_ipc_port_string
         ld      a,(p126_atm_video_mode)
         cp      P126_ATM_VIDEO_MODE_RG6_TEXT80X25
         jp      nz,.video_bad_host_mode
         ld      a,P126_CMD_NGS_VIDEO_FRAME
         call    p126_ipc_send_command
         jp      c,.video_command_timeout
+        ld      hl,p126_ipc_video_trace_command_ok
+        call    p126_ipc_port_string
 
         di
         ld      hl,0
@@ -871,6 +876,8 @@ p126_ipc_dma_receive_video_frame::
         ld      a,P126_CMD_DMA_END
         call    p126_ipc_send_command
         jp      c,.video_dma_end_timeout
+        ld      hl,p126_ipc_video_trace_dma_ok
+        call    p126_ipc_port_string
 
         ld      hl,P126_IPC_DMA_RX_BUFFER
         ld      bc,P126_IPC_MAX_FRAME_SIZE
@@ -1002,6 +1009,9 @@ p126_ipc_dma_receive_video_frame::
         ret
 
 p126_ipc_video_failure_code: db 0
+p126_ipc_video_trace_request:    db "[VIDEO] E4 REQUEST",13,10,0
+p126_ipc_video_trace_command_ok: db "[VIDEO] E4 COMMAND ACK",13,10,0
+p126_ipc_video_trace_dma_ok:     db "[VIDEO] E4 DMA COMPLETE",13,10,0
 
 ; IPC status text belongs to the boot console only. Once BIOS is
 ; installed, keep the ATM text page exclusively owned by the guest VGA frame.
