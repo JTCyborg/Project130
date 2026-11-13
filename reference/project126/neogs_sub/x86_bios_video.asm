@@ -557,6 +557,14 @@ bios_video_write_cell:
         push    bc
         push    de
         push    hl
+        ; The executing BIOS may change Sequencer Map Mask after mode setup.
+        ; Text cells are interleaved character/attribute bytes in odd/even
+        ; mode, so both plane 0 and plane 1 must be enabled for every cell.
+        ld      hl,#03C4
+        ld      a,2
+        ld      d,3
+        call    bios_video_vga_index_data
+        jr      c,.write_return
         ld      hl,0
         ld      de,160
         ld      a,(bios_video_row)
