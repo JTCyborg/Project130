@@ -767,6 +767,13 @@ x86_vga_capture_text_frame_gate_impl:
         call    x86_vga_decode_aperture
         jp      c,.capture_restore_fail
 
+        ; Text mode uses VGA odd/even (chain-2) addressing: CPU A0 selects
+        ; plane 0/1 and the physical byte offset is aperture_offset >> 1.
+        ; Guest writes already apply this normalization before mapping a
+        ; plane; capture must do exactly the same or it reads page + 2
+        ; instead of the page containing the BIOS text bytes (page + 1).
+        call    x86_vga_offset_even
+
         ; Plane 0: exactly the B8000 character bytes selected by GC6.
         xor     a
         call    x86_vga_map_plane
