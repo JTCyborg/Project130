@@ -1192,6 +1192,73 @@ p126_ipc_log_dma_rx_transport_bad: db "[P130 IPC] DMA RX TRANSPORT FAILED STAGE=
 ; are sequential and the reverse test overwrites the request after TX.
 p126_ipc_dma_rx_buffer EQU P126_IPC_DMA_RX_BUFFER
 
+; Request the Project125-derived BIOS INT10 regression on NeoGS.
+; Requires BIOS POST complete and X86VID registered. The NeoGS handler
+; executes the guest program through the production X86EXEC/X86VID gates.
+; OUT: carry clear after the DMA service handler completes; carry set on error.
+p126_ipc_run_int10_regression::
+        ld      hl,#C000
+        ld      a,'P'
+        ld      (hl),a
+        inc     hl
+        ld      a,'1'
+        ld      (hl),a
+        inc     hl
+        ld      a,'2'
+        ld      (hl),a
+        inc     hl
+        ld      a,'6'
+        ld      (hl),a
+        inc     hl
+        ld      a,P126_IPC_MAJOR
+        ld      (hl),a
+        inc     hl
+        ld      a,P126_IPC_MINOR
+        ld      (hl),a
+        inc     hl
+        ld      a,P126_MSG_REQUEST
+        ld      (hl),a
+        inc     hl
+        ld      a,P126_SERVICE_DIAGNOSTICS
+        ld      (hl),a
+        inc     hl
+        ld      a,P126_OP_DIAGNOSTIC_INT10_TEST
+        ld      (hl),a
+        inc     hl
+        xor     a
+        ld      (hl),a
+        ld      hl,(p126_ipc_int10_test_sequence)
+        inc     hl
+        ld      (p126_ipc_int10_test_sequence),hl
+        ld      (#C00A),hl
+        ld      hl,0
+        ld      (#C00C),hl
+        xor     a
+        ld      (#C00E),a
+        ld      (#C00F),a
+        ; CRC-16/CCITT-FALSE covers header[0..15]; this request has no payload.
+        ld      hl,#FFFF
+        ld      de,#C000
+        ld      b,16
+.p126_int10_test_crc:
+        ld      a,(de)
+        inc     de
+        call    p126_ipc_crc16_update
+        djnz    .p126_int10_test_crc
+        ld      (#C010),hl
+        ld      hl,p126_ipc_int10_test_begin_log
+        call    p126_ipc_debug_string
+        ld      hl,#C000
+        ld      bc,P126_IPC_HEADER_SIZE
+        call    p126_ipc_dma_send_frame
+        ret     c
+        ld      hl,p126_ipc_int10_test_sent_log
+        jp      p126_ipc_debug_string
+
+p126_ipc_int10_test_sequence: dw 0
+p126_ipc_int10_test_begin_log: db "[P130 TEST] REQUEST INT10 REGRESSION",13,10,0
+p126_ipc_int10_test_sent_log: db "[P130 TEST] INT10 REGRESSION SERVICE COMPLETE",13,10,0
+
 ; Send one XT keyboard scan-code event to the NeoGS software device model.
 ; A=make/break scan code. The guest keyboard FIFO raises virtual IRQ1.
 p126_ipc_send_keyboard_event::
