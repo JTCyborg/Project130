@@ -866,6 +866,34 @@ x86_vga_capture_text_frame_gate_impl:
         call    x86_vga_decode_aperture
         jp      c,.capture_restore_fail
 
+        ; Snapshot the live VGA addressing state at the exact capture point.
+        ; This distinguishes an aperture/plane mapping fault from a frame
+        ; publication fault without changing the guest-visible VGA state.
+        push    af
+        push    hl
+        ld      hl,x86_vga_capture_state
+        call    p126_ngs_resident_log
+        ld      a,(x86_vga_gc_regs+5)
+        call    x86_vga_log_hex_byte
+        ld      a,(x86_vga_gc_regs+6)
+        call    x86_vga_log_hex_byte
+        ld      a,(x86_vga_seq_regs+4)
+        call    x86_vga_log_hex_byte
+        ld      a,(x86_vga_seq_regs+2)
+        call    x86_vga_log_hex_byte
+        ld      a,(x86_vga_gc_regs+4)
+        call    x86_vga_log_hex_byte
+        ld      a,(x86_vga_offset+1)
+        call    x86_vga_log_hex_byte
+        ld      a,(x86_vga_offset)
+        call    x86_vga_log_hex_byte
+        ld      a,13
+        out     (#EF),a
+        ld      a,10
+        out     (#EF),a
+        pop     hl
+        pop     af
+
         ; Text mode uses VGA odd/even (chain-2) addressing: CPU A0 selects
         ; plane 0/1 and the physical byte offset is aperture_offset >> 1.
         ; Guest writes already apply this normalization before mapping a
@@ -1097,6 +1125,7 @@ x86_vga_trace_hex_nibble:
         out     (#EF),a
         ret
 
+x86_vga_capture_state:   db "[VGA CAP] GC5/6 SEQ4/2 GC4 OFF=",0
 x86_vga_trace_chars:     db "[VGA CAP] PLANE0 STAGE=",0
 x86_vga_trace_attrs:     db "[VGA CAP] PLANE1 STAGE=",0
 x86_vga_trace_dma_chars: db "[VGA CAP] DMA CHARS=",0
