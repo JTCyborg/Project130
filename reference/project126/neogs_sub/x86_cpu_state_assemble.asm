@@ -321,3 +321,9 @@ x86_video_module_end:
     ASSERT x86_video_module_end-x86_video_module_start <= P126_IMAGE_X86VID_MAX_SIZE
     ASSERT bios_int10_dispatch_impl >= x86_video_module_start
     ASSERT bios_int10_dispatch_impl < x86_video_module_end
+    ASSERT bios_int10_teletype >= x86_video_module_start
+    ASSERT bios_int10_teletype < x86_video_module_end
+    ASSERT bios_video_write_cell >= x86_video_module_start
+    ASSERT bios_video_write_cell < x86_video_module_end
+    ASSERT bios_video_store_cursor >= x86_video_module_start
+    ASSERT bios_video_store_cursor < x86_video_module_end
