@@ -924,7 +924,7 @@ bios_int10_video_regression_test_impl:
         ld      (bios_int10_test_byte),a
         inc     hl
         ld      (bios_int10_test_src),hl
-        ld      hl,0
+        ld      hl,#C800
         ld      de,(bios_int10_test_dst)
         call    x86_cpu_calc_phys
         ld      a,(bios_int10_test_byte)
