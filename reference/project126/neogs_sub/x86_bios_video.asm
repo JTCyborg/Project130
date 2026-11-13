@@ -497,10 +497,8 @@ bios_int10_teletype:
         ld      a,(x86_reg_bx+1)
         or      a
         ret     nz
-        ; Some XT BIOS builds enter INT10 teletype without first requesting
-        ; mode 03h (their startup mode calls may be clone-specific).  The
-        ; text services below always target B800:0000, so establish the
-        ; matching VGA text aperture/plane state before the first character.
+        ; Project125 BIOS teletype state machine, adapted only for the
+        ; Project130 VGA overlay and guest-memory write interface.
         ld      a,(bios_video_text_state_ready)
         or      a
         jr      nz,.text_state_ready
@@ -511,11 +509,6 @@ bios_int10_teletype:
 .text_state_ready:
         ld      a,(x86_reg_ax)
         ld      (bios_video_char),a
-        ; Stage 1: exact BIOS INT 10h/AH=0Eh output stream to diagnostic #EF.
-        ; Keep this independent from the INT10 register trace and the later
-        ; VGA/frame/ATM dumps so a missing stage is immediately identifiable.
-        call    bios_video_trace_teletype_char
-        ld      a,(bios_video_char)
         or      a
         ret     z
         cp      13
@@ -525,9 +518,9 @@ bios_int10_teletype:
         cp      8
         jr      z,.bs
         cp      7
-        jr      z,.done
+        jr      z,.cursor_done
         cp      32
-        jr      c,.done
+        jr      c,.cursor_done
         ld      a,BIOS_VIDEO_ATTR
         ld      (bios_video_attr),a
         call    bios_video_write_cell
@@ -547,7 +540,7 @@ bios_int10_teletype:
 .bs:
         ld      a,(bios_video_col)
         or      a
-        jr      z,.done
+        jr      z,.cursor_done
         dec     a
         ld      (bios_video_col),a
         ld      a,32
@@ -568,31 +561,11 @@ bios_int10_teletype:
 .store:
         call    bios_video_store_cursor
         ret
-.done:
+.cursor_done:
         or      a
         ret
 
-; Emit the byte BIOS actually passed in AL to INT 10h/AH=0Eh.
-; CR/LF are preserved; other control bytes are represented as '.' in log.
-bios_video_trace_teletype_char:
-        push    af
-        push    bc
-        ld      a,(bios_video_char)
-        cp      13
-        jr      z,.trace_emit
-        cp      10
-        jr      z,.trace_emit
-        cp      32
-        jr      nc,.trace_emit
-        ld      a,'.'
-.trace_emit:
-        ld      bc,#00EF
-        out     (c),a
-        pop     bc
-        pop     af
-        ret
-
-; Character/attribute pair at B8000h + row*160 + column*2.
+; Project125 BIOS cell writer, using Project130's guest physical-memory API.
 bios_video_write_cell:
         push    bc
         push    de
@@ -615,58 +588,13 @@ bios_video_write_cell:
         add     hl,de
         ld      (bios_video_guest_offset),hl
         ld      a,(bios_video_char)
-        ld      (bios_video_guest_value),a
         call    bios_video_write_guest_byte
-        jr      c,.write_done
+        jr      c,.write_return
         ld      hl,(bios_video_guest_offset)
         inc     hl
         ld      (bios_video_guest_offset),hl
         ld      a,(bios_video_attr)
-        ld      (bios_video_guest_value),a
         call    bios_video_write_guest_byte
-.write_done:
-        jr      c,.write_return
-        ld      a,(bios_video_trace_vga_write_once)
-        or      a
-        jr      nz,.write_return
-        inc     a
-        ld      (bios_video_trace_vga_write_once),a
-        ; Read the just-written character/attribute pair back from the actual
-        ; VGA plane backing store before the frame DMA capture can obscure
-        ; whether the failure is on the write or capture side.
-        push    af
-        push    bc
-        push    de
-        push    hl
-        ld      hl,(bios_video_guest_offset)
-        dec     hl
-        ; Project125 calls the VGA reader directly because both routines are
-        ; resident in one image. In Project130 X86VID and X86VGA are separate
-        ; overlays: convert the B800 byte offset to a cell index and enter the
-        ; resident X86VGA wrapper so WIN2 is switched to page08 before CALL.
-        srl     h
-        rr      l
-        ld      a,#80
-        call    x86_vga_read_text_cell
-        ld      (bios_video_readback_char),a
-        ld      a,d
-        ld      (bios_video_readback_attr),a
-        ld      hl,bios_video_trace_vga_write_msg
-        call    bios_video_trace_string
-        ld      a,(bios_video_readback_char)
-        call    bios_video_trace_hex8
-        ld      a,' '
-        out     (#EF),a
-        ld      a,(bios_video_readback_attr)
-        call    bios_video_trace_hex8
-        ld      a,13
-        out     (#EF),a
-        ld      a,10
-        out     (#EF),a
-        pop     hl
-        pop     de
-        pop     bc
-        pop     af
 .write_return:
         pop     hl
         pop     de
