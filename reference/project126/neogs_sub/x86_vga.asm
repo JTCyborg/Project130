@@ -168,6 +168,43 @@ x86_vga_io_write8_impl:
         add     hl,de
         ld      a,(x86_io_value)
         ld      (hl),a
+        ; Trace the Sequencer Map Mask and Memory Mode writes. These two
+        ; registers decide whether B8000 bytes are routed to plane 0/1 or
+        ; broadcast to the enabled planes; the final register snapshot alone
+        ; cannot reveal the values active during each BIOS store.
+        ld      a,(x86_vga_seq_index)
+        cp      2
+        jr      z,.seq_trace
+        cp      4
+        jr      nz,.seq_trace_done
+.seq_trace:
+        push    af
+        push    bc
+        push    de
+        push    hl
+        ld      a,(x86_vga_seq_trace_count)
+        cp      24
+        jp      nc,.seq_trace_restore
+        inc     a
+        ld      (x86_vga_seq_trace_count),a
+        ld      hl,x86_vga_seq_trace_prefix
+        call    p126_ngs_resident_log
+        ld      a,(x86_vga_seq_index)
+        call    x86_vga_log_hex_byte
+        ld      a,' '
+        out     (#EF),a
+        ld      a,(x86_io_value)
+        call    x86_vga_log_hex_byte
+        ld      a,13
+        out     (#EF),a
+        ld      a,10
+        out     (#EF),a
+.seq_trace_restore:
+        pop     hl
+        pop     de
+        pop     bc
+        pop     af
+.seq_trace_done:
         or      a
         ret
 .gc_index:
@@ -1096,6 +1133,8 @@ x86_vga_log_hex_byte:
         and     #0F
         jp      x86_vga_trace_hex_nibble
 
+x86_vga_seq_trace_count: db 0
+x86_vga_seq_trace_prefix: db "[VGA SEQ] IDX/VAL=",0
 x86_vga_log_op:           db 0
 x86_vga_log_data:         db 0
 x86_vga_log_read_count:   db 0
