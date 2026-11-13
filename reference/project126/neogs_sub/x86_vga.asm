@@ -414,8 +414,71 @@ x86_vga_compare_one:
 
 x86_vga_mem_write8_impl:
         ld      (x86_mem_data),a
+        ; One-shot write-path trace. This distinguishes overlay entry,
+        ; aperture decode, GC write mode and physical-plane verify failures.
+        xor     a
+        ld      (x86_vga_write_diag_this),a
+        ld      a,(x86_vga_write_diag_once)
+        or      a
+        jr      nz,.write_diag_entry_done
+        inc     a
+        ld      (x86_vga_write_diag_once),a
+        ld      a,1
+        ld      (x86_vga_write_diag_this),a
+        push    af
+        push    bc
+        push    de
+        push    hl
+        ld      hl,x86_vga_write_diag_enter
+        call    p126_ngs_resident_log
+        ld      a,(x86_mem_addr+2)
+        call    x86_vga_log_hex_byte
+        ld      a,(x86_mem_addr+1)
+        call    x86_vga_log_hex_byte
+        ld      a,(x86_mem_addr)
+        call    x86_vga_log_hex_byte
+        ld      hl,x86_vga_write_diag_gc
+        call    p126_ngs_resident_log
+        ld      a,(x86_vga_gc_regs+5)
+        call    x86_vga_log_hex_byte
+        ld      a,(x86_vga_gc_regs+6)
+        call    x86_vga_log_hex_byte
+        ld      a,(x86_vga_seq_regs+4)
+        call    x86_vga_log_hex_byte
+        ld      a,13
+        out     (#EF),a
+        ld      a,10
+        out     (#EF),a
+        pop     hl
+        pop     de
+        pop     bc
+        pop     af
+.write_diag_entry_done:
         call    x86_vga_decode_aperture
-        ret     c
+        jr      nc,.write_aperture_ok
+        ld      a,(x86_vga_write_diag_this)
+        or      a
+        jr      z,.write_decode_return
+        push    af
+        push    hl
+        ld      hl,x86_vga_write_diag_decode_fail
+        call    p126_ngs_resident_log
+        pop     hl
+        pop     af
+.write_decode_return:
+        scf
+        ret
+.write_aperture_ok:
+        ld      a,(x86_vga_write_diag_this)
+        or      a
+        jr      z,.write_decode_logged
+        push    af
+        push    hl
+        ld      hl,x86_vga_write_diag_decode_ok
+        call    p126_ngs_resident_log
+        pop     hl
+        pop     af
+.write_decode_logged:
         ; Chain-2 writes use A0 to choose plane pair member and address>>1.
         ld      a,(x86_vga_seq_regs+4)
         bit     2,a
@@ -575,10 +638,30 @@ x86_vga_mem_write8_impl:
         or      a
         ret
 .write_verify_failed:
+        ld      a,(x86_vga_write_diag_this)
+        or      a
+        jr      z,.write_verify_return
+        push    af
+        push    hl
+        ld      hl,x86_vga_write_diag_verify_fail
+        call    p126_ngs_resident_log
+        pop     hl
+        pop     af
+.write_verify_return:
         ; Carry is the existing x86 guest-memory write fault ABI.
         scf
         ret
 .unsupported:
+        ld      a,(x86_vga_write_diag_this)
+        or      a
+        jr      z,.write_unsupported_return
+        push    af
+        push    hl
+        ld      hl,x86_vga_write_diag_unsupported
+        call    p126_ngs_resident_log
+        pop     hl
+        pop     af
+.write_unsupported_return:
         or      a
         ret
 
@@ -916,6 +999,15 @@ x86_vga_log_data:         db 0
 x86_vga_log_read_prefix:  db "[VGA READ] ADDR=",0
 x86_vga_log_write_prefix: db "[VGA WRITE] ADDR=",0
 x86_vga_log_data_prefix:  db " DATA=",0
+
+x86_vga_write_diag_enter:        db "[VGA WTRACE] ENTER P=",0
+x86_vga_write_diag_gc:           db " GC5/6/SEQ4=",0
+x86_vga_write_diag_decode_fail:  db "[VGA WTRACE] DECODE FAIL",13,10,0
+x86_vga_write_diag_decode_ok:    db "[VGA WTRACE] DECODE OK",13,10,0
+x86_vga_write_diag_verify_fail:  db "[VGA WTRACE] PLANE VERIFY FAIL",13,10,0
+x86_vga_write_diag_unsupported:  db "[VGA WTRACE] UNSUPPORTED WRITE MODE",13,10,0
+x86_vga_write_diag_once:         db 0
+x86_vga_write_diag_this:         db 0
 
 ; One-shot capture diagnostics: dump eight bytes from the supplied
 ; WIN1/WIN3 pointer without changing the caller's register state.
