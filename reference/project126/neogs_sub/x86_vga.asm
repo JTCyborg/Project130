@@ -223,6 +223,42 @@ x86_vga_io_write8_impl:
         add     hl,de
         ld      a,(x86_io_value)
         ld      (hl),a
+        ; Trace read-map, mode and memory-map register writes.
+        ld      a,(x86_vga_gc_index)
+        cp      4
+        jr      z,.gc_trace
+        cp      5
+        jr      z,.gc_trace
+        cp      6
+        jr      nz,.gc_trace_done
+.gc_trace:
+        push    af
+        push    bc
+        push    de
+        push    hl
+        ld      a,(x86_vga_gc_trace_count)
+        cp      24
+        jp      nc,.gc_trace_restore
+        inc     a
+        ld      (x86_vga_gc_trace_count),a
+        ld      hl,x86_vga_gc_trace_prefix
+        call    p126_ngs_resident_log
+        ld      a,(x86_vga_gc_index)
+        call    x86_vga_log_hex_byte
+        ld      a,' '
+        out     (#EF),a
+        ld      a,(x86_io_value)
+        call    x86_vga_log_hex_byte
+        ld      a,13
+        out     (#EF),a
+        ld      a,10
+        out     (#EF),a
+.gc_trace_restore:
+        pop     hl
+        pop     de
+        pop     bc
+        pop     af
+.gc_trace_done:
         or      a
         ret
 .misc:
@@ -1133,6 +1169,8 @@ x86_vga_log_hex_byte:
         and     #0F
         jp      x86_vga_trace_hex_nibble
 
+x86_vga_gc_trace_count: db 0
+x86_vga_gc_trace_prefix: db "[VGA GC] IDX/VAL=",0
 x86_vga_seq_trace_count: db 0
 x86_vga_seq_trace_prefix: db "[VGA SEQ] IDX/VAL=",0
 x86_vga_log_op:           db 0
