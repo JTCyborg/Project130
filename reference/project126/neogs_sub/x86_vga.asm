@@ -596,9 +596,9 @@ x86_vga_mem_write8_impl:
         ld      (x86_vga_plane),a
         cp      4
         jr      c,.plane_loop
-        ld      a,'W'
         ld      a,(x86_mem_data)
         ld      b,a
+        ld      a,'W'
         call    x86_vga_log_access
         or      a
         ret
@@ -631,9 +631,9 @@ x86_vga_mem_write8_impl:
         ld      (x86_vga_plane),a
         cp      4
         jr      c,.mode1_loop
-        ld      a,'W'
         ld      a,(x86_mem_data)
         ld      b,a
+        ld      a,'W'
         call    x86_vga_log_access
         or      a
         ret
