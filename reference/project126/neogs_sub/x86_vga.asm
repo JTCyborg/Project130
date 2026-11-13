@@ -534,7 +534,8 @@ x86_vga_mem_write8_impl:
         cp      4
         jr      c,.plane_loop
         ld      a,'W'
-        ld      b,(x86_mem_data)
+        ld      a,(x86_mem_data)
+        ld      b,a
         call    x86_vga_log_access
         or      a
         ret
@@ -568,7 +569,8 @@ x86_vga_mem_write8_impl:
         cp      4
         jr      c,.mode1_loop
         ld      a,'W'
-        ld      b,(x86_mem_data)
+        ld      a,(x86_mem_data)
+        ld      b,a
         call    x86_vga_log_access
         or      a
         ret
@@ -860,7 +862,8 @@ x86_vga_capture_text_frame_gate_impl:
 ; A=operation ('R'/'W'), B=data. The helper preserves all caller registers.
 x86_vga_log_access:
         ld      (x86_vga_log_op),a
-        ld      (x86_vga_log_data),b
+        ld      a,b
+        ld      (x86_vga_log_data),a
         push    af
         push    bc
         push    de
