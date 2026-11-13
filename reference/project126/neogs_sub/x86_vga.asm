@@ -878,8 +878,12 @@ x86_vga_dump_full_vram_once:
 .page:
         ; Map one 16 KiB physical page of this plane into WIN3.
         ld      a,(x86_vga_full_dump_page)
-        rlca
-        rlca
+        add     a,a
+        add     a,a
+        add     a,a
+        add     a,a
+        add     a,a
+        add     a,a
         ld      h,a
         ld      l,0
         ld      (x86_vga_offset),hl
