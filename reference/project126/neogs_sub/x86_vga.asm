@@ -765,7 +765,7 @@ x86_vga_capture_text_frame_gate_impl:
         ld      a,#0B
         ld      (x86_mem_addr+2),a
         call    x86_vga_decode_aperture
-        jr      c,.capture_restore_fail
+        jp      c,.capture_restore_fail
 
         ; Plane 0: exactly the B8000 character bytes selected by GC6.
         xor     a
@@ -789,12 +789,7 @@ x86_vga_capture_text_frame_gate_impl:
         ld      hl,X86_VGA_CAPTURE_STAGE+#07D0
         call    x86_vga_trace_dump8
 
-        ; Restore the guest memory address before returning to the CPU.
-        ld      hl,x86_vga_trace_attrs
-        call    p126_ngs_resident_log
-        ld      hl,X86_VGA_CAPTURE_STAGE+#07D0
-        call    x86_vga_trace_dump8
-
+        ; Publish the captured text planes in the page-42 DMA frame.
         ; Restore the normal page-42 DMA producer mapping and publish the
         ; exact Project125 payload layout at the P126 frame payload offset.
         ld      a,P126_NGS_DMA_PAGE
