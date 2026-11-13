@@ -169,6 +169,59 @@ The source-level checks now establish the byte-layout equivalence. They do not e
 - run the fresh emulator and confirm the final ATM text screen and attributes.
 
 
+
+## Stage 6 — BIOS INT 10h regression-test port audit
+
+The Project125 executable test was fetched from
+`0/neogs_sub/bios/bios_video.asm` and its dispatch was checked in
+`0/neogs_sub/main.asm` (`command_bios_video_test` →
+`bank_call_bios_int10_video_test`).
+
+The guest-side test image exercises:
+- INT 10h/AH=00h mode 03h initialization;
+- AH=02h cursor placement and AH=0Eh teletype;
+- 83 printable characters to force 80-column wrapping;
+- CR/LF handling;
+- a visible `P124 INT10 PASS` marker at row 2, column 0;
+- AH=03h cursor readback and AH=0Fh mode/column readback;
+- direct B8000h character and attribute readback at physical `000B:8140` and `000B:8141`.
+
+The success contract is:
+- guest AX after AH=0Fh = `5003h`;
+- guest DX after AH=03h = `020Fh`;
+- BDA cursor word at 0000:0450 = `020Fh`;
+- B8000h cell `#8140` = ASCII `P`;
+- B8000h cell `#8141` = `BIOS_VIDEO_ATTR`;
+- saved result = `1A10h`; failure result uses high byte `1Ch` and a stage code 1..7.
+
+### Why the test has not been copied verbatim into Project130
+
+The Project125 command runner depends on `bank_call_bios_int10_video_test`,
+`bank_call_x86_real_execute`, `bank69_copy_image_to_guest`,
+`x86_real_bounds_enable`, and the resident result/status variables.
+The current Project130 `reference/project126/neogs_sub` source set has no
+matching Stage-3A command dispatcher or test-runner ABI exposed by its
+resident/overlay gate. The P125 test is therefore not a self-contained BIOS
+routine: copying its body into X86VID would introduce unresolved symbols and
+would bypass the Project130 overlay ownership model.
+
+### Porting contract for the Project130 test harness
+
+The test must be invoked by a Project130 resident test command, not by the
+BIOS overlay itself. Its adapter must:
+1. copy the same guest byte image to the same guest physical address using the
+   Project130 guest-memory API;
+2. initialize the 8086 register/stack state through the current CPU-state ABI;
+3. execute through the resident X86EXEC entry, allowing normal X86VID/X86VGA
+   overlay gates to run;
+4. validate AX, DX, BDA and B800 readback through the public memory/VGA gates;
+5. report stage-specific failure codes without direct NeoGS external I/O;
+6. restore the normal BIOS execution state after the test.
+
+**Stage 6 status: test specification and expected values are verified against
+Project125; Project130 execution harness is not yet implemented.** No fake
+pass marker or disconnected test stub was added.
+
 ## Runtime evidence and remaining acceptance tests
 
 The last supplied runtime log (SHA `b5e07186ede2b7f6db90f76453a8e84e3def795f`) showed:
