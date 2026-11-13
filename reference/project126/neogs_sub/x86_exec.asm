@@ -3717,35 +3717,64 @@ x86_exec_string:
         or      a
         jp      z,.string_single
 
-        ; PCem sets the initial ZF state for REPE/REPNE even when CX=0.
-        ; The first comparison then replaces it with the actual compare result.
+        ; A yielded CMPS/SCAS resumes with the flags from its last compare.
+        ; Match both opcode and original prefix IP before preserving that ZF.
         ld      a,(x86_exec_string_opcode)
         cp      #A6
-        jr      z,.string_compare_initial
+        jr      z,.string_compare_resume_check
         cp      #A7
-        jr      z,.string_compare_initial
+        jr      z,.string_compare_resume_check
         cp      #AE
-        jr      z,.string_compare_initial
+        jr      z,.string_compare_resume_check
         cp      #AF
         jr      nz,.string_check_count
+.string_compare_resume_check:
+        ld      a,(x86_exec_string_resume)
+        or      a
+        jr      z,.string_compare_initial
+        ld      hl,(x86_exec_instruction_start_ip)
+        ld      de,(x86_exec_string_resume_ip)
+        or      a
+        sbc     hl,de
+        jr      nz,.string_compare_new
+        ld      a,(x86_exec_string_opcode)
+        ld      b,a
+        ld      a,(x86_exec_string_resume_opcode)
+        cp      b
+        jr      z,.string_check_count
+.string_compare_new:
+        xor     a
+        ld      (x86_exec_string_resume),a
 .string_compare_initial:
+        ; PCem initializes ZF for REPE/REPNE even when CX=0.
         ld      a,(x86_exec_string_rep)
         cp      2
         jr      nz,.string_initial_repne
         ld      hl,(x86_reg_flags)
         set     6,l
         ld      (x86_reg_flags),hl
-        jr      .string_check_count
+        jr      .string_compare_mark_resume
 .string_initial_repne:
         ld      hl,(x86_reg_flags)
         res     6,l
         ld      (x86_reg_flags),hl
+.string_compare_mark_resume:
+        ld      hl,(x86_exec_instruction_start_ip)
+        ld      (x86_exec_string_resume_ip),hl
+        ld      a,(x86_exec_string_opcode)
+        ld      (x86_exec_string_resume_opcode),a
+        ld      a,1
+        ld      (x86_exec_string_resume),a
 
 .string_check_count:
         ld      hl,(x86_reg_cx)
         ld      a,h
         or      l
-        ret     z
+        jr      nz,.string_count_nonzero
+        xor     a
+        ld      (x86_exec_string_resume),a
+        ret
+.string_count_nonzero:
 
         ; CMPS/SCAS evaluate ZF after every element. Unconditional
         ; MOVS/STOS/LODS execute in 256-element quanta, then yield at the
@@ -3788,13 +3817,22 @@ x86_exec_string:
         ld      (x86_exec_string_remaining),a
 .string_compare_loop:
         call    x86_exec_string_iteration
-        ret     c
+        jr      nc,.string_compare_iteration_ok
+        xor     a
+        ld      (x86_exec_string_resume),a
+        scf
+        ret
+.string_compare_iteration_ok:
         ld      hl,(x86_reg_cx)
         dec     hl
         ld      (x86_reg_cx),hl
         ld      a,h
         or      l
-        ret     z
+        jr      nz,.string_compare_count_nonzero
+        xor     a
+        ld      (x86_exec_string_resume),a
+        ret
+.string_compare_count_nonzero:
 
         ; Test REPE/REPNE after each comparison, exactly as the 8086 does.
         ; Keep the comparisons inside this handler to avoid a full decode /
@@ -3804,12 +3842,17 @@ x86_exec_string:
         jr      nz,.string_compare_repne
         ld      hl,(x86_reg_flags)
         bit     6,l
-        ret     z
-        jr      .string_compare_continue
+        jr      nz,.string_compare_continue
+        xor     a
+        ld      (x86_exec_string_resume),a
+        ret
 .string_compare_repne:
         ld      hl,(x86_reg_flags)
         bit     6,l
-        ret     nz
+        jr      z,.string_compare_continue
+        xor     a
+        ld      (x86_exec_string_resume),a
+        ret
 
 .string_compare_continue:
         ld      a,(x86_exec_string_remaining)
@@ -4868,6 +4911,9 @@ x86_exec_overlay_probe:
 ; Diagnostic snapshot of the last successfully decoded EA ptr16:16.
 x86_exec_far_jmp_target_ip: dw 0
 x86_exec_far_jmp_target_cs: dw 0
+x86_exec_string_resume: db 0
+x86_exec_string_resume_opcode: db 0
+x86_exec_string_resume_ip: dw 0
 x86_exec_far_jmp_target_valid: db 0
 x86_exec_build_id_emitted: db 0
 x86_exec_build_id_text: db "[P130 X86EXEC BUILD=FEDEC-20261112-A]",13,10,0
