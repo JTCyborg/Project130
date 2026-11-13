@@ -736,6 +736,8 @@ x86_vga_rotated:         db 0
 ; Project130 overlay ABI adapter: reset the Project125 VGA core.
 x86_vga_reset_impl:
         xor     a
+        ld      (x86_vga_log_read_count),a
+        ld      (x86_vga_log_write_count),a
         ld      (x86_vga_seq_index),a
         ld      (x86_vga_gc_index),a
         ld      (x86_vga_attr_index),a
@@ -941,24 +943,35 @@ x86_vga_capture_text_frame_gate_impl:
         ret
 
 
-; Log every guest VGA memory transaction: physical cell address and byte.
-; A=operation ('R'/'W'), B=data. The helper preserves all caller registers.
+; Bounded VGA transaction trace. Emit only the first 16 reads and
+; first 16 writes per VGA reset; never throttle or skip the actual memory
+; operation. A=operation ('R'/'W'), B=data. Preserve caller registers/flags.
 x86_vga_log_access:
-        ld      (x86_vga_log_op),a
-        ld      a,b
-        ld      (x86_vga_log_data),a
         push    af
         push    bc
         push    de
         push    hl
+        ld      (x86_vga_log_op),a
+        ld      a,b
+        ld      (x86_vga_log_data),a
         ld      a,(x86_vga_log_op)
         cp      'W'
-        jr      z,.write
+        jr      z,.write_limit
+        ld      a,(x86_vga_log_read_count)
+        cp      16
+        jr      nc,.done
+        inc     a
+        ld      (x86_vga_log_read_count),a
         ld      hl,x86_vga_log_read_prefix
-        jr      .prefix
-.write:
+        jr      .emit
+.write_limit:
+        ld      a,(x86_vga_log_write_count)
+        cp      16
+        jr      nc,.done
+        inc     a
+        ld      (x86_vga_log_write_count),a
         ld      hl,x86_vga_log_write_prefix
-.prefix:
+.emit:
         call    p126_ngs_resident_log
         ld      a,(x86_mem_addr+2)
         call    x86_vga_log_hex_byte
@@ -976,6 +989,7 @@ x86_vga_log_access:
         out     (#EF),a
         ld      a,10
         out     (#EF),a
+.done:
         pop     hl
         pop     de
         pop     bc
@@ -996,6 +1010,8 @@ x86_vga_log_hex_byte:
 
 x86_vga_log_op:           db 0
 x86_vga_log_data:         db 0
+x86_vga_log_read_count:   db 0
+x86_vga_log_write_count:  db 0
 x86_vga_log_read_prefix:  db "[VGA READ] ADDR=",0
 x86_vga_log_write_prefix: db "[VGA WRITE] ADDR=",0
 x86_vga_log_data_prefix:  db " DATA=",0
