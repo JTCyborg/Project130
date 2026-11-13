@@ -633,8 +633,14 @@ bios_video_write_cell:
         push    hl
         ld      hl,(bios_video_guest_offset)
         dec     hl
+        ; Project125 calls the VGA reader directly because both routines are
+        ; resident in one image. In Project130 X86VID and X86VGA are separate
+        ; overlays: convert the B800 byte offset to a cell index and enter the
+        ; resident X86VGA wrapper so WIN2 is switched to page08 before CALL.
+        srl     h
+        rr      l
         ld      a,#80
-        call    x86_vga_read_text_cell_impl
+        call    x86_vga_read_text_cell
         ld      (bios_video_readback_char),a
         ld      a,d
         ld      (bios_video_readback_attr),a
