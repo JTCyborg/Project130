@@ -596,6 +596,34 @@ bios_video_write_guest_byte:
         ld      hl,#B800
         ld      de,(bios_video_guest_offset)
         call    x86_cpu_calc_phys
+        ; Trace the classifier result before dispatch. This distinguishes a
+        ; stale/mismatched X86CORE image from a VGA aperture decode failure.
+        ld      a,(bios_video_trace_mem_class_once)
+        or      a
+        jr      nz,.class_trace_done
+        inc     a
+        ld      (bios_video_trace_mem_class_once),a
+        push    bc
+        push    de
+        push    hl
+        call    x86_mem_classify
+        ld      (bios_video_trace_mem_class_region),a
+        ld      hl,bios_video_trace_mem_class_prefix
+        call    p126_ngs_resident_log
+        ld      a,(bios_video_trace_mem_class_region)
+        call    x86_bios_trace_emit_hex8
+        ld      a,' '
+        out     (#EF),a
+        ld      a,(x86_vga_gc_regs+6)
+        call    x86_bios_trace_emit_hex8
+        ld      a,13
+        out     (#EF),a
+        ld      a,10
+        out     (#EF),a
+        pop     hl
+        pop     de
+        pop     bc
+.class_trace_done:
         ; One-shot boundary trace: prove the exact physical B800 address and
         ; value reaching the unified memory dispatcher, then preserve its CF.
         ld      a,(bios_video_trace_mem_write_once)
@@ -795,6 +823,10 @@ bios_video_trace_nibble:
 
 bios_video_trace_prefix:
         db "[BIOS INT10] AX BX CX DX CS:IP=",0
+bios_video_trace_mem_class_prefix:
+        db "[BIOS VGA CLASS] REGION/GC6=",0
+bios_video_trace_mem_class_once: db 0
+bios_video_trace_mem_class_region: db 0
 bios_video_trace_mem_write_prefix:
         db "[BIOS VGA WRITE] PHYS/DATA=",0
 bios_video_trace_mem_result_prefix:
