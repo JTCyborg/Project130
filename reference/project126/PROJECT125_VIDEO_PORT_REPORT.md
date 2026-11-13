@@ -102,7 +102,7 @@ Project130 adds `x86_vga_capture_text_frame_gate_impl` and the X86VID conversion
 
 The ATM presenter converts IBM VGA attribute bits to ATM RG6 attributes and writes the received 80x25 cells. Its attribute mapping was previously compared against the Project125 `video_transfer.asm` mapping and found equivalent; the ATM cell writer was also found equivalent at the algorithm level.
 
-**Stage 5 status: not yet proven end-to-end equivalent.** The exact Project125 reverse-DMA capture/command handler still needs a complete side-by-side comparison with Project130's plane capture and IPC payload assembly. The staging workspace safety and exact DMA payload offsets also need a final audit.
+**Stage 5 status: logical payload layout is source-verified; runtime remains unverified.** The exact Project125 reverse-DMA and presenter contracts are compared below. Project130 intentionally changes the transport envelope and transfers a fixed 16 KiB IPC frame rather than the raw 4000-byte Project125 payload.
 
 
 ### Stage 5A — Exact Project125 reverse-DMA contract
@@ -136,15 +136,37 @@ Project125's `p125_video_present_text` consumes:
 
 Project130's converter advertises the same 80×25 text payload size (`0x0FA0`) and its ATM presenter consumes the ABI payload after the 18-byte header. This confirms the logical frame layout, but does not by itself prove the complete reverse-DMA sender/receiver handshake or screen contents. The presenter also includes the Project125-compatible attribute conversion and cell mapping previously compared; runtime acceptance remains pending.
 
+
+### Stage 5D — Project130 IPC sender/receiver and ATM renderer
+
+The Project130 sender was inspected in `reference/project126/neogs_sub/p126_ipc.asm`:
+- `p126_ngs_ipc_dma_send_video_frame` writes the VIDEO response header at page42:`#C000`.
+- The header declares payload length `#3FEE` (16,366 bytes); the first 4,000 payload bytes are the captured text frame at `#C012..#CFB1`.
+- It zero-fills the remainder of the payload, computes CRC-16/CCITT-FALSE over header bytes 0..15 plus the complete declared payload, and stores the CRC in header bytes 16..17.
+- `p126_ngs_ipc_dma_send_staged_frame` arms DMA from physical `108000h`, clears CBIT, waits for the ATM host to finish, then verifies the final DMA address is `10C001h`: one dummy aperture read plus exactly `4000h` frame bytes.
+
+The ATM receiver was inspected in `reference/project126/atm_host/neogs_ipc.asm`:
+- `p126_ipc_dma_receive_video_frame` issues `P126_CMD_NGS_VIDEO_FRAME`, disables interrupts, performs the discarded read at address zero, copies exactly `P126_IPC_MAX_FRAME_SIZE` (16 KiB) to `#C000`, and sends `P126_CMD_DMA_END`.
+- It validates the complete IPC frame CRC, then checks VIDEO service, VIDEO_FRAME operation, and zero response status before rendering.
+- Deferred `NO_OPERATION`/F2 responses are treated as pending while the BIOS has not initialized a supported VGA text state.
+
+The ATM renderer was inspected in `reference/project126/atm_host/p126_screen_console.asm`:
+- character pointer = receive buffer + 18-byte IPC header;
+- attribute pointer = receive buffer + 18 + 2000;
+- loops exactly 25 × 80 cells;
+- maps IBM VGA attributes using the same bit conversion as Project125;
+- writes each character/attribute pair through the ATM page7/page3 text-plane writer;
+- restores the host page mapping after every cell write.
+
+**Source-level conclusion:** the Project130 IPC envelope and fixed 16 KiB DMA exchange preserve the Project125 4000-byte character/attribute payload layout. The dummy-read and interrupt-disable handshake is also retained. The remaining unknown is runtime behavior, not an identified source-level payload-offset mismatch.
+
 ### Stage 5C — Remaining transport verification
 
 The source-level checks now establish the byte-layout equivalence. They do not establish runtime correctness. The remaining source/runtime boundary checks are:
-- verify the command dispatcher selects the video-frame response path after capture;
-- verify the staged IPC header declares exactly `0x0FA0` payload bytes and total frame size `18 + 0x0FA0`;
-- verify the sender DMA starts at physical page42 base and transfers the declared complete frame;
-- verify the ATM receiver strips the header and presents payload offsets 0 and `0x07D0`;
-- verify the host's reverse-DMA dummy-read/interrupt/CBIT sequencing is correctly represented by the Project130 transport implementation;
-- run the fresh emulator and confirm nonzero character and attribute data at both ends.
+- verify the BIOS-triggered video command reaches `p126_ngs_ipc_dma_send_video_frame` in runtime;
+- verify the capture bytes at page42:`#C012` are nonzero and correspond to the BIOS writes;
+- verify the ATM receiver trace prints the same 80×25 text before screen application;
+- run the fresh emulator and confirm the final ATM text screen and attributes.
 
 
 ## Runtime evidence and remaining acceptance tests
