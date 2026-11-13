@@ -1655,8 +1655,44 @@ x86_guest_mem_write8:
         ld      a,(x86_mem_data)
         jp      x86_guest_ram_write8
 .vram:
+        ; One-shot proof that CPU stores reach the A0000-BFFFF VGA route.
+        ; Keep this at the common dispatcher boundary: it distinguishes a
+        ; missing CPU store call from a failure inside the VGA device model.
+        ld      a,(x86_mem_vga_store_diag_once)
+        or      a
+        jr      nz,.vram_dispatch
+        inc     a
+        ld      (x86_mem_vga_store_diag_once),a
+        push    af
+        push    bc
+        push    de
+        push    hl
+        ld      hl,x86_mem_vga_store_prefix
+        call    p126_ngs_resident_log
+        ld      a,(x86_phys_addr+2)
+        call    x86_bios_trace_emit_hex8
+        ld      a,(x86_phys_addr+1)
+        call    x86_bios_trace_emit_hex8
+        ld      a,(x86_phys_addr)
+        call    x86_bios_trace_emit_hex8
+        ld      a,' '
+        out     (#EF),a
+        ld      a,(x86_mem_data)
+        call    x86_bios_trace_emit_hex8
+        ld      a,13
+        out     (#EF),a
+        ld      a,10
+        out     (#EF),a
+        pop     hl
+        pop     de
+        pop     bc
+        pop     af
+.vram_dispatch:
         ld      a,(x86_mem_data)
         jp      x86_vga_mem_write8
+
+x86_mem_vga_store_prefix: db "[X86 VGA STORE] P=",0
+x86_mem_vga_store_diag_once: db 0
 
 ; Generic WIN3 selector. IN A=page bias; OUT HL=C000h|(guest_address&3FFFh).
 ; Clobbers AF, BC, HL. The caller's page bias is consumed here.
