@@ -738,6 +738,8 @@ x86_vga_reset_impl:
         xor     a
         ld      (x86_vga_log_read_count),a
         ld      (x86_vga_log_write_count),a
+        ld      (x86_vga_log_text_read_count),a
+        ld      (x86_vga_log_text_write_count),a
         ld      (x86_vga_seq_index),a
         ld      (x86_vga_gc_index),a
         ld      (x86_vga_attr_index),a
@@ -954,6 +956,33 @@ x86_vga_log_access:
         ld      (x86_vga_log_op),a
         ld      a,b
         ld      (x86_vga_log_data),a
+        ; Keep an independent sample budget for B8000 text memory. The
+        ; initial A0000 graphics probe must not consume the text trace quota.
+        ld      a,(x86_mem_addr+2)
+        cp      #0B
+        jr      nz,.non_text
+        ld      a,(x86_mem_addr+1)
+        bit     7,a
+        jr      z,.non_text
+        ld      a,(x86_vga_log_op)
+        cp      'W'
+        jr      z,.text_write_limit
+        ld      a,(x86_vga_log_text_read_count)
+        cp      16
+        jr      nc,.done
+        inc     a
+        ld      (x86_vga_log_text_read_count),a
+        ld      hl,x86_vga_log_read_prefix
+        jr      .emit
+.text_write_limit:
+        ld      a,(x86_vga_log_text_write_count)
+        cp      16
+        jr      nc,.done
+        inc     a
+        ld      (x86_vga_log_text_write_count),a
+        ld      hl,x86_vga_log_write_prefix
+        jr      .emit
+.non_text:
         ld      a,(x86_vga_log_op)
         cp      'W'
         jr      z,.write_limit
@@ -1012,6 +1041,8 @@ x86_vga_log_op:           db 0
 x86_vga_log_data:         db 0
 x86_vga_log_read_count:   db 0
 x86_vga_log_write_count:  db 0
+x86_vga_log_text_read_count:  db 0
+x86_vga_log_text_write_count: db 0
 x86_vga_log_read_prefix:  db "[VGA READ] ADDR=",0
 x86_vga_log_write_prefix: db "[VGA WRITE] ADDR=",0
 x86_vga_log_data_prefix:  db " DATA=",0
