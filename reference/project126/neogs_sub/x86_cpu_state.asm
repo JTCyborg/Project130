@@ -352,9 +352,28 @@ x86_bios_startup_trace:
         call    x86_bios_trace_log_registers
         pop     hl
 .trace_cs_expected:
-        ; Live progress for the BIOS REP STOSW RAM-clear phase. Emit one
-        ; update per 256 words and a final 100% line when CX reaches zero.
+        ; REP STOSW progress is diagnostic only. Do not call the tracker
+        ; for every guest instruction: that added several Z80 instructions
+        ; to the hottest path, including every RAM-test instruction. Enter
+        ; it only for BIOS STOSW, once at start and then every 256 words.
+        ld      a,(x86_exec_opcode)
+        cp      #AB
+        jr      nz,.rep_progress_done
+        ld      a,(x86_reg_cs)
+        or      a
+        jr      nz,.rep_progress_done
+        ld      a,(x86_reg_cs+1)
+        cp      #F0
+        jr      nz,.rep_progress_done
+        ld      a,(x86_bios_rep_stosw_active)
+        or      a
+        jr      z,.rep_progress_call
+        ld      a,(x86_reg_cx)
+        or      a
+        jr      nz,.rep_progress_done
+.rep_progress_call:
         call    x86_bios_rep_stosw_progress
+.rep_progress_done:
         ld      hl,(x86_bios_trace_executed)
         inc     hl
         ld      (x86_bios_trace_executed),hl
